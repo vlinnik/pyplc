@@ -51,8 +51,12 @@ if __name__!='__main__':
                         ch_num = int(info[-1])
                         s = __plc.subscribe( f'plc.S{slot:02}C{ch_num:02}',info[0] )
                         ch = eval( f'plc.slots[{info[-2]}].channel({info[-1]})' )
+                        plc.declare(ch,info[0])
                         ch.bind(s)  #изменения канала ввода/вывода производит запись в Subscription
-                        s.write = ch #а при получении нового значения от сервера происходит запись в Channel
+                        if ch.rw:
+                            s.write = ch #а при получении нового значения от сервера происходит запись в Channel
+                        else:
+                            s.write = ch.force
                         vars = vars+1
                 except Exception as e:
                     print(e)

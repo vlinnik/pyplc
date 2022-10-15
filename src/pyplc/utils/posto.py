@@ -18,11 +18,27 @@ class Subscription():
         self.remote_id = remote_id
         self.filed = False
         self.write = None   #callable method for writing new value from client
+        self.bound = None  
+        self.__sinks = []
+
+    def __str__(self)->str:
+        return f'<Subscription id={id(self)}, item={self.item}, value={self.__value}>'
+
+    def cleanup(self):
+        if self.bound:
+            self.bound[1].unbind( self.bound[0], self )
+            self.bound = None
+            self.write = None
 
     def changed(self,value):
         self.__value = value
         self.modified = True
         self.ts = time.time_ns()
+        for sink in self.__sinks:
+            try:
+                sink( value )
+            except Exception as e:
+                print(f'Notification of subscription failed: {e}')
  
     def __call__(self, *args, **kwds) :
         if len(args)==0:
@@ -31,6 +47,14 @@ class Subscription():
             value = args[0]
             if self.__value!=value:
                 self.changed( value )
+
+    def bind(self,__notify: callable):
+        if __notify not in self.__sinks:
+            self.__sinks.append(__notify)
+
+    def unbind(self,__notify: callable):
+        if __notify in self.__sinks:
+            self.__sinks.remove(__notify)
 """
 Cервер "Почта" доступа к переменным на порте 9003. 
 Пример использования:
@@ -44,21 +68,22 @@ Cервер "Почта" доступа к переменным на порте 
 class POSTO(TCPServer):
     def __init__(self,port=9003):
         self.ctx = None
-        self.subscriptions ={ }
-        self.belongs = { }
+        self.subscriptions ={ } 
+        self.belongs = { }      #map subscription to fileno of socket
         self.modified = []
         self.keepalive = time.time()
         super().__init__(port)
 
     def connected(self,sock:socket.socket):
-        #print(f'connected client {sock}')
+        print(f'POSTO client {sock.fileno()} online')
         pass
 
     def disconnected(self,sock: socket.socket):
-        #print(f'disconnected client {sock}')
         offline = list( filter( lambda x: self.belongs[x]==sock.fileno(), self.belongs ) )
+        print(f'POSTO client {sock.fileno()} offline. available/gone {len(self.subscriptions)}/{len(offline)} subscriptions')
         for s in offline:
             self.unsubscribe(id(s))
+            s.cleanup( )
 
     def subscribe(self,item:str,remote_id:int):
         path = item.split('.')
@@ -68,6 +93,7 @@ class POSTO(TCPServer):
 
                 if source and hasattr(source,'bind') and not isinstance(source,type):
                     s = Subscription( str(item), remote_id )
+                    s.bound = (path[-1],source)
                     s.write = source.bind(path[-1],s )
                     self.subscriptions[id(s)] = s
                     return s
@@ -199,29 +225,41 @@ class Subscriber(TCPClient):
         альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
         """
         def __init__(self,parent):
-            self.vars = parent.items
-            self.index = parent.subscriptions
+            self.__parent = parent
         
         def __item(self,name:str)->Subscription:
-            id = self.vars[name]
-            return self.index[id]
+            id = self.__parent.items[name]
+            return self.__parent.subscriptions[id]
 
         def __getattr__(self, __name: str):
-            if __name!='vars' and __name in self.vars:
+            if not __name.endswith('__parent') and __name in self.__parent.items:
                 obj = self.__item(__name)
                 return obj()
             return super().__getattribute__(__name)
 
         def __setattr__(self, __name: str, __value):
-            if __name!='vars' and __name in self.vars:
+            if not __name.endswith('__parent') and __name in self.__parent.items:
                 obj = self.__item(__name)
                 obj(__value)
+                return
 
             return super().__setattr__(__name,__value)
 
         def __data__(self):
-            return { var: self.vars[var]() for var in self.vars }
-        
+            return { var: self.__item(var)() for var in self.__parent.items }
+
+        def bind(self,__name:str,__notify: callable):
+            if __name not in self.__parent.items:
+                return
+            s = self.__item(__name)
+            s.bind( __notify )
+
+        def unbind(self,__name:str,__notify: callable):
+            if __name not in self.__parent.items:
+                return
+            s = self.__item(__name)
+            s.unbind( __notify )
+
     def __init__(self, host,port=9003):
         self.items = { }
         self.unsubscribed = [ ]
@@ -232,10 +270,10 @@ class Subscriber(TCPClient):
         super().__init__(host,port)
 
     def connected(self):
-        print('connected to server')
+        print(f'Subscriber is online. Pending {len(self.unsubscribed)} subsciptions')
 
     def disconnected(self):
-        print('disconnected from server')
+        print(f'Subscriber is offline. Gone {len(self.subscriptions)-len(self.unsubscribed)} subscriptions')
         for i in self.subscriptions:
             s = self.subscriptions[i]
             s.remote_id = None
@@ -297,7 +335,11 @@ class Subscriber(TCPClient):
                     saved = s.modified
                     s( value )  #modify subscription..
                     if s.write:
-                        s.write( value )
+                        try:
+                            s.write( value )
+                        except Exception as e:
+                            print(f'Exception in posto.Subscriber: {e}')
+                            pass
                     s.modified = saved
 
         return size

@@ -9,7 +9,7 @@ g_pi - просто переменная mx - программа STL из PYPLC
 сервера получает новые значения. Запись также работает
 """
 
-from pyplc.utils import POSTO,Bindable,CLI
+from pyplc.utils import Bindable
 from pyplc import STL
 from kx.config import *
 

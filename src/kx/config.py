@@ -2,7 +2,7 @@ import krax
 from pyplc import PYPLC
 from pyplc.utils import CLI,POSTO
 from .misc import exports
-import os,json,re,gc
+import os,json,re,gc,time
 
 def __fexists(filename):
     try:
@@ -73,6 +73,21 @@ if __name__!='__main__':
 def passive():
     print('Running empty program in PLC mode')
     global plc
+    start_time = time.time()
+    try:
+        min_mem = gc.mem_free()
+    except:
+        min_mem = 0
+    stat_time = 0
+
     while True:
         with plc(ctx=globals()):
-            pass
+            uptime = time.time()-start_time
+            try:
+                if min_mem > gc.mem_free():
+                    min_mem = gc.mem_free()
+            except:
+                pass
+            if stat_time+1<=uptime:
+                stat_time = uptime
+                print(f'\rUpTime: {uptime:.0f}\tScanTime: {plc.scanTime:.4f}\tMem min:  {min_mem}\t',end='')

@@ -5,4 +5,4 @@ from .modules import KRAX430,KRAX530,KRAX455
 from .core import PYPLC
 
 if __name__!="__main__":
-    print('Welcome to PyPLC version 0.0.3')
+    print('Welcome to PyPLC version 0.0.4')

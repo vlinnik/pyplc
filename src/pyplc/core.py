@@ -15,24 +15,25 @@ class PYPLC():
         альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
         """
         def __init__(self,plc):
-            self.vars = plc.vars
+            self.__plc = plc
 
         def __getattr__(self, __name: str):
-            if __name!='vars' and __name in self.vars:
-                obj = self.vars[__name]
+            if not __name.endswith('__plc') and __name in self.__plc.vars:
+                obj = self.__plc.vars[__name]
                 return obj()
             return super().__getattribute__(__name)
 
         def __setattr__(self, __name: str, __value):
-            if __name!='vars' and __name in self.vars:
-                obj = self.vars[__name]
+            if not __name.endswith('__plc') and __name in self.__plc.vars:
+                obj = self.__plc.vars[__name]
                 if obj.rw:
                     obj(__value)
+                return
 
             return super().__setattr__(__name,__value)
 
         def __data__(self):
-            return { var: self.vars[var]() for var in self.vars }
+            return { var: self.__plc.vars[var]() for var in self.__plc.vars }
         
         def bind(self,__name:str,__notify: callable):
             if __name not in self.vars:
@@ -158,7 +159,8 @@ class PYPLC():
             m = id.match(__name)
             ch = self.slots[int(m.group(1))].channel(int(m.group(2)))
             ch.bind( __notify )
-            return ch   #для записи 
+            if ch.rw:
+                return ch   #для записи 
         except Exception as e:
             print(f'PLC cant make bind item {__name}: {e}')
     def unbind(self,__name:str,__notify: callable):

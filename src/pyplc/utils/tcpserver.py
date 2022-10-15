@@ -28,6 +28,7 @@ class TCPServer():
         self.svr = svr
         self.b_size = b_size
         self.buff={ }
+        self.rx=0
 
     def connected(self,sock):
         print(f'connected client {sock}')
@@ -48,6 +49,8 @@ class TCPServer():
         self.sockets.pop(sock.fileno())
         self.poll.unregister(sock)
         self.disconnected(sock)
+        if sock.fileno() in self.buff:
+            self.buff.pop(sock.fileno())
         sock.close()
 
     def __call__(self, *args, **kwds):
@@ -80,6 +83,7 @@ class TCPServer():
                                 data = self.buff.pop(sock.fileno()) + sock.recv(self.b_size)
                             else:
                                 data = sock.recv(self.b_size)
+                            self.rx+=len(data)
                             last_processed = processed = self.received(sock,data)
                             count = 0
                             while last_processed>0 and len(data)>processed:

@@ -1,1 +1,7 @@
 .vscode
+.*
+__pycache__
+depricated
+dist
+src/pyplc.egg-info
+upydev_.config

@@ -38,7 +38,8 @@ class KRAX430(Module):
             return ((self.dio.data) & (1<<self.num))!=0
 
         def write(self,val):
-            raise Exception('KRAX430.DI is read only',self)
+            if self.read()!=val:
+                raise Exception('KRAX430.DI is read only',self)
 
         def __invert__(self):
             return lambda: not self.read()
@@ -156,11 +157,12 @@ class KRAX455(Module):
             return self.mod.data[self.num]
 
         def write(self,val):
-            raise Exception('KRAX455.AI is read only',self)
+            if val!=self.read():
+                raise Exception('KRAX455.AI is read only',self)
 
         def force(self,val=None):
-            self.forced = val
-            self.changed( )
+            self.mod.data[self.num] = val
+            super().force(val)
 
         def __str__(self):
             if self.name!='':
