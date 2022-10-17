@@ -18,11 +18,12 @@ class TCPServer():
         """
         svr = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         svr.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        svr.setblocking(False)
         addr = socket.getaddrinfo('0.0.0.0', port)[0][-1]
         svr.bind(addr)
         svr.listen( 1 )
         poll = select.poll()
-        poll.register( svr, select.POLLIN)
+        poll.register( svr, select.POLLIN | select.POLLHUP | select.POLLERR)
         self.sockets = { svr.fileno(): svr }
         self.poll = poll
         self.svr = svr
@@ -72,18 +73,24 @@ class TCPServer():
                     if sock.fileno()==svr.fileno():
                         try:
                             client,addr = svr.accept()
-                            poll.register(client,select.POLLIN)
+                            client.setblocking(False)
+                            poll.register(client,select.POLLIN | select.POLLHUP | select.POLLERR)
                             sockets[client.fileno()] = client
                             self.connected(client)
-                        except:
+                        except Exception as e:
+                            print('exception {e}')
                             pass
                     else:
                         try:
+                            arrived = sock.recv(self.b_size)
                             if sock.fileno() in self.buff:
-                                data = self.buff.pop(sock.fileno()) + sock.recv(self.b_size)
+                                data = self.buff.pop(sock.fileno()) + arrived
                             else:
-                                data = sock.recv(self.b_size)
-                            self.rx+=len(data)
+                                data = arrived
+                            if len(arrived)==0:
+                                self.close(sock)
+                                continue
+                            self.rx+=len(arrived)
                             last_processed = processed = self.received(sock,data)
                             count = 0
                             while last_processed>0 and len(data)>processed:
