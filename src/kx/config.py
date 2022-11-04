@@ -1,3 +1,5 @@
+import time
+startAt = time.time()
 import krax
 from pyplc import PYPLC
 from pyplc.utils import CLI,POSTO
@@ -15,16 +17,10 @@ def __restore():
     if __fexists('krax.conf'):
         with open('krax.conf','rb') as f:
             conf = json.loads(f.readline())
-            no_espnow = 'no_espnow' in conf
-            if 'ipv4' in conf and not no_espnow:
-                ipv4=conf['ipv4']
-            else:
-                ipv4='0.0.0.0'
-            if not no_espnow:
-                krax.init(id = conf['node_id'],iface=1,host = ipv4 )
-                if __fexists('krax.dat'):
-                    with open('krax.dat','rb') as d:
-                        krax.restore(d.read())
+            krax.init(id = conf['node_id'],iface=0 )
+            if __fexists('krax.dat'):
+                with open('krax.dat','rb') as d:
+                    krax.restore(d.read())
             return conf
 
 if __name__!='__main__':
@@ -32,11 +28,9 @@ if __name__!='__main__':
     if conf:
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         devs = conf['devs']
-        ipv4 = conf['ipv4']
     else:
         scanTime = 100
         devs = []
-        ipv4 = '0.0.0.0'
 
     cli = CLI()         #simple telnet 
     posto = POSTO( )    #simple share data over tcp 
@@ -60,14 +54,14 @@ if __name__!='__main__':
                     info = [i.strip() for i in info.split(';')]
                     if id.match(info[0]) and num.match(info[-2]) and num.match(info[-1]) :
                         info = [ i.strip() for i in info ]
-                        ch = eval( f'plc.slots[{info[-2]}].channel({info[-1]})' )
+                        ch = plc.slots[int(info[-2])].channel(int(info[-1]))
                         plc.declare(ch,info[0])
                         vars = vars+1
                 except Exception as e:
                     print(e)
                     errs = errs+1
         gc.collect( )
-        print(f'Declared {vars} variable, have {errs} errors')
+        print(f'Declared {vars} variable, have {errs} errors, {time.time()-startAt} secs')
 
 
 def passive():
@@ -79,6 +73,14 @@ def passive():
     except:
         min_mem = 0
     stat_time = 0
+
+    try:
+        import network
+        ap = network.WLAN(network.AP_IF)
+        ap.active(True)
+        ap.config(essid='KRAX')
+    except:
+        pass
 
     while True:
         with plc(ctx=globals()):

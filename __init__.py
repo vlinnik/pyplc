@@ -170,10 +170,6 @@ def MAIN(ctx=None,target=None,cycle=200,simple=False,telnet=False):
     def decorator(main):
         if not simple:
             def __entry__(*args,**kwargs):
-                try:
-                    gc.threshold(1000)
-                except:
-                    pass
                 async def wrapper(*args,**kwargs):
                     from pyplc.telnet import Telnet
                     from pyplc.netvar import Monitor
@@ -198,10 +194,6 @@ def MAIN(ctx=None,target=None,cycle=200,simple=False,telnet=False):
             return __entry__
         else:
             def wrapper(*args,**kwargs):
-                try:
-                    gc.threshold(1000)
-                except:
-                    pass
                 if telnet:
                     print('telnet could work only in simple=False mode')
                 while True:

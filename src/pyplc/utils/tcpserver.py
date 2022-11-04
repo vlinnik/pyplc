@@ -1,4 +1,4 @@
-import select,socket,gc
+import select,socket
 
 """
 TCP Cервер с работой циклами. Синхронно каждый вызов происходит проверка наличия данных и их обработка. 
@@ -96,7 +96,6 @@ class TCPServer():
                             while last_processed>0 and len(data)>processed:
                                 last_processed=self.received(sock,data[processed:])
                                 processed += last_processed
-                                gc.collect()
                                 count+=1
 
                             if len(data)>processed:

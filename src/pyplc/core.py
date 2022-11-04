@@ -8,7 +8,7 @@ class PYPLC():
     slots = layout( (KRAX530,KRAX430,KRAX455) ) 
     даст нам модуль slots[0] типа KRAX530,slots[1] типа KRAX430 и slots[2] KRAX455
     """
-    class __State():
+    class __State(object):
         """
         прокси для удобного доступа к значениям переменных ввода вывода
         например если есть канал ввода/вывода MIXER_ON_1, то для записи необходимо MIXER_ON_1(True). 
@@ -17,11 +17,15 @@ class PYPLC():
         def __init__(self,plc):
             self.__plc = plc
 
+        # def __getattribute__(self,__name):  #required only in micropython
+        #      return getattr(self,__name)
+
         def __getattr__(self, __name: str):
             if not __name.endswith('__plc') and __name in self.__plc.vars:
                 obj = self.__plc.vars[__name]
                 return obj()
-            return super().__getattribute__(__name)
+            # return super().__getattr__(__name)
+            #return self.__getattribute__(__name)
 
         def __setattr__(self, __name: str, __value):
             if not __name.endswith('__plc') and __name in self.__plc.vars:
@@ -36,14 +40,14 @@ class PYPLC():
             return { var: self.__plc.vars[var]() for var in self.__plc.vars }
         
         def bind(self,__name:str,__notify: callable):
-            if __name not in self.vars:
+            if __name not in self.__plc.vars:
                 return
-            var = self.vars[__name]
+            var = self.__plc.vars[__name]
             var.bind( __notify )
         def unbind(self,__name:str,__notify: callable):
-            if __name not in self.vars:
+            if __name not in self.__plc.vars:
                 return
-            var = self.vars[__name]
+            var = self.__plc.vars[__name]
             var.unbind( __notify )
 
     def __init__(self,*args,krax=None,pre=None,post=None,period=100):
@@ -58,11 +62,6 @@ class PYPLC():
         self.state = self.__State(self)
         self.kwds = {}
         addr = 0
-        gc.enable()
-        try:
-            gc.threshold(1000)
-        except:
-            pass
         if krax is not None:
             Module.reader = krax.read
             Module.writer = krax.write

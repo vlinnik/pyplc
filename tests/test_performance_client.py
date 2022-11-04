@@ -1,21 +1,19 @@
 from pyplc.utils import Subscriber
 import time
 
-sr = Subscriber( '192.168.1.72' )
-sr.subscribe('prg.a')
-sr.subscribe('prg.b')
+sr = Subscriber( 'localhost' )
+sr.subscribe('prg.clk')
 sr.subscribe('prg.q')
+sr.subscribe('prg.out')
 
-begin = None
-while True:
-    if sr.a is not None and sr.b is not None and begin is None:
-        print(f'start with {sr.a},{sr.b},{sr.q}')
-        sr.a = sr.a+1
-        sr.b = sr.b+1
-        begin = time.time()
-
-    if begin is not None and sr.q == sr.a+sr.b:
-        end = time.time()
-        break
-    sr()
-print(end-begin)
+clk = False
+cnt = 0
+for i in range(0,200):
+    sr.state.clk = not clk
+    if sr.state.out != clk :
+        clk = not clk
+        cnt+=1
+    sr( )
+    time.sleep(0.03)
+sr( )
+print(sr.state.q,cnt)

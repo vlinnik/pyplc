@@ -1,6 +1,6 @@
 from .tcpserver import TCPServer
 from .tcpclient import TCPClient
-import socket,time,struct
+import socket,time,struct,sys
 
 class Subscription():
     """Подписка на данные python-программы 
@@ -13,16 +13,18 @@ class Subscription():
         """
         self.item = item
         self.__value = value
+        self.source = None
         self.modified = False
         self.ts = time.time_ns()
         self.remote_id = remote_id
         self.filed = False
         self.write = None   #callable method for writing new value from client
         self.bound = None  
+        self.no_exec = False
         self.__sinks = []
 
     def __str__(self)->str:
-        return f'<Subscription id={id(self)}, item={self.item}, value={self.__value}>'
+        return f'<Subscription id={id(self)}, item={self.item}, value={self.__value}, ts={self.ts}>'
 
     def cleanup(self):
         if self.bound:
@@ -30,27 +32,72 @@ class Subscription():
             self.bound = None
             self.write = None
 
-    def changed(self,value):
+    def modify(self,value): #modify current value for underlying subscription's item
+        """Изменить значение текущее __value
+        Изменяет флаг modified если новое значение отличается от старого
+        Все что подписывались на информирование об доступе (bind) извещаются о доступе
+
+        Args:
+            value (Any): новое значение
+        """
+        if self.__value!=value:
+            self.modified = True
+            self.ts = time.time_ns()
         self.__value = value
-        self.modified = True
-        self.ts = time.time_ns()
         for sink in self.__sinks:
             try:
                 sink( value )
             except Exception as e:
                 print(f'Notification of subscription failed: {e}')
+
+    def remote(self,value,source=None,ctx=None): #subscribed item changed on remote side (client write new value)
+        """Значение изменено где-то на другом конце (у клиента)
+
+        Args:
+            value (Any): новое значение
+            source (_type_, optional): Идентификатор кто менял. чтобы не послать ему уведомление об изменении
+            ctx (_type_, optional): Если write не доступен, то в случае no_exec = False произойдет изменение значения через exec (глобальные переменные и тп)
+        """
+        self.source = source    #запомним откуда прилитело изменение
+        modified = self.__value!=value
+        self.modify(value)      #произведем 
+        if modified:
+            if self.write and callable(self.write):
+                try:
+                    self.write(value)
+                except Exception as e:
+                    print(f'Exception in Subscription::remote: {e}')
+            elif not self.no_exec:
+                try:
+                    exec(f'{self.item} = {value}',ctx)
+                except Exception as e:
+                    print(f'Exception during exec {self.item} = {value} in Subscription::remote: {e}')
+
+    def changed(self,value):
+        """Подписка изменена локально (по эту сторону)
+
+        Args:
+            value (Any): Новое значение
+        """
+        modified = self.modified
+        self.modify(value)
+        if self.modified!=modified:
+            self.source = None  #новое значение поступило из программы
  
     def __call__(self, *args, **kwds) :
         if len(args)==0:
             return self.__value
         else:
             value = args[0]
-            if self.__value!=value:
-                self.changed( value )
+            self.changed( value )
 
     def bind(self,__notify: callable):
         if __notify not in self.__sinks:
-            self.__sinks.append(__notify)
+            try:
+                __notify( self.__value)
+                self.__sinks.append(__notify)
+            except Exception as e:
+                print(f'Cant bind callback to subscription: {e}')
 
     def unbind(self,__notify: callable):
         if __notify in self.__sinks:
@@ -73,7 +120,15 @@ class POSTO(TCPServer):
         self.modified = []
         self.keepalive = time.time()
         super().__init__(port)
-
+    def find(self,item: str):
+        for id in self.subscriptions:
+            s = self.subscriptions[id]
+            if s.item == item:
+                return s
+    def list(self):
+        for id in self.subscriptions:
+            s = self.subscriptions[id]
+            print(f'{s.item} = {s}')
     def connected(self,sock:socket.socket):
         print(f'POSTO client {sock.fileno()} online')
         pass
@@ -96,6 +151,7 @@ class POSTO(TCPServer):
                     s.bound = (path[-1],source)
                     s.write = source.bind(path[-1],s )
                     self.subscriptions[id(s)] = s
+                    s.modified = True
                     return s
 
             source = eval( item,self.ctx )
@@ -104,6 +160,7 @@ class POSTO(TCPServer):
             return s
         except Exception as e:
             print(f'Exception in subscribe for {item}:',e)
+            sys.print_exception(e)
 
         return None
     def unsubscribe(self,local_id: int):
@@ -130,7 +187,6 @@ class POSTO(TCPServer):
                 s = self.subscribe(item.decode(),remote_id)
                 if s:
                     response += struct.pack( 'qq', s.remote_id,id(s) )
-                    s.modified = True
                     self.belongs[s] = sock.fileno()
             sock.send(struct.pack('ii',0,len(response))+response )                           #response for subscribe command
             return off
@@ -160,15 +216,7 @@ class POSTO(TCPServer):
                     off+=d_size
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
-                    try:
-                        if s.write and callable(s.write):
-                            s.write(value)
-                        else:
-                            exec(f'{s.item} = {value}',self.ctx)
-                    except Exception as e:
-                        print(e)
-                    s( value )  #modify subscription
-                    #s.modified = False
+                    s.remote(value,source=id(sock),ctx=self.ctx)        #получено новое значение
         else:
             pass    #keep alive or unsupported command
         
@@ -181,8 +229,8 @@ class POSTO(TCPServer):
             for s in modified:
                 value = s( )
                 remote_id = s.remote_id
-                if value is None or self.belongs[s]!=sock.fileno():
-                    pass
+                if value is None or self.belongs[s]!=sock.fileno() or s.source==id(sock):
+                    continue
                 elif type(value) is bool:
                     payload+=struct.pack('qiib',remote_id,0,1,value)
                 elif type(value) is int:
@@ -192,7 +240,6 @@ class POSTO(TCPServer):
                 elif type(value) is str:
                     ba = value.encode()
                     payload+=struct.pack(f'qii{len(ba)}s',remote_id,3,len(ba),ba)
-                s.modified = False
             try:
                 sock.send( struct.pack('ii',2,len(payload))+payload)
                 self.keepalive = time.time()
@@ -248,11 +295,12 @@ class Subscriber(TCPClient):
         def __data__(self):
             return { var: self.__item(var)() for var in self.__parent.items }
 
-        def bind(self,__name:str,__notify: callable):
+        def bind(self,__name:str,__notify: callable):   #используется POSTO при оформлении подписки
             if __name not in self.__parent.items:
                 return
             s = self.__item(__name)
             s.bind( __notify )
+            return s.remote
 
         def unbind(self,__name:str,__notify: callable):
             if __name not in self.__parent.items:
@@ -283,6 +331,7 @@ class Subscriber(TCPClient):
     
     def subscribe(self,item:str,local_id:str=None):
         s = Subscription( item )
+        s.no_exec = True
         self.subscriptions[id(s)] = s
         if local_id is None:
             path = item.split('.')
@@ -332,15 +381,7 @@ class Subscriber(TCPClient):
                     off+=d_size
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
-                    saved = s.modified
-                    s( value )  #modify subscription..
-                    if s.write:
-                        try:
-                            s.write( value )
-                        except Exception as e:
-                            print(f'Exception in posto.Subscriber: {e}')
-                            pass
-                    s.modified = saved
+                    s.remote( value )
 
         return size
 
@@ -382,7 +423,8 @@ class Subscriber(TCPClient):
                         payload+=struct.pack('qiid',remote_id,2,8,value)
                     elif type(value) is str:
                         payload+=struct.pack('qiis',remote_id,3,len(value),value)
-                    s.modified = False
+                    s.modified = False 
+
                 self.send( struct.pack('ii',2,len(payload))+payload)
                 self.keepalive = time.time()
             else:

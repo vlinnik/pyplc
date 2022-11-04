@@ -8,13 +8,16 @@ clean:
 	@find ./ -iname __pycache__  | xargs rm -rf
 
 upload: clean
-	@cd src && upydev dsync pyplc && upydev dsync kx
+	@cd src && upydev dsync pyplc -g && upydev dsync kx -g
 
 all: dirs $(OBJS)
 
 dirs:
 	@mkdir -p $(ODIR)/$(INSTALL_DIR)
 
+package:
+	python -m build && pip install ./dist/pyplc-0.0.4-py3-none-any.whl --force-reinstall
+	
 $(ODIR)/$(INSTALL_DIR)/%.mpy: %.py
 	@echo Compiling $<
 	@$(MPY-CROSS) $< -o $@

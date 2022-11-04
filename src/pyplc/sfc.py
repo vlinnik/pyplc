@@ -24,6 +24,9 @@ class SFC(object):
                 self.step = None
                 self.context = []
                 self.subtasks = [ ]
+                self.durance = 0
+                self.sfc_reset = False
+                self.__ret = None
                 super().__init__(*args,**kwargs)
 
             def log(self,*args,**kwds):
@@ -35,7 +38,7 @@ class SFC(object):
                     self.context.append(self.step)
                     self.step = gen
 
-                #self( )
+                # self( )
 
             def jump(self,gen):
                 if not SFC.isgenerator(gen):
@@ -43,7 +46,7 @@ class SFC(object):
                 if SFC.isgenerator(self.step):
                     self.step.close()
                 self.step = gen
-                #self( )
+                self( )
 
             def till(self,cond,min=None,max=None,step=None,enter=None,exit=None):
                 """[summary]
@@ -62,16 +65,15 @@ class SFC(object):
 
                     return cond
 
-                if callable(enter):
+                if callable(enter) and not self.sfc_reset:
                     enter()
 
-                while ((min is not None and self.T<min) or check() ) and (max is None or self.T<max):
+                while ((min is not None and self.T<min) or check() ) and (max is None or self.T<max) and not self.sfc_reset:
                     if callable(step):
                         step( )
                     yield True
                     self.T = (time.time_ns()-begin)/1000000000
-                    #yield step
-                if callable(exit):
+                if callable(exit) and not self.sfc_reset:
                     exit()
 
             def until(self,cond,min=None,max=None,step=None,enter=None,exit=None):
@@ -91,19 +93,24 @@ class SFC(object):
                 self.T = 0
                 begin = time.time_ns()
 
-                if callable(enter):
+                if callable(enter) and not self.sfc_reset:
                     enter()
 
-                while ((min is not None and self.T<min) or check() ) and (max is None or self.T<max):
+                while ((min is not None and self.T<min) or check() ) and (max is None or self.T<max) and not self.sfc_reset:
                     if callable(step):
                         step( )
                     yield True
                     self.T = (time.time_ns()-begin)/1000000000
 
-                if callable(exit):
+                if callable(exit) and not self.sfc_reset:
                     exit()
+            
+            def pause(self,T:float):
+                for x in self.till(True,max=T):
+                    yield x
 
             def __call__(self, *args, **kwds):
+                start_t = time.time_ns()
                 for s in self.subtasks:
                     if callable(s):
                         s()
@@ -117,15 +124,22 @@ class SFC(object):
                             except Exception as e:
                                 print(f'Exception in SFC({self.id}): {e}')
                         elif callable(job):
-                            job()
+                            self.__ret = job()
+                        else:
+                            self.__ret = job
                     except StopIteration:
                         if len(self.context)>0:
                             self.step = self.context.pop()
                             #self( )
                         else:
+                            #self.born = time.time_ns()
+                            #self.jump(super().__call__(*args,**kwds))
                             self.step = None
                 else:
                     self.born = time.time_ns()
                     self.jump(super().__call__(*args,**kwds))
+                self.durance = (time.time_ns() - start_t)/1000000
+
+                return self.__ret
 
         return MagicSFC

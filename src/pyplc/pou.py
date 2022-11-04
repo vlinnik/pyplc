@@ -27,9 +27,12 @@ class POU():
             # def __getattribute__(self,__name):  #required only in micropython
             #     return getattr(self,__name)
 
+            def export(self,__name: str):
+                self.__exports.append(__name)
+
             def __data__(self):
                 d = {}
-                for key in type(self).syms:
+                for key in type(self).syms+self.__exports:
                     d[key] = getattr(self,key)
                 return d
 
@@ -41,6 +44,7 @@ class POU():
             def __init__(self,*args,id=None,**kwargs) -> None:
                 self.__sinks = []
                 self.__bindings = {}
+                self.__exports=[]
                 self.id = type(self).id if id is None else id
                 kwvalues = kwargs
 
@@ -55,7 +59,12 @@ class POU():
                     if key in kwargs and callable(kwargs[key]):
                         self.__sinks.append((key,kwvalues.pop(key)))
 
-                super().__init__(*args,*args,**kwvalues)
+                super().__init__(*args,**kwvalues)
+
+            def join(self,__name,__source):
+                if __name in type(self).inputs:
+                    self.__bindings[__name] = __source
+
 
             def bind(self,__name,__sink):   #bind and atrribute to callback
                 self.__sinks.append( (__name,__sink) )
@@ -72,7 +81,8 @@ class POU():
                 super().__setattr__(__name,__value)
 
             def __call__(self, *args, **kwds):
-                kwargs={}
+                kwargs=kwds
+
                 for key in type(self).inputs:
                     input = getattr(self,key)
                     if key in kwds:
@@ -84,6 +94,10 @@ class POU():
                         input = self.__bindings[key]()
                         self.__setattr__(key,input)
                     kwargs[key]=input
+                for key in kwargs:
+                    if key not in type(self).inputs and hasattr(self,key):
+                        val = kwargs[key]
+                        self.__setattr__(key,val)
                 return super().__call__(*args, **kwargs)
 
         return MagicPOU

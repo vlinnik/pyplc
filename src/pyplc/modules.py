@@ -49,9 +49,6 @@ class KRAX430(Module):
                 return f'KRAX430.DI({self.name} AT %IX{self.dio.addr}.{self.num}={self()})'
             else:
                 return f'KRAX430.DI(%IX{self.dio.addr}.{self.num}={self()})'                
-        def force(self,val=None):
-            self.forced = val
-            self.changed( )
             
     def channel(self,n,name=''):
         if self.channels[n]:
@@ -99,7 +96,7 @@ class KRAX530(Module):
             super().write(val)
 
         def __invert__(self):
-            return lambda x: self.write(not x)
+            return lambda: not self.read()
 
         def __str__(self):
             if self.name!='':
@@ -142,6 +139,7 @@ class KRAX455(Module):
     family = Module.IN
     def __init__(self,addr):
         self.data = [0x0000,0x0000,0x0000,0x0000]
+        self.channels = [None]*4
         super().__init__(addr)
 
     class Channel(GChannel):
@@ -170,10 +168,16 @@ class KRAX455(Module):
             else:
                 return f'KRAX455.AI(%IW{self.mod.addr+self.num}={self()})'                
     def channel(self,n,name=''):
-        return self.Channel(self,n,name)
+        if self.channels[n]:
+            return self.channels[n]
+        self.channels[n] = self.Channel(self,n,name)
+        return self.channels[n]
 
     def sync(self):
         if callable(Module.reader):
             data = Module.reader( self.addr, 8 )
-            for i in range(0,3):
+            for i in range(0,4):
+                o_val = self.data[i]
                 self.data[i] = int.from_bytes(data[i*2:i*2+2],'little')
+                if self.channels[i] and o_val!=self.data[i]:
+                    self.channels[i].changed( )

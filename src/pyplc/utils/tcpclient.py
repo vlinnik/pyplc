@@ -42,7 +42,10 @@ class TCPClient():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             #self.sock.connect(socket.getaddrinfo(self.host, self.port)[0][-1])
+            self.sock.settimeout(5)
             self.sock.connect((self.host, self.port))
+            self.sock.settimeout(None)
+            self.sock.setblocking(False)
             self.poll.register( self.sock, select.POLLIN)
             self.connected()
         except Exception as e:

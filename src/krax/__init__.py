@@ -15,10 +15,6 @@ def init(id=None,start=None,size=None,event=None,host='0.0.0.0',**kwds):
     ctx = Context()
     if callable(event):
         ctx.g_event = event
-    if host!='0.0.0.0':
-        Context.g_online = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        Context.g_online.connect((host, 9002))
-        pass
     pass
     
 

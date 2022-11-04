@@ -12,7 +12,7 @@ class Channel(object):
         return f'{self.value}'
 
     def force(self,value):
-        changed = self.forced!=value
+        changed = (self()!=value)
         self.forced = value
         if changed:
             self.changed( )
