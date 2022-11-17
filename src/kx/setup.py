@@ -21,21 +21,25 @@ def show_devs(devs,layout=[]):
 """
 возвращает доступные устройства упорядоченные по типам
 """
-def rescan(node_id=1,attemts=10):
+def rescan(node_id=1,attemts=60,max=0):
     krax.init(id=node_id)
-    krax.scan( )
+    input('Press ENTER after devices prepared')
+    print('Starting scanning...')
     while True:
+        krax.scan( )
+        print('.',end='')
         before = krax.devices('mac')
-        krax.scan( before )
-        time.sleep_ms(100)
-        after = krax.devices('mac')
-        if len(after)==len(before):
-            attemts=attemts-1
-            if attemts<=0:
+        time.sleep(1)
+        after = krax.devices('device_id')
+        if len(after)!=len(before):
+            print(f'\nFound {after[-1]}')
+            if attemts==1 or len(after)==max:
                 break
+        if attemts>0:
+            attemts-=1
 
     devs = krax.devices()
-    devs.sort(key=lambda x: x['device_id'] )
+    #devs.sort(key=lambda x: x['device_id'] )
 
     return devs
 
@@ -79,15 +83,15 @@ def find(devs,mac):
             return x
 
 def setup(node_id,layout=[]):
-    if fexists('krax.conf'):
-        with open('krax.conf','r') as l:
-            conf = json.loads(l.readline())
-            layout = conf['layout']
-    if fexists('krax.dat'):
-        with open('krax.dat','r') as l:
-            krax.restore( l.read() )
+    # if fexists('krax.conf'):
+    #     with open('krax.conf','r') as l:
+    #         conf = json.loads(l.readline())
+    #         layout = conf['layout']
+    # if fexists('krax.dat'):
+    #     with open('krax.dat','r') as l:
+    #         krax.restore( l.read() )
 
-    devs = rescan(node_id)
+    devs = rescan(node_id,max=len(layout))
     show_devs(devs,layout)
     while True:
         act = input('Action:').upper()
@@ -95,17 +99,29 @@ def setup(node_id,layout=[]):
             layout = edit_action(devs,layout)
         elif act=='U':
             layout = unbind_action(devs,layout)
+        elif act=='D':
+            layout = [ dev['mac'] for dev in devs ]
+            show_devs(devs,layout)
         elif act=='A':
             for i in layout:
                 if not find(devs,i):
                     layout.remove(i)
-            print(layout)
-            krax.bind( layout )
+            krax.unbind( )
+            for x in layout:
+                d = find(krax.devices(),x)
+                while d['node_id']!=node_id:
+                    print(f'Binding device {d["device_id"]}({d["mac"]})...')
+                    krax.bind( [x] )
+                    time.sleep_ms(500)
+                    d = find(krax.devices(),x)
+                
         elif act=='R':
             devs = rescan(node_id)
             show_devs(devs,layout)
         elif act=='S':
-            krax.hello(layout)
+            for x in layout:
+                krax.hello([x])
+                time.sleep_ms(500)
             print(layout)
         elif act=='Q':
             save = input('Save changes:').upper()
@@ -126,13 +142,14 @@ def setup(node_id,layout=[]):
             print('Bye!')
             break
         else:
-            print('Unknown action. Supported E - Edit, U - Unbind, A - Apply, R - Rescan, S - Show layout, Q - quit')
+            print('Unknown action. Supported E - Edit, D - default layout, U - Unbind, A - Apply, R - Rescan, S - Show layout, Q - quit')
 
 try:
     node_id = 1
     slots = 0
     node_id = int(input('Node ID:'))
     slots = int(input('Enter slots:'))
+    network.WLAN(0).active(True)
 except:
     pass
 if slots>0:
