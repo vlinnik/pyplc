@@ -3,6 +3,7 @@ from .tcpclient import TCPClient
 import socket,time,struct,sys
 
 class Subscription():
+    next_id = 0
     """Подписка на данные python-программы 
     """
     def __init__(self,item , remote_id:int=None,value=None):
@@ -22,9 +23,11 @@ class Subscription():
         self.bound = None  
         self.no_exec = False
         self.__sinks = []
+        self.local_id = Subscription.next_id
+        Subscription.next_id+=1
 
     def __str__(self)->str:
-        return f'<Subscription id={id(self)}, item={self.item}, value={self.__value}, ts={self.ts}>'
+        return f'<Subscription id={self.local_id}, item={self.item}, value={self.__value}, ts={self.ts}>'
 
     def cleanup(self):
         if self.bound:
@@ -137,7 +140,7 @@ class POSTO(TCPServer):
         offline = list( filter( lambda x: self.belongs[x]==sock.fileno(), self.belongs ) )
         print(f'POSTO client {sock.fileno()} offline. available/gone {len(self.subscriptions)}/{len(offline)} subscriptions')
         for s in offline:
-            self.unsubscribe(id(s))
+            self.unsubscribe(s.local_id)
             s.cleanup( )
 
     def subscribe(self,item:str,remote_id:int):
@@ -150,13 +153,14 @@ class POSTO(TCPServer):
                     s = Subscription( str(item), remote_id )
                     s.bound = (path[-1],source)
                     s.write = source.bind(path[-1],s )
-                    self.subscriptions[id(s)] = s
+                    self.subscriptions[s.local_id] = s
                     s.modified = True
                     return s
 
             source = eval( item,self.ctx )
             s = Subscription( str(item), remote_id,value = source )
-            self.subscriptions[id(s)] = s
+            self.subscriptions[s.local_id] = s
+            s.modified = True
             return s
         except Exception as e:
             print(f'Exception in subscribe for {item}:',e)
@@ -178,42 +182,40 @@ class POSTO(TCPServer):
             return 0
         size += 8
         self.keepalive = time.time()
+        off = 8
         if cmd==0:  #subscribe
-            off = 8
             response = bytearray()
             while off<size:
-                remote_id,slen = struct.unpack_from('qi',data,off); off+=12
+                remote_id,slen = struct.unpack_from('HH',data,off); off+=struct.calcsize('HH')
                 item, = struct.unpack_from(f'{slen}s',data,off); off+=slen
                 s = self.subscribe(item.decode(),remote_id)
                 if s:
-                    response += struct.pack( 'qq', s.remote_id,id(s) )
+                    response += struct.pack( 'HH', s.remote_id,s.local_id )
                     self.belongs[s] = sock.fileno()
             sock.send(struct.pack('ii',0,len(response))+response )                           #response for subscribe command
             return off
         elif cmd==1:    #unsubscribe
-            off=8
             while off<size:
-                local_id, = struct.unpack_from('q',data,off); off+=8
+                local_id, = struct.unpack_from('H',data,off); off+=struct.calcsize('H')
                 s = self.unsubcribe(local_id)
                 if s in self.belongs:
                     self.belongs.pop(s)
             return off
         elif cmd==2:    #write new value
-            off = 8
-            while off+16<=size:
+            HBH = struct.calcsize('!HBH')
+            while off+HBH<=size:
                 value = None
-                local_id,type_id,d_size = struct.unpack_from('qii',data,off); off+=16
+                local_id,type_id,d_size = struct.unpack_from('!HBH',data,off); off+=HBH
                 if type_id==0 and off+1<=size:  #bool
-                    value, = struct.unpack_from('b',data,off); off+=1
+                    value, = struct.unpack_from('!b',data,off) 
                     value = value!=0
                 elif type_id==1 and off+8<=size:    #int
-                    value, = struct.unpack_from('q',data,off); off+=8
+                    value, = struct.unpack_from('!q',data,off) 
                 elif type_id==2 and off+8<=size:    #double
-                    value, = struct.unpack_from('d',data,off); off+=8
+                    value, = struct.unpack_from('!d',data,off) 
                 elif type_id==3 and off+d_size<=size:    #string
-                    value, = struct.unpack_from(f'{d_size}s',data,off); off+=d_size
-                else:
-                    off+=d_size
+                    value, = struct.unpack_from(f'{d_size}s',data,off)
+                off+=d_size
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
                     s.remote(value,source=id(sock),ctx=self.ctx)        #получено новое значение
@@ -232,14 +234,14 @@ class POSTO(TCPServer):
                 if value is None or self.belongs[s]!=sock.fileno() or s.source==id(sock):
                     continue
                 elif type(value) is bool:
-                    payload+=struct.pack('qiib',remote_id,0,1,value)
+                    payload+=struct.pack('!HBHb',remote_id,0,struct.calcsize('b'),value)
                 elif type(value) is int:
-                    payload+=struct.pack('qiiq',remote_id,1,8,value)
+                    payload+=struct.pack('!HBHq',remote_id,1,struct.calcsize('q'),value)
                 elif type(value) is float:
-                    payload+=struct.pack('qiid',remote_id,2,8,value)
+                    payload+=struct.pack('!HBHd',remote_id,2,struct.calcsize('d'),value)
                 elif type(value) is str:
                     ba = value.encode()
-                    payload+=struct.pack(f'qii{len(ba)}s',remote_id,3,len(ba),ba)
+                    payload+=struct.pack(f'!HBH{len(ba)}s',remote_id,3,len(ba),ba)
             try:
                 sock.send( struct.pack('ii',2,len(payload))+payload)
                 self.keepalive = time.time()
@@ -326,13 +328,13 @@ class Subscriber(TCPClient):
             s = self.subscriptions[i]
             s.remote_id = None
             s.filed = False
-            if id(s) not in self.unsubscribed:
-                self.unsubscribed.append(id(s))
+            if s.local_id not in self.unsubscribed:
+                self.unsubscribed.append(s.local_id)
     
     def subscribe(self,item:str,local_id:str=None):
         s = Subscription( item )
         s.no_exec = True
-        self.subscriptions[id(s)] = s
+        self.subscriptions[s.local_id] = s
         if local_id is None:
             path = item.split('.')
             if len(path)>1:
@@ -340,8 +342,8 @@ class Subscriber(TCPClient):
             else:
                 local_id = item
             local_id.replace('.','_')
-        self.items[local_id] = id(s)
-        self.unsubscribed.append( id(s) )
+        self.items[local_id] = s.local_id
+        self.unsubscribed.append( s.local_id )
         setattr(self,local_id,s)
         return s
 
@@ -352,10 +354,10 @@ class Subscriber(TCPClient):
         if size+8>len(data):
             return 0
         size+=8
+        off = 8
         if cmd==0:  #subscribe response
-            off = 8
             while off<size:
-                local_id,remote_id = struct.unpack_from('qq',data,off); off+=16
+                local_id,remote_id = struct.unpack_from('HH',data,off); off+=struct.calcsize('HH')
                 if local_id in self.subscriptions:
                     s = self.subscriptions[local_id]
                     s.remote_id = remote_id
@@ -364,21 +366,21 @@ class Subscriber(TCPClient):
                         self.unsubscribed.remove(local_id)
             return off
         elif cmd==2:  #data changed 
-            off = 8
-            while off+16<=size:
+            HBH = struct.calcsize('!HBH')
+            while off+HBH<=size:
                 value = None
-                local_id,type_id,d_size = struct.unpack_from('qii',data,off); off+=16
+                local_id,type_id,d_size = struct.unpack_from('!HBH',data,off); off+=HBH
                 if type_id==0 and off+1<=size:  #bool
-                    value, = struct.unpack_from('b',data,off); off+=1
+                    value, = struct.unpack_from('!b',data,off)
                     value = value!=0
                 elif type_id==1 and off+8<=size:    #int
-                    value, = struct.unpack_from('q',data,off); off+=8
+                    value, = struct.unpack_from('!q',data,off)
                 elif type_id==2 and off+8<=size:    #double
-                    value, = struct.unpack_from('d',data,off); off+=8
+                    value, = struct.unpack_from('!d',data,off)
                 elif type_id==3 and off+d_size<=size:    #string
-                    value, = struct.unpack_from(f'{d_size}s',data,off); off+=d_size
-                else:
-                    off+=d_size
+                    value, = struct.unpack_from(f'{d_size}s',data,off)
+
+                off+=d_size
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
                     s.remote( value )
@@ -395,7 +397,7 @@ class Subscriber(TCPClient):
                 s = self.subscriptions[i]
                 if s.filed:
                     continue
-                payload+=struct.pack(f'qi{len(s.item)}s',i,len(s.item),s.item.encode( ) )
+                payload+=struct.pack(f'HH{len(s.item)}s',i,len(s.item),s.item.encode( ) )
                 filed.append(s)
             try:
                 if len(filed)>0:
@@ -416,13 +418,13 @@ class Subscriber(TCPClient):
                     if value is None or len(payload)>self.b_size-32 or remote_id is None:
                         continue
                     elif type(value) is bool:
-                        payload+=struct.pack('qiib',remote_id,0,1,value)
+                        payload+=struct.pack('!HBHb',remote_id,0,1,value)
                     elif type(value) is int:
-                        payload+=struct.pack('qiiq',remote_id,1,8,value)
+                        payload+=struct.pack('!HBHq',remote_id,1,8,value)
                     elif type(value) is float:
-                        payload+=struct.pack('qiid',remote_id,2,8,value)
+                        payload+=struct.pack('!HBHd',remote_id,2,8,value)
                     elif type(value) is str:
-                        payload+=struct.pack('qiis',remote_id,3,len(value),value)
+                        payload+=struct.pack('!HBHs',remote_id,3,len(value),value)
                     s.modified = False 
 
                 self.send( struct.pack('ii',2,len(payload))+payload)
