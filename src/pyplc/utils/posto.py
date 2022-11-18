@@ -186,17 +186,17 @@ class POSTO(TCPServer):
         if cmd==0:  #subscribe
             response = bytearray()
             while off<size:
-                remote_id,slen = struct.unpack_from('HH',data,off); off+=struct.calcsize('HH')
+                remote_id,slen = struct.unpack_from('!HH',data,off); off+=struct.calcsize('!HH')
                 item, = struct.unpack_from(f'{slen}s',data,off); off+=slen
                 s = self.subscribe(item.decode(),remote_id)
                 if s:
-                    response += struct.pack( 'HH', s.remote_id,s.local_id )
+                    response += struct.pack( '!HH', s.remote_id,s.local_id )
                     self.belongs[s] = sock.fileno()
             sock.send(struct.pack('ii',0,len(response))+response )                           #response for subscribe command
             return off
         elif cmd==1:    #unsubscribe
             while off<size:
-                local_id, = struct.unpack_from('H',data,off); off+=struct.calcsize('H')
+                local_id, = struct.unpack_from('!H',data,off); off+=struct.calcsize('!H')
                 s = self.unsubcribe(local_id)
                 if s in self.belongs:
                     self.belongs.pop(s)
@@ -397,7 +397,7 @@ class Subscriber(TCPClient):
                 s = self.subscriptions[i]
                 if s.filed:
                     continue
-                payload+=struct.pack(f'HH{len(s.item)}s',i,len(s.item),s.item.encode( ) )
+                payload+=struct.pack(f'!HH{len(s.item)}s',i,len(s.item),s.item.encode( ) )
                 filed.append(s)
             try:
                 if len(filed)>0:
