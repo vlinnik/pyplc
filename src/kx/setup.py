@@ -82,15 +82,37 @@ def find(devs,mac):
         if x['mac']==mac:
             return x
 
-def setup(node_id,layout=[]):
-    # if fexists('krax.conf'):
-    #     with open('krax.conf','r') as l:
-    #         conf = json.loads(l.readline())
-    #         layout = conf['layout']
-    # if fexists('krax.dat'):
-    #     with open('krax.dat','r') as l:
-    #         krax.restore( l.read() )
+def save():
+    sure = input('Save changes:').upper()
+    if sure!='Y':
+        print('Canceled!')
+        return
 
+    node_id = input('Node ID:')
+    try:
+        node_id = int(node_id)
+    except:
+        node_id = 1
+
+    scanTime = input('Enter scan time (ms):')
+    try:
+        scanTime = int(scanTime)
+    except:
+        scanTime = 100
+
+    layout = krax.devices('mac')
+    devs = krax.devices('device_id')
+
+    with open('krax.conf','w') as l:
+        conf = { 'node_id':node_id , 'scanTime':scanTime , 'layout':layout,'devs': devs ,'ipv4':'0.0.0.0'}
+        json.dump(conf,l )
+    with open('krax.dat','w') as d:
+        d.write(krax.save())
+
+    print('Bye!')
+
+
+def setup(node_id,layout=[]):
     devs = rescan(node_id,max=len(layout))
     show_devs(devs,layout)
     while True:

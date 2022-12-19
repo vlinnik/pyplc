@@ -32,8 +32,8 @@ if __name__!='__main__':
         scanTime = 100
         devs = []
 
-    cli = CLI()         #simple telnet 
-    posto = POSTO( )    #simple share data over tcp 
+    cli = CLI()                   #simple telnet 
+    posto = POSTO( port=9004 )    #simple share data over tcp 
     plc = PYPLC( devs, period = scanTime, krax = krax , pre = cli ,post = posto  )
     hw = plc.state
     __all__=['plc','hw','passive','exports']
@@ -54,7 +54,7 @@ if __name__!='__main__':
                     info = [i.strip() for i in info.split(';')]
                     if id.match(info[0]) and num.match(info[-2]) and num.match(info[-1]) :
                         info = [ i.strip() for i in info ]
-                        ch = plc.slots[int(info[-2])].channel(int(info[-1]))
+                        ch = plc.slots[int(info[-2])-1].channel(int(info[-1])-1)
                         plc.declare(ch,info[0])
                         vars = vars+1
                 except Exception as e:
@@ -85,11 +85,11 @@ def passive():
     while True:
         with plc(ctx=globals()):
             uptime = time.time()-start_time
-            try:
-                if min_mem > gc.mem_free():
-                    min_mem = gc.mem_free()
-            except:
-                pass
             if stat_time+1<=uptime:
+                try:
+                    if min_mem > gc.mem_free():
+                        min_mem = gc.mem_free()
+                except:
+                    pass
                 stat_time = uptime
                 print(f'\rUpTime: {uptime:.0f}\tScanTime: {plc.scanTime:.4f}\tMem min:  {min_mem}\t',end='')

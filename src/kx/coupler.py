@@ -10,6 +10,14 @@ def __fexists(filename):
     except OSError:
         return False
 
+
+def passive():
+    print('Running empty program in coupler mode')
+    global plc
+    while True:
+        with plc(ctx=globals()):
+            pass
+
 if __name__!='__main__':
     conf = { }
     ipv4 = 'localhost'
@@ -32,9 +40,12 @@ if __name__!='__main__':
 
     cli = CLI(port=2456)           #simple telnet 
     posto = POSTO( port = 9004)    #simple share data over tcp 
-    plc = PYPLC( devs, period = scanTime, pre = cli ,post = [posto,__plc]  )
+    plc = PYPLC( devs, period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
     __all__ = ['plc','hw','passive','exports']
 
+    plc.passive = passive          #
+    plc.connection = __plc         #
+   
     if __fexists('io.csv'):
         vars = 0
         errs = 0
@@ -49,8 +60,8 @@ if __name__!='__main__':
                         info = [ i.strip() for i in info ]
                         slot = int(info[-2])
                         ch_num = int(info[-1])
-                        s = __plc.subscribe( f'plc.S{slot:02}C{ch_num:02}',info[0] )
-                        ch = eval( f'plc.slots[{info[-2]}].channel({info[-1]})' )
+                        s = __plc.subscribe( f'S{slot:02}C{ch_num:02}',info[0] )
+                        ch = eval( f'plc.slots[{info[-2]}-1].channel({info[-1]}-1)' )
                         plc.declare(ch,info[0])
                         if ch.rw:
                             s.write = ch #а при получении нового значения от сервера происходит запись в Channel
@@ -59,14 +70,6 @@ if __name__!='__main__':
                         ch.bind(s)  #изменения канала ввода/вывода производит запись в Subscription
                         vars = vars+1
                 except Exception as e:
-                    print(e)
+                    print(e,info)
                     errs = errs+1
         print(f'Declared {vars} variable, have {errs} errors')
-
-
-def passive():
-    print('Running empty program in coupler mode')
-    global plc
-    while True:
-        with plc(ctx=globals()):
-            pass
