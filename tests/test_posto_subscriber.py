@@ -21,7 +21,7 @@ def __fexists(filename):
     except OSError:
         return False
 
-cpm = Subscriber( '192.168.4.1' )
+cpm = Subscriber( '192.168.1.68' )
 # if __fexists('io.csv'):
 #     vars = 0
 #     errs = 0
@@ -45,7 +45,9 @@ cpm = Subscriber( '192.168.4.1' )
 #     print(f'Declared {vars} variable, have {errs} errors')
 
 cli = CLI(port=2456)
-cpm.subscribe('hw.MIXER_ON_1')
+cpm.subscribe('S01C01')
+cpm.subscribe('S03C01')
+cpm.subscribe('S04C01')
 while True:
     cpm( )
     cli( ctx = globals() )

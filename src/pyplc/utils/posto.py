@@ -164,7 +164,7 @@ class POSTO(TCPServer):
             return s
         except Exception as e:
             print(f'Exception in subscribe for {item}:',e)
-            sys.print_exception(e)
+            # sys.print_exception(e)
 
         return None
     def unsubscribe(self,local_id: int):
@@ -219,6 +219,13 @@ class POSTO(TCPServer):
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
                     s.remote(value,source=id(sock),ctx=self.ctx)        #получено новое значение
+        elif cmd==3:
+            if size<=8+8:
+                sock.send( struct.pack('ii',3,size) + data[8:size] + struct.pack('q',time.time_ns()) )
+            else:
+                ts_0,ts_1 = struct.unpack_from('qq',data,off)
+                ts_2 = time.time_ns()
+                print(f'keep alive stat {ts_2-ts_0}/{ts_1-ts_0}/{ts_2-ts_1}')
         else:
             pass    #keep alive or unsupported command
         
@@ -283,13 +290,16 @@ class Subscriber(TCPClient):
         def __getattr__(self, __name: str):
             if not __name.endswith('__parent') and __name in self.__parent.items:
                 obj = self.__item(__name)
-                return obj()
+                if obj.remote_id is not None:
+                    return obj()
+                return None
             return super().__getattribute__(__name)
 
         def __setattr__(self, __name: str, __value):
             if not __name.endswith('__parent') and __name in self.__parent.items:
                 obj = self.__item(__name)
-                obj(__value)
+                if obj.remote_id is not None:
+                    obj(__value)
                 return
 
             return super().__setattr__(__name,__value)
@@ -316,6 +326,8 @@ class Subscriber(TCPClient):
         self.subscriptions = { }
         self.keepalive = time.time()
         self.state = self.__State(self)
+        self.online = False
+        self.stat = [None]*3
 
         super().__init__(host,port)
 
@@ -324,6 +336,7 @@ class Subscriber(TCPClient):
 
     def disconnected(self):
         print(f'Subscriber is offline. Gone {len(self.subscriptions)-len(self.unsubscribed)} subscriptions')
+        self.online = False
         for i in self.subscriptions:
             s = self.subscriptions[i]
             s.remote_id = None
@@ -357,13 +370,15 @@ class Subscriber(TCPClient):
         off = 8
         if cmd==0:  #subscribe response
             while off<size:
-                local_id,remote_id = struct.unpack_from('HH',data,off); off+=struct.calcsize('HH')
+                local_id,remote_id = struct.unpack_from('!HH',data,off); off+=struct.calcsize('!HH')
                 if local_id in self.subscriptions:
                     s = self.subscriptions[local_id]
                     s.remote_id = remote_id
                     s.filed = False
                     if local_id in self.unsubscribed:
-                        self.unsubscribed.remove(local_id)
+                        self.unsubscribed.remove(local_id)                       
+            if len(self.unsubscribed)==0:
+                self.online = True
             return off
         elif cmd==2:  #data changed 
             HBH = struct.calcsize('!HBH')
@@ -383,7 +398,19 @@ class Subscriber(TCPClient):
                 off+=d_size
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
-                    s.remote( value )
+                    s.remote( value,source = id(self.sock) )
+        elif cmd==3: #keepalive
+            if size<40:
+                self.send( struct.pack('ii',3,size) + data[8:8+size] + struct.pack('q',time.time_ns()) )
+            else:
+                ts_0,ts_1,ts_2,ts_3 = struct.unpack_from('qqqq',data,off)   #ts_0 - мы посылали ts_1 - нам в ответ когда отправили ts_2 - мы снова туда отправили ts_3 - нам в ответ
+                ts_0/=1000000
+                ts_1/=1000
+                ts_2/=1000000
+                ts_3/=1000
+                ts_4 = time.time_ns()/1000000
+                self.stat=[(ts_2-ts_0)/2,(ts_3-ts_1)/2,(ts_4-ts_0)/4]
+                print(f'OUT:{self.stat[0]:.0f}/{self.stat[2]:.0f}\tIN:{self.stat[1]:.0f}')
 
         return size
 
@@ -415,6 +442,9 @@ class Subscriber(TCPClient):
                 for s in modified:
                     value = s( )
                     remote_id = s.remote_id
+                    if s.source is not None:
+                        s.modified = False
+                        continue
                     if value is None or len(payload)>self.b_size-32 or remote_id is None:
                         continue
                     elif type(value) is bool:
@@ -427,9 +457,11 @@ class Subscriber(TCPClient):
                         payload+=struct.pack('!HBHs',remote_id,3,len(value),value)
                     s.modified = False 
 
-                self.send( struct.pack('ii',2,len(payload))+payload)
+                if len(payload)>0:
+                    self.send( struct.pack('ii',2,len(payload))+payload)
+
                 self.keepalive = time.time()
             else:
                 if time.time()>self.keepalive+5:
-                    self.send( struct.pack('ii',3,0) ) #keep alive
+                    self.send( struct.pack('iiq',3,8,time.time_ns()) ) #keep alive
                     self.keepalive = time.time()

@@ -74,11 +74,12 @@ class TCPServer():
                         try:
                             client,addr = svr.accept()
                             client.setblocking(False)
+                            client.setsockopt(socket.IPPROTO_TCP, 1, 1)
                             poll.register(client,select.POLLIN | select.POLLHUP | select.POLLERR)
                             sockets[client.fileno()] = client
                             self.connected(client)
                         except Exception as e:
-                            print('exception {e}')
+                            print(f'exception {e}')
                             pass
                     else:
                         try:

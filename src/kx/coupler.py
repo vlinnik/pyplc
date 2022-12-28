@@ -11,7 +11,7 @@ def __fexists(filename):
         return False
 
 
-def passive():
+def __passive():
     print('Running empty program in coupler mode')
     global plc
     while True:
@@ -25,8 +25,8 @@ if __name__!='__main__':
     if __fexists('krax.conf'):
         with open('krax.conf','rb') as f:
             conf = json.loads(f.readline())
-            if 'coupler' in conf:
-                ipv4=conf['coupler']
+            if 'ipv4' in conf:
+                ipv4=conf['ipv4']
 
     __plc = Subscriber( ipv4 )
     hw = __plc.state
@@ -38,12 +38,12 @@ if __name__!='__main__':
         scanTime = 100
         devs = []
 
-    cli = CLI(port=2456)           #simple telnet 
-    posto = POSTO( port = 9004)    #simple share data over tcp 
+    cli = CLI(port=2455)           #simple telnet 
+    posto = POSTO( port = 9003)    #simple share data over tcp 
     plc = PYPLC( devs, period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
-    __all__ = ['plc','hw','passive','exports']
+    plc.passive = __passive
+    __all__ = ['plc','hw','exports']
 
-    plc.passive = passive          #
     plc.connection = __plc         #
    
     if __fexists('io.csv'):

@@ -89,6 +89,11 @@ class PYPLC():
             else:
                 addr=register(t,addr)
 
+    def sync(self,output=True):
+        for s in self.slots:
+            if (s.family == Module.IN and output==False) or (s.family == Module.OUT and output==True):
+                s.sync()
+        
     def __enter__(self):
         if isinstance(self.pre,list):
             for pre in self.pre:
@@ -103,19 +108,19 @@ class PYPLC():
         try:
             if self.scanTime/1000<self.period:
                 time.sleep_ms(int(self.period-self.scanTime))
+        except KeyboardInterrupt:
+            print('Terminating program')
+            raise SystemExit
         except:
             if self.scanTime<self.period:
                 time.sleep(self.period/1000-self.scanTime/1000)
-        
-        for s in self.slots:
-            if s.family == Module.IN:
-                s.sync()
+
+        self.sync( False )
+
         self.__ts = time.time_ns()
 
     def __exit__(self, type, value, traceback):
-        for s in self.slots:
-            if s.family == Module.OUT:
-                s.sync()
+        self.sync(True)
 
         if isinstance(self.post,list):
             for post in self.post:
@@ -123,9 +128,6 @@ class PYPLC():
                     post(**self.kwds)
         elif callable(self.post):
             self.post( **self.kwds )
-
-        if self.krax is not None:
-            self.krax.master(False)
 
         self.scanTime = (time.time_ns() - self.__ts)/1000000000
 

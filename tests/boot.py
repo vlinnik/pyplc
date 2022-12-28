@@ -8,7 +8,7 @@ def __lan():
     import network
     from machine import Pin
     try:
-        lan = network.LAN(mdc=Pin(23),mdio=Pin(18),power=Pin(5),id=None,phy_addr=1,phy_type=network.PHY_LAN8720)
+        lan = network.LAN(mdc=Pin(23),mdio=Pin(18),power=Pin(4),id=None,phy_addr=1,phy_type=network.PHY_LAN8720)
         if lan.active():
             lan.active(False)
         lan.active(True)
