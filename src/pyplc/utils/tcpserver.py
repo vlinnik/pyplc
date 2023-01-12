@@ -30,6 +30,11 @@ class TCPServer():
         self.b_size = b_size
         self.buff={ }
         self.rx=0
+        
+    def term(self):
+        socks = list(self.sockets.values())
+        for s in socks:
+            self.close(s)
 
     def connected(self,sock):
         print(f'connected client {sock}')

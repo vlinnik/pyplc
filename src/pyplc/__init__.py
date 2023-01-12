@@ -5,9 +5,11 @@ from .modules import KRAX430,KRAX530,KRAX455
 from .core import PYPLC
 import gc
 
+print(f'Welcome to PyPLC version 0.0.5')
 if __name__!="__main__":
     try:
         mem = gc.mem_free()
+        print(f"\tRuntime mode. Available {mem} bytes")
     except:
-        mem = '<unknown>'
-    print(f'Welcome to PyPLC version 0.0.4. Available {mem} bytes')
+        print('\tSimulation mode')
+        pass    

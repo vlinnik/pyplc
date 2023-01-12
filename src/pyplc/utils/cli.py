@@ -37,6 +37,10 @@ class CLI(TCPServer):
                 if cmd=='quit':
                     sock.send(b'Bye!\n')
                     self.close(sock)
+                elif cmd=='term':
+                    sock.send(b'Yes master. Bye!\n')
+                    self.close(sock)
+                    raise SystemExit
                 elif cmd=='stat':
                     sock.send(f'Mem: {gc.mem_free()}\n'.encode())
                     sock.send(CLI.G_PS)

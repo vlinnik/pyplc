@@ -1,6 +1,6 @@
 from .modules import KRAX530, KRAX430,KRAX455, Module
 from .channel import Channel
-import time,gc,re
+import time,re,sys
 
 class PYPLC():
     """
@@ -61,6 +61,7 @@ class PYPLC():
         self.vars = {}
         self.state = self.__State(self)
         self.kwds = {}
+        self.safe = True
         addr = 0
         if krax is not None:
             Module.reader = krax.read
@@ -102,14 +103,16 @@ class PYPLC():
         elif callable(self.pre):
             self.pre( **self.kwds )
         
-        if self.krax is not None:
-            self.krax.master(True)
+        if self.krax is not None and self.safe:
+            self.krax.master(1)
 
         try:
             if self.scanTime/1000<self.period:
                 time.sleep_ms(int(self.period-self.scanTime))
         except KeyboardInterrupt:
             print('Terminating program')
+            if 'main' in sys.modules:
+                sys.modules.pop('main')
             raise SystemExit
         except:
             if self.scanTime<self.period:
