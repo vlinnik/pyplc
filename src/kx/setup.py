@@ -52,11 +52,11 @@ if __name__!='__main__':
         node_id = conf['node_id'] if 'node_id' in conf else 1
         rate = conf['rate'] if 'rate' in conf else 0x0B
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-        iface = conf['iface'] if 'iface' in conf else 1
+        iface = conf['iface'] if 'iface' in conf else 0
         print(f'Staring node configuration with id={node_id}...')
         wps(node_id,rate=rate,scanTime=scanTime,iface=iface)
     except Exception as e:
         print(e)
         print(f'Staring default configuration with id=1...')
-        wps(1,rate=11,scanTime=100,iface=1)
+        wps(1,rate=11,scanTime=100,iface=0)
         pass
