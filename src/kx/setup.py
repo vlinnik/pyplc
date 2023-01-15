@@ -58,5 +58,5 @@ if __name__!='__main__':
     except Exception as e:
         print(e)
         print(f'Staring default configuration with id=1...')
-        wps(1,rate=0x1c,scanTime=100,iface=1)
+        wps(1,rate=11,scanTime=100,iface=1)
         pass
