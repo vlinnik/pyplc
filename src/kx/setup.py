@@ -26,7 +26,7 @@ class Setup():
         except:
             ipv4='0.0.0.0'
 
-        with open('krax.conf','w') as l:
+        with open('krax.json','w') as l:
             conf = { 'node_id':node_id , 'layout':layout,'devs': devs ,'ipv4':ipv4}
             conf.update(kwargs)
             json.dump(conf,l )
@@ -45,3 +45,18 @@ class Setup():
         print('KRAX.IO setup complete!')
 
 wps = Setup( )
+if __name__!='__main__':
+    try:
+        with open('krax.json','rb') as f:
+            conf = json.load(f)
+        node_id = conf['node_id'] if 'node_id' in conf else 1
+        rate = conf['rate'] if 'rate' in conf else 0x0B
+        scanTime = conf['scanTime'] if 'scanTime' in conf else 100
+        iface = conf['iface'] if 'iface' in conf else 1
+        print(f'Staring node configuration with id={node_id}...')
+        wps(node_id,rate=rate,scanTime=scanTime,iface=iface)
+    except Exception as e:
+        print(e)
+        print(f'Staring default configuration with id=1...')
+        wps(1,rate=0x1c,scanTime=100,iface=1)
+        pass

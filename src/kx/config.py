@@ -127,24 +127,24 @@ class Manager():
             return False
 
     def __krax_init(self):
-        if Manager.__fexists('krax.conf'):
-            with open('krax.conf', 'rb') as f:
-                conf = self.conf = json.loads(f.readline())
-                iface = conf['iface'] if 'iface' in conf else 0
-                rate = conf['rate'] if 'rate' in conf else 0
-                scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-                network.WLAN(iface).active(True)
-                krax.init(conf['node_id'], iface=iface, scanTime = scanTime, rate=rate )
-                if Manager.__fexists('krax.dat'):
-                    with open('krax.dat', 'rb') as d:
-                        krax.restore(d.read())
+        conf = self.conf 
+        iface = conf['iface'] if 'iface' in conf else 0
+        rate = conf['rate'] if 'rate' in conf else 0
+        scanTime = conf['scanTime'] if 'scanTime' in conf else 100
+        network.WLAN(iface).active(True)
+        krax.init(conf['node_id'], iface=iface, scanTime = scanTime, rate=rate )
+        if Manager.__fexists('krax.dat'):
+            with open('krax.dat', 'rb') as d:
+                krax.restore(d.read())
 
     def load(self):
         global cli, posto, plc, hw
-        self.__krax_init()
+        if Manager.__fexists('krax.json'):
+            with open('krax.json', 'rb') as f:
+                conf = self.conf = json.load(f)
         conf = self.conf
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-        devs = conf['devs']
+        devs = conf['devs'] if 'devs' in conf else []
         
         try:
             plc
@@ -162,6 +162,7 @@ class Manager():
         plc = PYPLC(devs, period=scanTime, krax=krax, pre=cli, post=posto)
         plc.passive = __passive
         hw = plc.state
+        plc.connection = plc    #чтобы  не отличался от coupler
 
         if self.__fexists('io.csv'):
             vars = 0
@@ -187,6 +188,7 @@ class Manager():
             gc.collect()
             print(
                 f'Declared {vars} variable, have {errs} errors, {time.time()-startAt} secs')
+        self.__krax_init()
 
 if __name__ != '__main__' and __target_krax:
     board = Board()

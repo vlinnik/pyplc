@@ -76,9 +76,9 @@ class Manager():
     def load(self):
         conf = { }
         ipv4 = '0.0.0.0'
-        if Manager.__fexists('krax.conf'):
-            with open('krax.conf','rb') as f:
-                conf = json.loads(f.readline())
+        if Manager.__fexists('krax.json'):
+            with open('krax.json','rb') as f:
+                conf = json.load(f)
                 if 'ipv4' in conf:
                     ipv4=conf['ipv4']
 
