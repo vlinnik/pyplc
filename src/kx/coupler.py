@@ -125,6 +125,6 @@ if __name__!='__main__':
     manager = Manager( )
     def kx_init():
         return manager.load()
-    __all__ = ['board','kx_init']
+    __all__ = ['board','kx_init','exports']
 
    

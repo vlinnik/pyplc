@@ -53,6 +53,8 @@ class PYPLC():
     def __init__(self,*args,krax=None,pre=None,post=None,period=100):
         self.slots = []
         self.scanTime = 0
+        self.userTime = 0
+        self.idleTime = 0
         self.__ts = None
         self.pre = pre
         self.post = post
@@ -66,6 +68,7 @@ class PYPLC():
         if krax is not None:
             Module.reader = krax.read
             Module.writer = krax.write
+        print(f'Initialized PYPLC with scan time={self.period} msec')
 
         def register(t,addr):
             if isinstance(t,int) or isinstance(t,str):
@@ -96,33 +99,36 @@ class PYPLC():
                 s.sync()
         
     def __enter__(self):
+        self.__fts = time.time_ns()
         if isinstance(self.pre,list):
             for pre in self.pre:
                 if callable(pre):
                     pre(**self.kwds)
         elif callable(self.pre):
             self.pre( **self.kwds )
-        
         if self.krax is not None and self.safe:
             self.krax.master(1)
 
         try:
-            if self.scanTime/1000<self.period:
-                time.sleep_ms(int(self.period-self.scanTime))
+            self.idleTime += (self.period/1000-self.scanTime)
+            if self.idleTime>0:
+                time.sleep_ms(int(self.idleTime*1000))
+            else:
+                self.idleTime=(self.period/1000-self.scanTime)
         except KeyboardInterrupt:
             print('Terminating program')
             if 'main' in sys.modules:
                 sys.modules.pop('main')
             raise SystemExit
         except:
-            if self.scanTime<self.period:
-                time.sleep(self.period/1000-self.scanTime/1000)
+            time.sleep(self.idleTime)
 
         self.sync( False )
 
         self.__ts = time.time_ns()
 
     def __exit__(self, type, value, traceback):
+        self.userTime = (time.time_ns() - self.__ts)/1000000000
         self.sync(True)
 
         if isinstance(self.post,list):
@@ -132,7 +138,7 @@ class PYPLC():
         elif callable(self.post):
             self.post( **self.kwds )
 
-        self.scanTime = (time.time_ns() - self.__ts)/1000000000
+        self.scanTime = (time.time_ns() - self.__fts)/1000000000
 
     def __call__(self,**kwds):
         """python vs micropython: в micropython globals() общий как будто всюду, или как минимум из вызывающего контекста

@@ -1,4 +1,4 @@
-import re
+import re,time
 """
 Элемент программы с входами и выходами, которые можно присоединить к callable
 Пример:
@@ -46,6 +46,7 @@ class POU():
                 self.__bindings = {}
                 self.__exports=[]
                 self.id = type(self).id if id is None else id
+                self.cpu = 0
                 kwvalues = kwargs
 
                 for key in type(self).inputs: #bind inputs to external data source
@@ -81,6 +82,7 @@ class POU():
                 super().__setattr__(__name,__value)
 
             def __call__(self, *args, **kwds):
+                __ts = time.time_ns()
                 kwargs=kwds
 
                 for key in type(self).inputs:
@@ -98,6 +100,8 @@ class POU():
                     if key not in type(self).inputs and hasattr(self,key):
                         val = kwargs[key]
                         self.__setattr__(key,val)
-                return super().__call__(*args, **kwargs)
+                x=super().__call__(*args, **kwargs)
+                self.cpu = (time.time_ns() - __ts)/1000000000
+                return x
 
         return MagicPOU
