@@ -1,25 +1,22 @@
-from kx.config import *
+# This is project entry point.
+import time
 from pyplc import SFC
-import time,struct
+from kx.config import *
+print('Starting up KRAX.IO project!')
+plc,hw = kx_init( )
 
-plc,hw = kx_init ( )
-
-@SFC(inputs=[], outputs=[], vars=[],persistent=['state'])
-class WPS(SFC):
+@SFC(inputs=[], outputs=[], var=[])
+class WPS_FN():
     def __init__(self, *args, **kwargs):
-        self.state = 0
         pass
 
     def longPress(self):
-        self.state+=10
         self.log(f'активирована функция длинного нажатия {self.T}')
 
     def doubleClick(self):
-        self.state-=1
         self.log(f'активирована функция двойного нажатия {self.T}')
 
     def click(self):
-        self.state+=1
         self.log(f'активирована функция короткого нажатия {self.T}')
 
     def __call__(self, *args, **kwargs):
@@ -36,16 +33,12 @@ class WPS(SFC):
             else:
                 self.click( )
 
-wps = WPS(id='wps')
-
-
-plc.config( persist = board.eeprom )
-
-start = time.time()
-while time.time()-start<5:
-    with plc(ctx=globals()):
-        wps( )
-
-wps.state+=1
-plc.backup( )
-plc.flush( )
+instances = [] #here should be listed user defined programs
+cycles = 0
+begin_ts = time.time_ns()
+while cycles<5000000:
+  cycles+=1
+  for i in instances:
+    i()
+end_ts = time.time_ns()
+print(f'{(end_ts-begin_ts)/1000000} ms')

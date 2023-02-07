@@ -1,7 +1,7 @@
 from pyplc import SFC
 
 @SFC(inputs=['clk','pt','reset'],outputs=['q','et'])
-class Stopwatch():
+class Stopwatch(SFC):
     """Таймер с настраевыемым моментом сработки. Подобие часов используемых при игре в шахматы
 
     Через установленное время (pt) при clk = True q -> True
@@ -27,7 +27,7 @@ class Stopwatch():
         self.q = False
 
 @SFC(inputs=['clk','pt'],outputs=['q','et'])
-class TON():
+class TON(SFC):
     def __init__(self,clk=False,pt=0.0):
         self.clk = clk
         self.pt = pt
@@ -45,7 +45,7 @@ class TON():
             yield self.q
 
 @SFC(inputs=['clk','pt'],outputs=['q','et'])
-class TOF():
+class TOF(SFC):
     def __init__(self,clk=False,pt=0.0):
         self.clk = clk
         self.pt = pt
@@ -64,7 +64,7 @@ class TOF():
                 yield self.q
 
 @SFC(inputs=['enable','t_on','t_off'],outputs=['q'],id='blink')
-class BLINK():
+class BLINK(SFC):
     def __init__(self,enable=False,t_on:float=1.0,t_off:float=1.0):
         self.enable = enable
         self.t_on = t_on

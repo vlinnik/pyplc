@@ -1,24 +1,20 @@
-import time
 from pyplc import PYPLC
 from pyplc.utils import CLI, POSTO
 from .misc import exports
-import os
-import json
-import re
-import gc
-import time
+from io import IOBase
+import os,struct,json,re,gc,time
 
 __target_krax = True
 try:
-    import krax
-    import network  # доступно на micropython только
-    from machine import Pin
+    import krax,network # доступно на micropython только
+    from machine import Pin,ADC
+    from .at25640b import AT25640B
 except:
     from .coupler import *  # если не не micropython-e => то режим coupler
     __target_krax = False
 
 startAt = time.time()
-
+        
 def __passive():
     print('Running empty program in PLC mode')
     global plc
@@ -50,13 +46,16 @@ def __passive():
                 print(
                     f'\rUpTime: {uptime:.0f}\tScanTime: {plc.scanTime:.4f}\tMem min:  {min_mem}\t', end='')
 
+
 class Board():
     def __init__(self):
+        self.__adc = ADC(Pin(35))        # create an ADC object acting on a pin
         self.__wps = Pin(34, Pin.IN)
         self.__comm = Pin(15, Pin.OUT)
         self.__err = Pin(33, Pin.OUT)
         self.__run = Pin(2, Pin.OUT)
         self.__swps = Pin(32, Pin.OUT)
+        self.__storage = None
 
     def get_wps(self) -> bool:
         return self.__wps.value() == 0
@@ -104,10 +103,23 @@ class Board():
     @run.setter
     def run(self, value: bool):
         self.set_run(value)
+    
+    @property 
+    def vdd(self):
+        return self.__adc.read_uv()/1000*0.031
+    
+    @property
+    def eeprom(self)->IOBase:
+        if self.__storage is not None:
+            return self.__storage
 
+        self.__storage = AT25640B()
+        return self.__storage
+        
 class Manager():
     """Управление настройками KRAX.IO - загрузка настроек и подготовка глобальных переменных plc,hw,posto,cli
     """
+
     def __init__(self):
         global eth
         try:
@@ -115,7 +127,7 @@ class Manager():
         except:
             ipv4 = '0.0.0.0'
         self.conf = {'ipv4': ipv4, 'node_id': 1, 'scanTime': 100,
-                     'layout': [], 'devs': [], 'iface': 0}
+                     'layout': [], 'devs': [], 'iface': 0, 'hostname' : 'krax'}
         pass
 
     @staticmethod
@@ -127,12 +139,13 @@ class Manager():
             return False
 
     def __krax_init(self):
-        conf = self.conf 
+        conf = self.conf
         iface = conf['iface'] if 'iface' in conf else 0
         rate = conf['rate'] if 'rate' in conf else 0
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
+        hostname = conf['hostname'] if 'hostname' in conf else 'krax'
         network.WLAN(iface).active(True)
-        krax.init(conf['node_id'], iface=iface, scanTime = scanTime, rate=rate )
+        krax.init(conf['node_id'], iface=iface, scanTime=scanTime, rate=rate,hostname=hostname)
         if Manager.__fexists('krax.dat'):
             with open('krax.dat', 'rb') as d:
                 krax.restore(d.read())
@@ -145,7 +158,7 @@ class Manager():
         conf = self.conf
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         devs = conf['devs'] if 'devs' in conf else []
-        
+
         try:
             plc
             print('Cleanup objects: cli/posto/plc')
@@ -156,13 +169,13 @@ class Manager():
             del plc
         except:
             pass
-       
+
         cli = CLI()  # simple telnet
         posto = POSTO(port=9004)  # simple share data over tcp
         plc = PYPLC(devs, period=scanTime, krax=krax, pre=cli, post=posto)
         plc.passive = __passive
         hw = plc.state
-        plc.connection = plc    #чтобы  не отличался от coupler
+        plc.connection = plc  # чтобы  не отличался от coupler
 
         if self.__fexists('io.csv'):
             vars = 0
@@ -174,7 +187,7 @@ class Manager():
                 for info in csv:
                     try:
                         info = [i.strip() for i in info.split(';')]
-                        if len(info)<4:
+                        if len(info) < 4:
                             continue
                         if id.match(info[0]) and num.match(info[-2]) and num.match(info[-1]):
                             info = [i.strip() for i in info]
@@ -190,10 +203,12 @@ class Manager():
                 f'Declared {vars} variable, have {errs} errors, {time.time()-startAt} secs')
         self.__krax_init()
 
+
 if __name__ != '__main__' and __target_krax:
     board = Board()
     manager = Manager()
+
     def kx_init():
         manager.load()
-        return plc,hw
-    __all__ = ['board','kx_init']
+        return plc, hw
+    __all__ = ['board', 'kx_init']

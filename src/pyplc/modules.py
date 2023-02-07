@@ -121,10 +121,12 @@ class KRAX530(Module):
             o_val = Module.reader(self.addr,1)[0]
         else:
             o_val = self.data
+        f_mod = (self.data ^ o_val) & ~self.dirty 
 
-        n_val = o_val & (0xFF & ~self.dirty) | (self.data & self.dirty)
+        self.data = n_val = o_val & (0xFF & ~self.dirty) | (self.data & self.dirty)
         for i in range(0,8):
-            if self.channels[i] and (self.dirty & (0x1<<i))!=0:
+            i_bit = (0x1<<i)
+            if self.channels[i] and ((self.dirty & i_bit)!=0 or (f_mod & i_bit)!=0):
                 self.channels[i].changed( )
         self.dirty = 0x00
         if callable(Module.writer):

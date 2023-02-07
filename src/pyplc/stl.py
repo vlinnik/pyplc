@@ -1,16 +1,20 @@
 from .pou import POU
 
-class STL(object):
-    def __init__(self,inputs=[],outputs=[],vars=[],id=None,*args,**kwargs):
-        self.inputs = inputs
-        self.output = outputs
-        self.vars = vars
-        self.id = id
-
-    def __call__(self, cls):
-        @POU(inputs=self.inputs,outputs=self.output,vars=self.vars,id=cls.__name__ if self.id is None else self.id )
-        class MagicSTL(cls):
-            def __init__(self,*args,**kwargs):
-                super().__init__(*args,**kwargs)
-
-        return MagicSTL
+class STL(POU):
+    def __call__(self, *args,**kwargs):
+        if len(args)==1 and issubclass(args[0],STL):
+            cls = args[0]
+            helper = self
+            class Instance(cls):
+                def __init__(self,*args,**kwargs):
+                    id = kwargs['id'] if 'id' in kwargs else helper.id
+                    if id is not None and len(helper.__persistent__)>0 : POU.__persistable__.append(self)
+                    POU.__init__(self,inputs=helper.inputs,outputs=helper.outputs,vars=helper.outputs,persistent = helper.__persistent__,id=id)
+                    kwvals = self.__inputs__( **kwargs )
+                    cls.__init__(self,*args,**kwvals)
+                
+                def __call__(self,*args,**kwargs):
+                    self.__pou__( **kwargs )                    #обработка параметров
+                    return super().__call__( *args,**kwargs )
+            return Instance
+        return super().__call__(*args,**kwargs)

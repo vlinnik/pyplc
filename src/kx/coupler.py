@@ -1,7 +1,8 @@
 from pyplc.utils import POSTO,Subscriber,CLI
 from pyplc import PYPLC
 from .misc import exports
-import os,re,json
+from io import IOBase
+import os,re,json,struct
 
 class Board():
     def __init__(self):
@@ -9,6 +10,7 @@ class Board():
         self.__comm = False
         self.__err = False
         self.__run = False
+        self.__storage = None
 
     def get_wps(self) -> bool:
         return self.__wps
@@ -56,6 +58,25 @@ class Board():
     @run.setter
     def run(self, value: bool):
         self.set_run(value)
+    
+    @property 
+    def vdd(self):
+        return 24.0
+
+    @property
+    def eeprom(self)->IOBase:
+        if self.__storage is not None:
+            return self.__storage
+        
+        #normal file
+        self.__storage = open('persist.dat','a+b')
+        try:
+            self.__storage.seek(-8,2)
+            b_size, = struct.unpack('!q',self.__storage.read(8))
+            self.__storage.seek( -b_size-8, 2 )
+        except OSError:
+            pass
+        return self.__storage
 
 class Manager():
     """Управление настройками KRAX.IO - загрузка настроек и подготовка глобальных переменных plc,hw,posto,cli
@@ -76,8 +97,8 @@ class Manager():
     def load(self):
         conf = { }
         ipv4 = '0.0.0.0'
-        if Manager.__fexists('krax.json'):
-            with open('krax.json','rb') as f:
+        if Manager.__fexists('src/krax.json'):
+            with open('src/krax.json','rb') as f:
                 conf = json.load(f)
                 if 'ipv4' in conf:
                     ipv4=conf['ipv4']
@@ -91,10 +112,10 @@ class Manager():
         hw = __plc.state
         plc.connection = __plc         #
         
-        if self.__fexists('io.csv'):
+        if self.__fexists('src/io.csv'):
             vars = 0
             errs = 0
-            with open('io.csv','r') as csv:
+            with open('src/io.csv','r') as csv:
                 csv.readline()  #skip column headers
                 id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
                 num = re.compile(r'[0-9]+')

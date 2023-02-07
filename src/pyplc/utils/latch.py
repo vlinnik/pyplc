@@ -1,7 +1,7 @@
 from pyplc import STL
 
 @STL(inputs=['set','reset'],outputs=['q'])
-class SR():
+class SR(STL):
     """Флаг
     """
     def __init__(self,set=False,reset=False,q=False) -> None:
@@ -21,6 +21,8 @@ class SR():
         self.q=False
 
     def __call__(self,set=None,reset=None):
+        if set is None: set = self.set
+        if reset is None: reset = self.reset
         if set:
             self.q=True
         if reset and not self.__reset:
@@ -28,9 +30,9 @@ class SR():
         self.__reset = self.reset
 
         return self.q
-        
-@STL(inputs=['set','reset'],outputs=['q'])
-class RS():
+    
+@STL(inputs=['set','reset'],outputs=['q'])        
+class RS(STL):
     def __init__(self,reset=False,set=False,q=False) -> None:
         """Конструктор
 
@@ -48,6 +50,8 @@ class RS():
         self.q = False
 
     def __call__(self,reset=None,set=None):
+        if reset is None: reset = self.reset
+        if set is None: set = self.set
         if reset:
             self.q=False
         if set and set!=self.__set:

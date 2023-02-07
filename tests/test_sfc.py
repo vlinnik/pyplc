@@ -1,40 +1,32 @@
 from pyplc import SFC
 import time
 
-@SFC(inputs=['clk','pt'],outputs=['q'])
-class TON():
+@SFC(inputs=['clk','pt'],outputs=['q'],result = 'q')
+class TON(SFC):
     def __init__(self,clk=False,pt=1,q=False):
         self.clk = clk
         self.pt = pt
         self.q = q
 
-    def __call__(self,*args,pt=None,**kwargs) :
-        self.log('initial state')
-        # yield self.until(lambda : self.clk)
+    def __call__(self,*args,**kwargs) :
         for x in self.until(lambda : self.clk):
-            self.log(f'waiting for level')
             yield True
-        self.log('detected level')
-        for x in self.till(lambda: self.clk ,max=pt):
-            self.log(f'waiting {pt} {x} {self.T}')
+        for x in self.till(lambda: self.clk ,max=self.pt):
             yield True
 
         if self.clk:
-            self.log(f'level during {pt} secs. turning on')
             self.q = True
             for x in self.till(lambda: self.clk):
-                self.log(f'waiting for low level')
                 yield True
-            self.log(f'low level. tunring off')
             self.q = False
 
-x = TON(pt=1,id='x')
-cycles=0
+x = TON(pt=1)
+cycle = 0 
+start_ts = time.time_ns()
+while not x.q:
+    x( clk = True )
+    cycle+=1
+end_ts = time.time_ns()
+print(f'{(end_ts-start_ts)/cycle/1000000} ms/call')
 
-while True:
-    cycles = cycles+1
-    x( clk = not x.q)
-    if x.q:
-        x.log(f'cycles {cycles}')
-        cycles= 0
-    time.sleep(1)
+print(f'ok: {x()}')

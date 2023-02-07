@@ -1,56 +1,60 @@
 from .modules import KRAX530, KRAX430,KRAX455, Module
 from .channel import Channel
-import time,re,sys
+from .pou import POU
+from io import IOBase
+import time,re,sys,json
+import hashlib,struct
 
 class PYPLC():
-    """
-    создать конфигурацию модулей из tuple типов модулей, например 
-    slots = layout( (KRAX530,KRAX430,KRAX455) ) 
-    даст нам модуль slots[0] типа KRAX530,slots[1] типа KRAX430 и slots[2] KRAX455
-    """
-    class __State(object):
+    class __State():
         """
         прокси для удобного доступа к значениям переменных ввода вывода
         например если есть канал ввода/вывода MIXER_ON_1, то для записи необходимо MIXER_ON_1(True). 
         альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
         """
-        def __init__(self,plc):
-            self.__plc = plc
-
-        # def __getattribute__(self,__name):  #required only in micropython
-        #      return getattr(self,__name)
+        def __init__(self,parent ):
+            self.__parent = parent 
+        
+        def __item(self,name:str)->Channel:
+            if name in self.__parent.vars:
+                return self.__parent.vars[name]
+            return None
 
         def __getattr__(self, __name: str):
-            if not __name.endswith('__plc') and __name in self.__plc.vars:
-                obj = self.__plc.vars[__name]
+            if not __name.endswith('__parent') and __name in self.__parent.vars:
+                obj = self.__item(__name)
                 return obj()
-            # return super().__getattr__(__name)
-            #return self.__getattribute__(__name)
+            return super().__getattribute__(__name)
 
         def __setattr__(self, __name: str, __value):
-            if not __name.endswith('__plc') and __name in self.__plc.vars:
-                obj = self.__plc.vars[__name]
-                if obj.rw:
-                    obj(__value)
+            if not __name.endswith('__parent') and __name in self.__parent.vars:
+                obj = self.__item(__name)
+                obj(__value)
                 return
 
-            return super().__setattr__(__name,__value)
+            super().__setattr__(__name,__value)
 
         def __data__(self):
-            return { var: self.__plc.vars[var]() for var in self.__plc.vars }
-        
-        def bind(self,__name:str,__notify: callable):
-            if __name not in self.__plc.vars:
+            return { var: self.__item(var)() for var in self.__parent.vars }
+
+        def bind(self,__name:str,__notify: callable):   
+            if __name not in self.__parent.vars:
                 return
-            var = self.__plc.vars[__name]
-            var.bind( __notify )
+            s = self.__item(__name)
+            s.bind( __notify )
+
         def unbind(self,__name:str,__notify: callable):
-            if __name not in self.__plc.vars:
+            if __name not in self.__parent.vars:
                 return
-            var = self.__plc.vars[__name]
-            var.unbind( __notify )
+            s = self.__item(__name)
+            s.unbind( __notify )
 
     def __init__(self,*args,krax=None,pre=None,post=None,period=100):
+        POU.__persistable__.clear( ) 
+        self.__backup__ = None  #состояние из backup восстановлено
+        self.__dump__ = None    #текущий dump, который нужно сохранить
+        self.__backup_timeout__ = None #сохранение происходит с задержкой, чтобы увеличить срок службы EEPROM
+        self.has_eeprom = False
         self.slots = []
         self.scanTime = 0
         self.userTime = 0
@@ -97,7 +101,100 @@ class PYPLC():
         for s in self.slots:
             if (s.family == Module.IN and output==False) or (s.family == Module.OUT and output==True):
                 s.sync()
+    
+    def config(self,safe:bool=True,persist:IOBase = None ):
+        self.safe = safe
+        self.persist = persist
+        if persist: #восстановление & подготовка следующей резервной копии
+            info = [ ]
+            try:
+                with open('persist.json','r') as f:
+                    info = json.load(f)
+                    
+                backup = POU.__persistable__
+                for i in info:
+                    name = i['item']
+                    size = i['size']
+                    sha1 = i['sha1']
+                    properties = i['properties']
+
+                    so = list( filter( lambda x: x.id==name ,backup ) )[0]
+                    crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
+                    if crc != sha1:
+                        raise f"Backup broken on {so.id}"
+                    
+                    self.__backup__ = data = persist.read(size)
+                    so.from_bytearray( data, properties )
+                try:
+                    success = persist.truncate( 0 )        #на на python truncate доступно, на micropython-e нет. а AT25640b truncate выдает не 0
+                    if success!=0:
+                        self.has_eeprom = True
+                except:
+                    pass
+            except:
+                self.__backup__ = None
+                print('persist.json is not found or backup broken...')
+                            
+            POU.__dirty__=False
+            info.clear()
+            for so in POU.__persistable__:
+                properties = so.__persistent__
+                sha1 = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(so.__persistent__).encode( ) ).digest( ))
+                size = len( so.to_bytearray( ) )
+                info.append( { 'item': so.id , 'properties': properties, 'sha1':sha1 , 'size': size  } )
+
+            with open('persist.json','w+') as f:
+                json.dump(info,f)
+                    
+    def backup(self):  
+        if self.__dump__ is not None or self.persist is None:
+            return
+        buf = bytearray()
+        index = []
+        for so in POU.__persistable__:
+            if so.id in index:
+                raise Exception(f'POU id is not unique ({so.id}, {index})!')
+            index.append(so.id)
+            buf.extend( so.to_bytearray( ) )            
+        buf.extend(struct.pack('!q',len(buf)))  #последнее записанное = размер backup
+        self.__dump__ = buf
+        self.persist.seek( 0 )       #переход на начало файла, !!!на  файлах a+b не работает. поэтому файл persist.dat будет расти!!!
+        POU.__dirty__=False
+        print('Backup started...')
+    
+    def flush(self,timeout_ms:int = 10 ):       #сохранение persistable переменных теневое
+        if self.__dump__ is None or self.persist is None:
+            return
+        done = self.persist.tell()    #где находимся
+        size = len(self.__dump__)
+        written = 0 
+        try:
+            if done==0 and not self.has_eeprom:
+                self.persist.truncate(0)                    #файлы на micropython-e не поддерживают truncate
+            self.persist.seek(0)
+        except:
+            pass
         
+        start_ts = time.time_ns( )
+        while done<size and time.time_ns()-start_ts<=timeout_ms*1000000:
+            npage=min(32,size-done)
+            if self.has_eeprom and self.__backup__ is not None and len(self.__backup__)>done+npage:
+                if self.__dump__[done:done+npage]!=self.__backup__[done:done+npage]:
+                    self.persist.write( self.__dump__[done:done+npage] )
+                else:
+                    self.persist.seek(done+npage)
+            else:
+                self.persist.write( self.__dump__[done:done+npage])
+            done+=npage
+            written+=npage
+        if done>=size:
+            self.__backup__ = self.__dump__
+            self.__dump__ = None                #все сохранили
+            self.persist.flush( )
+            if self.has_eeprom:
+                self.persist.seek( 0 )          #все сначала
+        return written
+
     def __enter__(self):
         self.__fts = time.time_ns()
         if isinstance(self.pre,list):
@@ -107,12 +204,21 @@ class PYPLC():
         elif callable(self.pre):
             self.pre( **self.kwds )
         if self.krax is not None and self.safe:
-            self.krax.master(1)
+            self.krax.master(1) #poll запрос для работы WDT ввода/вывода
 
+        if POU.__dirty__ and self.__backup_timeout__ is None:
+            self.__backup_timeout__ = 5     #5 сек
+            print('Backup scheduled after 5 sec')
+        elif self.__backup_timeout__ is not None:
+            self.__backup_timeout__-=self.scanTime
+            if self.__backup_timeout__<=0:
+                self.__backup_timeout__ = None
+                self.backup( )
         try:
             self.idleTime += (self.period/1000-self.scanTime)
             if self.idleTime>0:
-                time.sleep_ms(int(self.idleTime*1000))
+                if self.flush(self.idleTime*1000) is None:
+                    time.sleep_ms(int(self.idleTime*1000))
             else:
                 self.idleTime=(self.period/1000-self.scanTime)
         except KeyboardInterrupt:
@@ -121,7 +227,7 @@ class PYPLC():
                 sys.modules.pop('main')
             raise SystemExit
         except:
-            time.sleep(self.idleTime)
+            time.sleep(self.idleTime or 0)
 
         self.sync( False )
 

@@ -13,8 +13,8 @@ def get_clk():
     except:
         pass
 
-x = RTRIG( clk = get_clk, q=False )
-result_check = result_rtrig
+x = FTRIG( clk = get_clk, q=False )
+result_check = result_ftrig
 print(x)
 
 begin_ts = time.time_ns()

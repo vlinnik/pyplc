@@ -1,145 +1,117 @@
 from .pou import POU
 import time
 
-class SFC(object):
-    STEP = type((lambda: (yield))( ))
+
+class SFC(POU):
+    STEP = type((lambda: (yield))())
     max_recursion = 10
 
-    def __init__(self,inputs=[],outputs=[],vars=[],id=None,*args,**kwargs) -> None:
-        self.inputs = inputs
-        self.outputs= outputs
-        self.vars   = vars
-        self.id = id
+    def __init__(self, inputs=[], outputs=[], vars=[], persistent=[], id=None,result:str=None) -> None:
+        POU.__init__(self, inputs, outputs, vars, persistent, id)
+        self.born = time.time_ns()
+        self.T = 0
+        self.step = None
+        self.context = []
+        self.subtasks = []
+        self.durance = 0
+        self.sfc_reset = False
+        self.sfc_step = None
+        self.sfc_result = result
+
+    def log(self, *args, **kwds):
+        ts = (time.time_ns() - self.born)/1000000000
+        print(f'[{ts:.3f}] #{self.id}:', *args, **kwds)
+
+    def call(self, gen):
+        if SFC.isgenerator(self.step):
+            self.context.append(self.step)
+            self.step = gen
+
+    def jump(self, gen):
+        if not SFC.isgenerator(gen):
+            return
+        if SFC.isgenerator(self.step):
+            self.step.close()
+        self.step = gen
+        self()
 
     @staticmethod
     def isgenerator(x):
-        return isinstance(x,SFC.STEP)
+        return isinstance(x, SFC.STEP)
 
-    def __call__(self, cls):
-        @POU(inputs=self.inputs,outputs=self.outputs,vars=self.vars,id=cls.__name__ if self.id is None else self.id)
-        class MagicSFC(cls):
-            def __init__(self,*args,**kwargs) -> None:
-                self.born = time.time_ns( )
-                self.T = 0
-                self.step = None
-                self.context = []
-                self.subtasks = [ ]
-                self.durance = 0
-                self.sfc_reset = False
-                self.__ret = None
-                super().__init__(*args,**kwargs)
+    def till(self, cond, min=None, max=None, step=None, enter=None, exit=None):
+        """[summary]
+        Выполнять пока выполняется условие
+        """
+        self.T = 0
+        begin = time.time_ns()
+        self.sfc_step = f'{step}'
 
-            def log(self,*args,**kwds):
-                ts = (time.time_ns() - self.born)/1000000000
-                print(f'[{ts:.3f}] #{self.id}({cls.__name__}):',*args,**kwds)
+        if callable(enter) and not self.sfc_reset:
+            enter()
 
-            def call(self,gen):
-                if SFC.isgenerator(self.step):
-                    self.context.append(self.step)
-                    self.step = gen
+        while not self.sfc_reset and ((min is not None and self.T < min) or cond()) and (max is None or self.T < max) :
+            if callable(step):
+                step()
+            yield True
+            self.T = (time.time_ns()-begin)/1000000000
+        if callable(exit) and not self.sfc_reset:
+            exit()
 
-                # self( )
+    def until(self, cond, min=None, max=None, step=None, enter=None, exit=None):
+        """[summary]
+        Выполнять пока не выполнится условие
+        """
+        return self.till(lambda: not cond(), min=min, max=max, step=step, enter=enter, exit=exit)
 
-            def jump(self,gen):
-                if not SFC.isgenerator(gen):
-                    return
-                if SFC.isgenerator(self.step):
-                    self.step.close()
-                self.step = gen
-                self( )
+    def pause(self, T: float, step: str = None):
+        for x in self.till(lambda: True, max=T,step = step):
+            yield x
 
-            def till(self,cond,min=None,max=None,step=None,enter=None,exit=None):
-                """[summary]
-                Выполнять пока выполняется условие
-                """
-                self.T = 0
-                begin = time.time_ns()
-                
-                def check():
-                    if isinstance(cond,bool):
-                        if (max is None and cond):
-                            raise Exception(f'SFC Step will never ends, job = {step}')
-                        return cond
-                    if callable(cond):
-                        return cond()
+    def __call__(self, *args, **kwargs):
+        if len(args) == 1 and issubclass(args[0], SFC):
+            cls = args[0]
+            helper = self
 
-                    return cond
+            class Instance(cls):
+                def __init__(self, *args, **kwargs) -> None:
+                    id=kwargs['id'] if 'id' in kwargs else helper.id
+                    if id is not None and len(helper.__persistent__)>0 : POU.__persistable__.append(self)
+                    SFC.__init__(self, inputs=helper.inputs,
+                                 outputs=helper.outputs, vars=helper.vars, persistent = helper.__persistent__, id=id,result=helper.sfc_result)
+                    kwvals = self.__inputs__(**kwargs)
+                    super().__init__(*args, **kwvals)
 
-                if callable(enter) and not self.sfc_reset:
-                    enter()
+                def __call__(self, *args, **kwds):
+                    self.__pou__(**kwds)
+                    start_t = time.time_ns()
 
-                while ((min is not None and self.T<min) or check() ) and (max is None or self.T<max) and not self.sfc_reset:
-                    if callable(step):
-                        step( )
-                    yield True
-                    self.T = (time.time_ns()-begin)/1000000000
-                if callable(exit) and not self.sfc_reset:
-                    exit()
-
-            def until(self,cond,min=None,max=None,step=None,enter=None,exit=None):
-                """[summary]
-                Выполнять пока не выполнится условие
-                """
-                def check():
-                    if isinstance(cond,bool):
-                        if (max is None and not cond):
-                            raise Exception(f'SFC.STEP will never ends, step={type(step)}')
-                        return not cond
-                    if callable(cond):
-                        return not cond()
-
-                    return not cond
-
-                self.T = 0
-                begin = time.time_ns()
-
-                if callable(enter) and not self.sfc_reset:
-                    enter()
-
-                while ((min is not None and self.T<min) or check() ) and (max is None or self.T<max) and not self.sfc_reset:
-                    if callable(step):
-                        step( )
-                    yield True
-                    self.T = (time.time_ns()-begin)/1000000000
-
-                if callable(exit) and not self.sfc_reset:
-                    exit()
-            
-            def pause(self,T:float):
-                for x in self.till(True,max=T):
-                    yield x
-
-            def __call__(self, *args, **kwds):
-                start_t = time.time_ns()
-                for s in self.subtasks:
-                    if callable(s):
+                    for s in self.subtasks:
                         s()
-                        
-                if SFC.isgenerator(self.step):
-                    try:
-                        job = next(self.step)
-                        if SFC.isgenerator(job):
-                            try:
-                                self.call(job)
-                            except Exception as e:
-                                print(f'Exception in SFC({self.id}): {e}')
-                        elif callable(job):
-                            self.__ret = job()
-                        else:
-                            self.__ret = job
-                    except StopIteration:
-                        if len(self.context)>0:
-                            self.step = self.context.pop()
-                            #self( )
-                        else:
-                            #self.born = time.time_ns()
-                            #self.jump(super().__call__(*args,**kwds))
-                            self.step = None
-                else:
-                    self.born = time.time_ns()
-                    self.jump(super().__call__(*args,**kwds))
-                self.durance = (time.time_ns() - start_t)/1000000
 
-                return self.__ret
+                    if SFC.isgenerator(self.step):
+                        try:
+                            job = next(self.step)
+                            if SFC.isgenerator(job):
+                                try:
+                                    self.call(job)
+                                except Exception as e:
+                                    print(f'Exception in SFC({self.id}): {e}')
+                            elif callable(job):
+                                job()
+                        except StopIteration:
+                            if len(self.context) > 0:
+                                self.step = self.context.pop()
+                                # self( )
+                            else:
+                                # self.born = time.time_ns()
+                                # self.jump(super().__call__(*args,**kwds))
+                                self.step = None
+                    else:
+                        self.born = time.time_ns()
+                        self.jump(super().__call__(*args, **kwds))
+                    self.cpu = (time.time_ns() - start_t)/1000000
+                    if self.sfc_result is not None: return getattr(self,self.sfc_result)
+            return Instance
 
-        return MagicSFC
+        return super().__call__(*args, **kwargs)
