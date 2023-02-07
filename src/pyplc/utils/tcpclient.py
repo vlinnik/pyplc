@@ -16,10 +16,8 @@ class TCPClient():
             port (int): номер порта
             b_size (int, optional): Максимальный размер получаемого пакета. Defaults to 256.
         """
-        poll = select.poll()
         self.host = host
         self.port = port
-        self.poll = poll
         self.b_size = b_size
         self.buf = bytearray()
         self.connect()
@@ -47,7 +45,6 @@ class TCPClient():
             self.sock.connect((self.host, self.port))
             self.sock.settimeout(None)
             self.sock.setblocking(False)
-            self.poll.register( self.sock, select.POLLIN)
             self.connected()
         except Exception as e:
             self.sock.close()
@@ -57,42 +54,37 @@ class TCPClient():
         if self.sock is None:
             return
         self.disconnected()
-        self.poll.unregister(self.sock)
         self.sock.close()
         self.sock = None
 
     def __call__(self,**kwds):
-        poll = self.poll
         sock = self.sock
         if self.sock is None:
             self.connect( )
             return
             
-        result = poll.poll(0)
-        for p in result:
-            if p[1]==select.POLLIN:
-                try:
-                    data = sock.recv(self.b_size)
-                    if len(data)==0:
-                        self.close( )
-                        continue
-                    data = self.buf + data
-                    processed = self.received(data)
-                    while processed>0 and len(data)>processed:
-                        data = data[processed:]
-                        processed=self.received(data)
-                    self.buf = data[processed:]
-                                            
-                except Exception as e:
-                    print(f'Exception {e}')
-                    self.close()
-                    return
-                        
-            elif p[1]==17:
+        result = select.select( [self.sock],[ ], [self.sock],0 )    #monitor exception and data arrive
+        
+        if len(result[0])>0:
+            try:
+                data = sock.recv(self.b_size)
+                if len(data)==0:
+                    raise Exception('Arrived zero bytes')
+                data = self.buf + data
+                processed = self.received(data)
+                while processed>0 and len(data)>processed:
+                    data = data[processed:]
+                    processed=self.received(data)
+                self.buf = data[processed:]
+                                        
+            except Exception as e:
+                print(f'Exception {e}')
                 self.close()
                 return
-            else:
-                print('Unsupported select event',p[1])
+
+        elif len(result[2])>0:
+            self.close()
+            return
 
         try:
             self.routine()

@@ -14,7 +14,7 @@ from pyplc import STL
 from kx.config import *
 
 @STL(inputs=['a','b'],outputs=['q'],vars=['nq'])
-class Add():
+class Add(SFC):
     def __init__(self,a=None,b=None):
         self.a = a
         self.b = b

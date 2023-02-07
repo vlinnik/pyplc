@@ -22,10 +22,7 @@ class TCPServer():
         addr = socket.getaddrinfo('0.0.0.0', port)[0][-1]
         svr.bind(addr)
         svr.listen( 1 )
-        poll = select.poll()
-        poll.register( svr, select.POLLIN | select.POLLHUP | select.POLLERR)
         self.sockets = { svr.fileno(): svr }
-        self.poll = poll
         self.svr = svr
         self.b_size = b_size
         self.buff={ }
@@ -53,71 +50,61 @@ class TCPServer():
 
     def close(self,sock: socket.socket):
         self.sockets.pop(sock.fileno())
-        self.poll.unregister(sock)
         self.disconnected(sock)
         if sock.fileno() in self.buff:
             self.buff.pop(sock.fileno())
         sock.close()
 
     def __call__(self, *args, **kwds):
-        poll = self.poll
         svr = self.svr 
-        sockets = self.sockets
+        sockets = list(self.sockets.values())
         repeat = True
 
         while repeat:
-            result = poll.poll(0)
-            repeat = len(result)>0
-            for p in result:
-                if isinstance(p[0],int):        #micropython vs python
-                    sock = sockets[p[0]]
-                else:
-                    sock = p[0]
-
-                if p[1]==select.POLLIN:
-                    if sock.fileno()==svr.fileno():
-                        try:
-                            client,addr = svr.accept()
-                            client.setblocking(False)
-                            client.setsockopt(socket.IPPROTO_TCP, 1, 1)
-                            poll.register(client,select.POLLIN | select.POLLHUP | select.POLLERR)
-                            sockets[client.fileno()] = client
-                            self.connected(client)
-                        except Exception as e:
-                            print(f'exception {e}')
-                            pass
-                    else:
-                        try:
-                            arrived = sock.recv(self.b_size)
-                            if sock.fileno() in self.buff:
-                                data = self.buff.pop(sock.fileno()) + arrived
-                            else:
-                                data = arrived
-                            if len(arrived)==0:
-                                self.close(sock)
-                                continue
-                            self.rx+=len(arrived)
-                            last_processed = processed = self.received(sock,data)
-                            count = 0
-                            while last_processed>0 and len(data)>processed:
-                                last_processed=self.received(sock,data[processed:])
-                                processed += last_processed
-                                count+=1
-
-                            if len(data)>processed:
-                                self.buff[sock.fileno()] = data[processed:]
-                        except Exception as e:
-                            print(f'Exception in TCPServer {e}')
-                            self.close(sock)
-                            
-                elif p[1]==17:
-                    self.close(sock)
-                else:
-                    print('Unsupported select event',p[1])
-            for sn in list(self.sockets):
-                if sn!=self.svr.fileno():
+            result = select.select( sockets , [], sockets, 0 )
+            repeat = len(result[0])>0                
+            for p in result[0]:
+                sock = p
+                if sock.fileno()==svr.fileno():
                     try:
-                        self.routine(self.sockets[sn])
+                        client,addr = svr.accept()
+                        client.setblocking(False)
+                        client.setsockopt(socket.IPPROTO_TCP, 1, 1)
+                        sockets[client.fileno()] = client
+                        self.connected(client)
+                    except Exception as e:
+                        print(f'exception {e}')
+                        pass
+                else:
+                    try:
+                        arrived = sock.recv(self.b_size)
+                        if sock.fileno() in self.buff:
+                            data = self.buff.pop(sock.fileno()) + arrived
+                        else:
+                            data = arrived
+                        if len(arrived)==0:
+                            self.close(sock)
+                            continue
+                        self.rx+=len(arrived)
+                        last_processed = processed = self.received(sock,data)
+                        count = 0
+                        while last_processed>0 and len(data)>processed:
+                            last_processed=self.received(sock,data[processed:])
+                            processed += last_processed
+                            count+=1
+
+                        if len(data)>processed:
+                            self.buff[sock.fileno()] = data[processed:]
+                    except Exception as e:
+                        print(f'Exception in TCPServer {e}')
+                        self.close(sock)
+            for p in result[2]:
+                print(f'Socket exception in {p}. Closing!')
+                self.close(p)                        
+            for sn in sockets:
+                if sn.fileno()!=self.svr.fileno():
+                    try:
+                        self.routine(sn)
                     except Exception as e:
                         print(f'Unhandled exception in TCP Server: {e}')
-                        self.close(self.sockets[sn])
+                        self.close(sn)
