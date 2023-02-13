@@ -1,4 +1,4 @@
-import select,socket,gc
+import gc
 from .tcpserver import TCPServer
 
 """

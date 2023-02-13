@@ -49,7 +49,10 @@ class TCPServer():
         pass
 
     def close(self,sock: socket.socket):
-        self.sockets.pop(sock.fileno())
+        if sock.fileno() in self.sockets:
+            self.sockets.pop(sock.fileno())
+        else: 
+            return
         self.disconnected(sock)
         if sock.fileno() in self.buff:
             self.buff.pop(sock.fileno())
@@ -70,7 +73,7 @@ class TCPServer():
                         client,addr = svr.accept()
                         client.setblocking(False)
                         client.setsockopt(socket.IPPROTO_TCP, 1, 1)
-                        sockets[client.fileno()] = client
+                        self.sockets[client.fileno()] = client
                         self.connected(client)
                     except Exception as e:
                         print(f'exception {e}')

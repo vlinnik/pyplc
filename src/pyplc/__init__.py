@@ -1,16 +1,8 @@
-import gc
-from .pou import POU
-from .stl import STL
-from .sfc import SFC
-from .modules import KRAX430,KRAX530,KRAX455
-from .core import PYPLC
-
-print(f'Welcome to PyPLC version 0.0.7')
+print(f'Welcome to PyPLC version 0.0.7: ',end='')
 
 if __name__!="__main__":
     try:
-        mem = gc.mem_free()
-        print(f"\tRuntime mode. Available {mem} bytes")
+        import esp32
+        print(f" runtime mode.")
     except:
-        print('\tSimulation mode.')
-        pass    
+        print(' simulation mode.')

@@ -13,29 +13,29 @@ class POU():
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None и len(persistent)>0
     def __pou__(self,**kwargs):   #обновить свойства в соответствии с kwargs и __bindings
-        for key in self.inputs: #bind inputs to external data source
+        for key in self.__inputs__: #bind inputs to external data source
             if key in kwargs:
                 setattr(self,key,kwargs[key])
             else:
-                if key in self.__bindings:
+                if key in self.__bindings__:
                     if key in kwargs:
                         setattr(self,key,kwargs[key])
                     else:
-                        setattr(self,key,self.__bindings[key]( ))
+                        setattr(self,key,self.__bindings__[key]( ))
                     
     def __init__(self,inputs=[],outputs=[],vars=[],persistent=[],id=None):
         self.__persistent__ = persistent
-        self.__sinks = { } 
-        self.__bindings = { }
-        self.__exports = [ ]
-        self.inputs = inputs
-        self.outputs = outputs
-        self.vars = vars
-        self.syms = inputs + outputs + vars
+        self.__sinks__ = { } 
+        self.__bindings__ = { }
+        self.__exports__ = [ ]
+        self.__inputs__ = inputs
+        self.__outputs__ = outputs
+        self.__vars__ = vars
+        self.__syms__ = inputs + outputs + vars
         self.id = id
                         
     def export(self,__name: str):
-        self.__exports.append(__name)
+        self.__exports__.append(__name)
     
     def __dump__(self,items: list[str]):
         d = {}
@@ -46,7 +46,7 @@ class POU():
         for key in items:
             setattr( self,key,items[key] )
     def __data__(self):
-        return self.__dump__(self.syms+self.__exports)
+        return self.__dump__(self.__syms__+self.__exports__)
     def __save__(self):
         return self.__dump__(self.__persistent__)
     
@@ -56,15 +56,15 @@ class POU():
         return f'{self.__data__()}'
 
     def join(self,__name,__source):
-        if __name in self.inputs:
-            self.__bindings[__name] = __source
+        if __name in self.__inputs__:
+            self.__bindings__[__name] = __source
             setattr(self,__name,__source( ) )
             
     def bind(self,__name,__sink):   #bind and atrribute to callback
-        if __name in self.__sinks:
-            self.__sinks[__name].append( __sink )
+        if __name in self.__sinks__:
+            self.__sinks__[__name].append( __sink )
         else:
-            self.__sinks[__name] = [ __sink ]
+            self.__sinks__[__name] = [ __sink ]
         try:
             __sink( getattr(self,__name) )
         except AttributeError as e:
@@ -72,26 +72,26 @@ class POU():
                 print(e)
 
     def unbind(self,__name,__sink = None):
-        if __name in self.__sinks:
-            self.__sinks[__name] = list(filter( lambda x: (x!=__sink or __sink is None), self.__sinks[__name] ))
+        if __name in self.__sinks__:
+            self.__sinks__[__name] = list(filter( lambda x: (x!=__sink or __sink is None), self.__sinks__[__name] ))
 
     def __setattr__(self, __name: str, __value) -> None:
-        if not __name.endswith('__sinks') and not __name.endswith('__'):#if not re.match(r'_.+',__name):
-            if __name in self.__sinks:
-                for s in self.__sinks[__name]:
+        if not __name.endswith('__'):
+            if __name in self.__sinks__:
+                for s in self.__sinks__[__name]:
                     s(__value)
             if __name in self.__persistent__:
                 POU.__dirty__ = True
                     
         super().__setattr__(__name,__value)   
  
-    def __inputs__(self,**kwargs):  #обработка входных параметров конструктора
-        for key in self.inputs:
+    def __get_inputs__(self,**kwargs):  #обработка входных параметров конструктора
+        for key in self.__inputs__:
             if key in kwargs:
                 if callable(kwargs[key]):
                     self.join( key, kwargs.pop(key))
                     kwargs[key]=getattr(self,key)
-        for key in self.outputs:
+        for key in self.__outputs__:
             if key in kwargs:
                 if callable(kwargs[key]):
                     self.bind(key,kwargs.pop(key))
@@ -145,9 +145,9 @@ class POU():
             class Instance(cls):
                 def __init__(self,*args,**kwargs):
                     POU.__persistable__.append(self)
-                    POU.__init__(self,inputs=helper.inputs,outputs=helper.outputs,vars=helper.vars,id=kwargs['id'] if 'id' in kwargs else helper.id, persistent=helper.__persistent__ )
+                    POU.__init__(self,inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__,id=kwargs['id'] if 'id' in kwargs else helper.id, persistent=helper.__persistent__ )
                     #подменим аргументы из input на значения, а callable outputs  просто уберем (чтобы сработали значения по умолчанию для cls)
-                    kwvals = self.__inputs__(*args,**kwargs)
+                    kwvals = self.__get_inputs__(*args,**kwargs)
                     cls.__init__(self,*args,**kwvals)
                 def __call__(self,*args,**kwargs):
                     self.__pou__(**kwargs)

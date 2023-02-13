@@ -1,1 +1,27 @@
-coupler-krax.conf
+{
+    "node_id": 2,
+    "layout": [
+        "24:62:AB:CE:90:90",
+        "24:62:AB:CE:90:4C",
+        "24:D7:EB:10:E9:78",
+        "24:D7:EB:10:EB:B8",
+        "24:62:AB:CE:90:E0",
+        "24:D7:EB:10:53:A4",
+        "24:D7:EB:10:51:D8",
+        "24:D7:EB:10:51:00"
+    ],
+    "devs": [
+        "KRAX AI-455",
+        "KRAX AI-455",
+        "KRAX DO-530",
+        "KRAX DO-530",
+        "KRAX DO-530",
+        "KRAX DI-430",
+        "KRAX DI-430",
+        "KRAX DI-430"
+    ],
+    "scanTime": 100,
+    "iface": 0,
+    "ipv4": "192.168.1.140",
+    "rate": 20
+}

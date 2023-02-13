@@ -77,9 +77,9 @@ class SFC(POU):
                 def __init__(self, *args, **kwargs) -> None:
                     id=kwargs['id'] if 'id' in kwargs else helper.id
                     if id is not None and len(helper.__persistent__)>0 : POU.__persistable__.append(self)
-                    SFC.__init__(self, inputs=helper.inputs,
-                                 outputs=helper.outputs, vars=helper.vars, persistent = helper.__persistent__, id=id,result=helper.sfc_result)
-                    kwvals = self.__inputs__(**kwargs)
+                    SFC.__init__(self, inputs=helper.__inputs__,
+                                 outputs=helper.__outputs__, vars=helper.__vars__, persistent = helper.__persistent__, id=id,result=helper.sfc_result)
+                    kwvals = self.__get_inputs__(**kwargs)
                     super().__init__(*args, **kwvals)
 
                 def __call__(self, *args, **kwds):

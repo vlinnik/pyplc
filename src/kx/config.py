@@ -1,8 +1,7 @@
-from pyplc import PYPLC
+from pyplc.core import PYPLC
 from pyplc.utils import CLI, POSTO
-from .misc import exports
 from io import IOBase
-import os,struct,json,re,gc,time
+import os,json,re,gc,time
 
 __target_krax = True
 try:
@@ -15,38 +14,6 @@ except:
 
 startAt = time.time()
         
-def __passive():
-    print('Running empty program in PLC mode')
-    global plc
-    start_time = time.time()
-    try:
-        min_mem = gc.mem_free()
-    except:
-        min_mem = 0
-    stat_time = 0
-
-    try:
-        import network
-        ap = network.WLAN(network.AP_IF)
-        ap.active(True)
-        ap.config(essid='KRAX')
-    except:
-        pass
-
-    while True:
-        with plc(ctx=globals()):
-            uptime = time.time()-start_time
-            if stat_time+1 <= uptime:
-                try:
-                    if min_mem > gc.mem_free():
-                        min_mem = gc.mem_free()
-                except:
-                    pass
-                stat_time = uptime
-                print(
-                    f'\rUpTime: {uptime:.0f}\tScanTime: {plc.scanTime:.4f}\tMem min:  {min_mem}\t', end='')
-
-
 class Board():
     def __init__(self):
         self.__adc = ADC(Pin(35))        # create an ADC object acting on a pin
@@ -144,7 +111,13 @@ class Manager():
         rate = conf['rate'] if 'rate' in conf else 0
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         hostname = conf['hostname'] if 'hostname' in conf else 'krax'
+        static = conf['static'] if 'static' in conf else False
+        ipv4 = conf['ipv4'] if 'ipv4' in conf else '0.0.0.0'
+        mask = conf['mask'] if 'mask' in conf else '255.255.255.0'
+        gw = conf['gw'] if 'gw' in conf else '0.0.0.0'
         network.WLAN(iface).active(True)
+        if static and ipv4!='0.0.0.0':
+            network.LAN(0).ifconfig((ipv4,mask,gw,gw))
         krax.init(conf['node_id'], iface=iface, scanTime=scanTime, rate=rate,hostname=hostname)
         if Manager.__fexists('krax.dat'):
             with open('krax.dat', 'rb') as d:
@@ -173,7 +146,6 @@ class Manager():
         cli = CLI()  # simple telnet
         posto = POSTO(port=9004)  # simple share data over tcp
         plc = PYPLC(devs, period=scanTime, krax=krax, pre=cli, post=posto)
-        plc.passive = __passive
         hw = plc.state
         plc.connection = plc  # чтобы  не отличался от coupler
 

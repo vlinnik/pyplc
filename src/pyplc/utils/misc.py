@@ -1,4 +1,4 @@
-from pyplc import SFC
+from pyplc.sfc import SFC
 
 @SFC(inputs=['clk','pt','reset'],outputs=['q','et'])
 class Stopwatch(SFC):

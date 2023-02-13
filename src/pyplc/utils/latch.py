@@ -1,4 +1,4 @@
-from pyplc import STL
+from pyplc.stl import STL
 
 @STL(inputs=['set','reset'],outputs=['q'])
 class SR(STL):
