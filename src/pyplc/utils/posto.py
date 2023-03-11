@@ -250,7 +250,7 @@ class POSTO(TCPServer):
                     ba = value.encode()
                     payload+=struct.pack(f'!HBH{len(ba)}s',remote_id,3,len(ba),ba)
             try:
-                sock.send( struct.pack('ii',2,len(payload))+payload)
+                sock.sendall( struct.pack('ii',2,len(payload))+payload)
                 self.keepalive = time.time()
             except Exception as e:
                 print(f'Exception in POSTO::routine: {e}')

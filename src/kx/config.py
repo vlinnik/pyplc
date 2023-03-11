@@ -122,6 +122,7 @@ class Manager():
         if Manager.__fexists('krax.dat'):
             with open('krax.dat', 'rb') as d:
                 krax.restore(d.read())
+        krax.online( )
 
     def load(self):
         global cli, posto, plc, hw
@@ -146,6 +147,7 @@ class Manager():
         cli = CLI()  # simple telnet
         posto = POSTO(port=9004)  # simple share data over tcp
         plc = PYPLC(devs, period=scanTime, krax=krax, pre=cli, post=posto)
+        # plc = PYPLC(devs, period=scanTime, krax=krax,pre=cli )
         hw = plc.state
         plc.connection = plc  # чтобы  не отличался от coupler
 

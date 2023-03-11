@@ -8,7 +8,11 @@ class SFC(POU):
 
     def __init__(self, inputs=[], outputs=[], vars=[], persistent=[], id=None,result:str=None) -> None:
         POU.__init__(self, inputs, outputs, vars, persistent, id)
-        self.born = time.time_ns()
+        if hasattr(time,'ticks_ms'):
+            self.ms = time.ticks_ms
+        else:
+            self.ms = lambda: int(time.time_ns( )/1000000000)
+        self.born = self.ms( )
         self.T = 0
         self.step = None
         self.context = []
@@ -17,15 +21,25 @@ class SFC(POU):
         self.sfc_reset = False
         self.sfc_step = None
         self.sfc_result = result
+        self.sfc_continue = False
+        self.sfc_T = None
+    
+    def true(self):
+        return True
+    
+    def false(self):
+        return False
 
     def log(self, *args, **kwds):
-        ts = (time.time_ns() - self.born)/1000000000
+        ts = (self.ms() - self.born)/1000
         print(f'[{ts:.3f}] #{self.id}:', *args, **kwds)
 
     def call(self, gen):
         if SFC.isgenerator(self.step):
             self.context.append(self.step)
             self.step = gen
+            self.T = 0
+            self.sfc_T = None
 
     def jump(self, gen):
         if not SFC.isgenerator(gen):
@@ -33,6 +47,8 @@ class SFC(POU):
         if SFC.isgenerator(self.step):
             self.step.close()
         self.step = gen
+        self.T = 0
+        self.sfc_T = None
         self()
 
     @staticmethod
@@ -44,8 +60,9 @@ class SFC(POU):
         Выполнять пока выполняется условие
         """
         self.T = 0
-        begin = time.time_ns()
         self.sfc_step = f'{step}'
+        if min is not None: min*=1000
+        if max is not None: max*=1000
 
         if callable(enter) and not self.sfc_reset:
             enter()
@@ -54,7 +71,6 @@ class SFC(POU):
             if callable(step):
                 step()
             yield True
-            self.T = (time.time_ns()-begin)/1000000000
         if callable(exit) and not self.sfc_reset:
             exit()
 
@@ -64,9 +80,15 @@ class SFC(POU):
         """
         return self.till(lambda: not cond(), min=min, max=max, step=step, enter=enter, exit=exit)
 
-    def pause(self, T: float, step: str = None):
-        for x in self.till(lambda: True, max=T,step = step):
-            yield x
+    def pause(self, T: int, step: str = None):
+        self.T = 0
+        self.sfc_T = None
+        self.sfc_step = step
+
+        while not self.sfc_reset and self.T < T and not self.sfc_continue:
+            yield True
+        
+        self.sfc_continue = False
 
     def __call__(self, *args, **kwargs):
         if len(args) == 1 and issubclass(args[0], SFC):
@@ -84,13 +106,16 @@ class SFC(POU):
 
                 def __call__(self, *args, **kwds):
                     self.__pou__(**kwds)
-                    start_t = time.time_ns()
+                    start_t = self.ms( )
 
                     for s in self.subtasks:
                         s()
 
                     if SFC.isgenerator(self.step):
                         try:
+                            if self.sfc_T is not None and start_t>self.sfc_T:
+                                self.T+=(start_t-self.sfc_T) #/1000
+                            self.sfc_T = start_t
                             job = next(self.step)
                             if SFC.isgenerator(job):
                                 try:
@@ -102,15 +127,12 @@ class SFC(POU):
                         except StopIteration:
                             if len(self.context) > 0:
                                 self.step = self.context.pop()
-                                # self( )
                             else:
-                                # self.born = time.time_ns()
-                                # self.jump(super().__call__(*args,**kwds))
                                 self.step = None
                     else:
-                        self.born = time.time_ns()
+                        self.born = self.ms( )
                         self.jump(super().__call__(*args, **kwds))
-                    self.cpu = (time.time_ns() - start_t)/1000000
+                    self.cpu = (self.ms() - start_t)
                     if self.sfc_result is not None: return getattr(self,self.sfc_result)
             return Instance
 

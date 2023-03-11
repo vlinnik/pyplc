@@ -23,15 +23,21 @@ class CLI(TCPServer):
 
     def disconnected(self,sock):
         pass
+    
+    def find_eol(self,data: bytearray,start:int = 0):
+        for i in range(start,len(data)-len(CLI.G_ENDL)+1):
+            if data[i:i+len(CLI.G_ENDL)]==CLI.G_ENDL:
+                return i
+        return -1
 
     def received(self, sock, data ):
         processed = 0
-        eol = data.find(CLI.G_ENDL)
+        eol = self.find_eol(data)
 
         while eol>=0:
             code = data[processed:eol]
             processed = eol + len(CLI.G_ENDL)
-            eol = data.find(CLI.G_ENDL,processed)
+            eol = self.find_eol(data,processed)
             try:
                 cmd = code.decode().rstrip( )
                 if cmd=='quit':

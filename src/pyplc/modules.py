@@ -1,4 +1,5 @@
 from .channel import Channel as GChannel
+import array 
 
 class Module(object):
     NONE = 0
@@ -21,7 +22,8 @@ class KRAX430(Module):
     size = 1
     family = Module.IN
     def __init__(self,addr):
-        self.data = 0x00
+        self._data = bytearray(1)
+        self.data = memoryview(self._data)
         self.channels = [None]*8
         super().__init__(addr)
 
@@ -35,7 +37,7 @@ class KRAX430(Module):
         def read(self):
             if self.forced:
                 return self.forced
-            return ((self.dio.data) & (1<<self.num))!=0
+            return ((self.dio.data[0]) & (1<<self.num))!=0
 
         def write(self,val):
             if self.read()!=val:
@@ -57,10 +59,10 @@ class KRAX430(Module):
         return self.channels[n]
 
     def sync(self):
-        o_val = self.data 
+        o_val = self.data[0]
         if callable(Module.reader):
-            self.data = Module.reader( self.addr, 1 )[0]
-        n_val = self.data
+            Module.reader( self.addr, self.data )
+        n_val = self.data[0]
         for i in range(0,8):
             if self.channels[i] and (o_val & (0x1<<i))!=(n_val & (0x1<<i)):
                 self.channels[i].changed( )
@@ -73,11 +75,13 @@ class KRAX530(Module):
     size = 1
     family = Module.OUT
     def __init__(self,addr):
-        self.data = 0x00
-        self.dirty = 0x00
+        self._data = bytearray(1)
+        self._mask = bytearray(1)
+        self.data = memoryview(self._data)
+        self.dirty = memoryview(self._mask)
         self.channels = [None]*8
         super().__init__(addr)
-
+    
     class Channel(GChannel):
         def __init__(self, dio, num: int, name=''):
             self.dio = dio
@@ -85,14 +89,14 @@ class KRAX530(Module):
             super().__init__(name,rw=True)
 
         def read(self):
-            return ((self.dio.data) & (1<<self.num))!=0
+            return ((self.dio.data[0]) & (1<<self.num))!=0
 
         def write(self,val):
-            self.dio.dirty|= (1<<self.num)
+            self.dio.dirty[0] |= (1 << self.num)
             if val:
-                self.dio.data |= (1<<self.num)
+                self.dio.data[0] |= (1 << self.num)
             else:
-                self.dio.data &= (~(1 << self.num))
+                self.dio.data[0] &= (~(1 << self.num))
             super().write(val)
 
         def __invert__(self):
@@ -117,20 +121,9 @@ class KRAX530(Module):
         return self.channels[n]
     
     def sync(self):
-        if callable(Module.reader):
-            o_val = Module.reader(self.addr,1)[0]
-        else:
-            o_val = self.data
-        f_mod = (self.data ^ o_val) & ~self.dirty 
-
-        self.data = n_val = o_val & (0xFF & ~self.dirty) | (self.data & self.dirty)
-        for i in range(0,8):
-            i_bit = (0x1<<i)
-            if self.channels[i] and ((self.dirty & i_bit)!=0 or (f_mod & i_bit)!=0):
-                self.channels[i].changed( )
-        self.dirty = 0x00
         if callable(Module.writer):
-            Module.writer(self.addr, n_val.to_bytes(1,'little') )
+            Module.writer(self.addr, self.data,self.dirty )
+        self.dirty[0] = 0x00
 
 class KRAX455(Module):
     """
@@ -140,7 +133,9 @@ class KRAX455(Module):
     size = 8
     family = Module.IN
     def __init__(self,addr):
-        self.data = [0x0000,0x0000,0x0000,0x0000]
+        self.shadow = array.array('H',[0x0,0x0,0x0,0x0])
+        self.data = array.array('H',[0x0,0x0,0x0,0x0])
+        self.mv_data = memoryview(self.data)
         self.channels = [None]*4
         super().__init__(addr)
 
@@ -177,9 +172,8 @@ class KRAX455(Module):
 
     def sync(self):
         if callable(Module.reader):
-            data = Module.reader( self.addr, 8 )
-            for i in range(0,4):
-                o_val = self.data[i]
-                self.data[i] = int.from_bytes(data[i*2:i*2+2],'little')
-                if self.channels[i] and o_val!=self.data[i]:
+            Module.reader( self.addr, self.mv_data )
+            for i,n_val in enumerate(self.data):
+                if self.channels[i] and n_val!=self.shadow[i]:
+                    self.shadow[i] = n_val
                     self.channels[i].changed( )

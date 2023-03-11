@@ -1,5 +1,5 @@
 from pyplc.utils import POSTO,Subscriber,CLI
-from pyplc import PYPLC
+from pyplc.core import PYPLC
 from .misc import exports
 from io import IOBase
 import os,re,json,struct

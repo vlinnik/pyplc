@@ -136,7 +136,7 @@ class POU():
             else:
                 raise TypeError('Unknown type code')
             setattr(self,i,value)
-
+                            
     def __call__(self,*args,**kwargs):
         if len(args)==1 and issubclass(args[0],POU):
             cls = args[0]

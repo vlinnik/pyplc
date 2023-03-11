@@ -8,7 +8,7 @@ clean:
 	@find ./ -iname __pycache__  | xargs rm -rf
 
 upload: clean
-	@cd src && upydev dsync pyplc -g && upydev dsync kx -g && upydev dsync kx_setup.py -g 
+	@cd src && upydev dsync pyplc -g && upydev dsync kx -g && upydev dsync kx_bonjour.py -g 
 
 all: dirs $(OBJS)
 

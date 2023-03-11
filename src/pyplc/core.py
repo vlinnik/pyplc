@@ -24,7 +24,10 @@ class PYPLC():
             if not __name.endswith('__parent') and __name in self.__parent.vars:
                 obj = self.__item(__name)
                 return obj()
-            return super().__getattribute__(__name)
+            try:
+                return super().__getattribute__(__name)
+            except Exception as e:
+                print(f'Exception in PYPLC.State.__getattr__ {e}')
 
         def __setattr__(self, __name: str, __value):
             if not __name.endswith('__parent') and __name in self.__parent.vars:
@@ -49,11 +52,13 @@ class PYPLC():
             s = self.__item(__name)
             s.unbind( __notify )
 
-    def __init__(self,*args,krax=None,pre=None,post=None,period=100):
+    def __init__(self,*args,krax=None,pre=None,post=None,period:int=100):
         POU.__persistable__.clear( ) 
         self.__backup__ = None  #состояние из backup восстановлено
         self.__dump__ = None    #текущий dump, который нужно сохранить
         self.__backup_timeout__ = None #сохранение происходит с задержкой, чтобы увеличить срок службы EEPROM
+        self.ms = time.ticks_ms if hasattr(time,'ticks_ms') else lambda: int(time.time_ns()/1000000000)
+        self.sleep = time.sleep_ms if hasattr(time,'sleep_ms') else lambda x: time.sleep(x/1000)
         self.has_eeprom = False
         self.slots = []
         self.scanTime = 0
@@ -70,9 +75,9 @@ class PYPLC():
         self.safe = True
         addr = 0
         if krax is not None:
-            Module.reader = krax.read
+            Module.reader = krax.read_to
             Module.writer = krax.write
-        print(f'Initialized PYPLC with scan time={self.period} msec')
+        print(f'Initialized PYPLC with scan time={self.period} sec')
 
         def register(t,addr):
             if isinstance(t,int) or isinstance(t,str):
@@ -102,7 +107,8 @@ class PYPLC():
             if (s.family == Module.IN and output==False) or (s.family == Module.OUT and output==True):
                 s.sync()
     
-    def config(self,safe:bool=True,persist:IOBase = None ):
+    def config(self,safe:bool=True,persist:IOBase = None,**kwds ):
+        self.kwds = kwds
         self.safe = safe
         self.persist = persist
         if persist: #восстановление & подготовка следующей резервной копии
@@ -194,9 +200,15 @@ class PYPLC():
             if self.has_eeprom:
                 self.persist.seek( 0 )          #все сначала
         return written
-
-    def __enter__(self):
-        self.__fts = time.time_ns()
+    
+    def idle(self):
+        self.idleTime = (self.period - self.userTime)
+        if self.idleTime>0:
+            if self.flush(self.idleTime) is None:
+                self.sleep(self.idleTime)
+        
+    def begin(self):
+        self.__fts = self.ms( )
         if isinstance(self.pre,list):
             for pre in self.pre:
                 if callable(pre):
@@ -215,26 +227,20 @@ class PYPLC():
                 self.__backup_timeout__ = None
                 self.backup( )
         try:
-            self.idleTime += (self.period/1000-self.scanTime)
-            if self.idleTime>0:
-                if self.flush(self.idleTime*1000) is None:
-                    time.sleep_ms(int(self.idleTime*1000))
-            else:
-                self.idleTime=(self.period/1000-self.scanTime)
+            self.idle( )
         except KeyboardInterrupt:
             print('Terminating program')
             if 'main' in sys.modules:
                 sys.modules.pop('main')
             raise SystemExit
         except:
-            time.sleep(self.idleTime or 0)
+            time.sleep(self.idleTime/1000 or 0)
 
         self.sync( False )
 
-        self.__ts = time.time_ns()
-
-    def __exit__(self, type, value, traceback):
-        self.userTime = (time.time_ns() - self.__ts)/1000000000
+        self.__ts = self.ms()
+    def end(self):
+        self.userTime = (self.ms() - self.__ts)
         self.sync(True)
 
         if isinstance(self.post,list):
@@ -244,7 +250,13 @@ class PYPLC():
         elif callable(self.post):
             self.post( **self.kwds )
 
-        self.scanTime = (time.time_ns() - self.__fts)/1000000000
+        self.scanTime = (self.ms() - self.__fts)
+    
+    def __enter__(self):
+        self.begin( )
+
+    def __exit__(self, type, value, traceback):
+        self.end()
 
     def __call__(self,**kwds):
         """python vs micropython: в micropython globals() общий как будто всюду, или как минимум из вызывающего контекста
