@@ -1,4 +1,4 @@
-from pyplc.sfc import SFC
+from pyplc.sfc import SFC,SFCAction
 
 @SFC(inputs=['clk','pt','reset'],outputs=['q','et'])
 class Stopwatch(SFC):
@@ -13,6 +13,7 @@ class Stopwatch(SFC):
         self.q = False
         self.et = 0.0
         self.reset = reset
+        
     def __call__(self,clk=None,pt=None,reset=None):
         for x in self.until(lambda: self.clk ):
             if self.reset:
@@ -28,50 +29,62 @@ class Stopwatch(SFC):
 
 @SFC(inputs=['clk','pt'],outputs=['q','et'])
 class TON(SFC):
-    def __init__(self,clk=False,pt=0.0):
+    def __init__(self,clk:bool=False,pt:int=1000):
         self.clk = clk
         self.pt = pt
         self.q = False
-        self.et = 0.0
+        self.et = 0
     
-    def __call__(self, *args, **kwds) :
-        self.et = 0.0
+    @SFCAction.create
+    def main(self) :
+        self.et = 0
         for x in self.until(lambda: self.clk ):
             self.q = False
-            yield self.q
+            yield x
         for x in self.till(lambda: self.clk ):
             self.et = self.T
             self.q = self.et>=self.pt
-            yield self.q
+            yield x
+            
+    def __call__(self,pt:int = None):
+        self.__arg__('pt',pt)
+        self.invoke(self.main)
+        return self.q
 
 @SFC(inputs=['clk','pt'],outputs=['q','et'])
 class TOF(SFC):
-    def __init__(self,clk=False,pt=0.0):
+    def __init__(self,clk:bool=False,pt:int=1000):
         self.clk = clk
         self.pt = pt
         self.q = False
-        self.et = 0.0
-    
-    def __call__(self, *args, **kwds) :
+        self.et = 0
+        
+    @SFCAction.create
+    def main(self) :
         while True:
-            self.et = 0.0
+            self.et = 0
             for x in self.till(lambda: self.clk ):
                 self.q = self.clk
-                yield self.q
+                yield x
             for x in self.until(lambda: self.clk ):
                 self.et = self.T
                 self.q = self.et<=self.pt and self.q
-                yield self.q
-
+                yield x
+                
+    def __call__(self,pt: int=None ):
+        self.__arg__(pt)
+        self.invoke(self.main)
+        return self.q
+        
 @SFC(inputs=['enable','t_on','t_off'],outputs=['q'],id='blink')
 class BLINK(SFC):
-    def __init__(self,enable=False,t_on:float=1.0,t_off:float=1.0):
+    def __init__(self,enable=False,t_on:int=1000,t_off:int=1000):
         self.enable = enable
         self.t_on = t_on
         self.t_off = t_off
         self.q = False
 
-    def __call__(self, *args, **kwds):
+    def __call__(self, enable: bool = None):
         while not self.enable:
             self.q = False
             yield False

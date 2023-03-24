@@ -9,33 +9,31 @@ g_pi - просто переменная mx - программа STL из PYPLC
 сервера получает новые значения. Запись также работает
 """
 
-from pyplc.utils import Bindable
-from pyplc import STL
-from kx.config import *
+from pyplc.stl import STL
+from pyplc.utils.posto import POSTO
+from pyplc.utils.cli import CLI
 
 @STL(inputs=['a','b'],outputs=['q'],vars=['nq'])
-class Add(SFC):
+class Add(STL):
     def __init__(self,a=None,b=None):
         self.a = a
         self.b = b
         self.q = None
         self.nq = None
     def __call__(self, a=None, b=None):
+        a = a or self.a
+        b = b or self.b
         if not a or not b:
             return
         self.q = a + b
         self.nq = - self.q 
         return self.q
 
-class Foo(Bindable):
-    def __init__(self):
-        self.bar = None
-        super().__init__( )
-
 g_pi = 3.14
 prg = Add( )
-foo = Foo( )
+posto = POSTO( )
+cli = CLI( )
 
 while True:
-    with plc(ctx=globals()):
-        prg( )
+    posto(ctx=globals())
+    cli(ctx=globals())

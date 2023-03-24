@@ -23,14 +23,11 @@ class Channel(object):
         return self.value
         
     def write(self,value):
-        global verbosity
-        changed = False
         if self.value!=value:
             self.value = value
-            changed = True
-        if changed:
             for c in self.callbacks:
                 c( value )
+                
     def bind(self,callback):
         try:
             callback( self.read() )
@@ -49,10 +46,10 @@ class Channel(object):
         for c in self.callbacks:
             c(value)
 
-    def __call__(self,*args):
-        if len(args)==0:
+    def __call__(self,value = None):
+        if value is None:
             return self.read()
-        self.write(args[0])
+        self.write(value)
     
     @staticmethod  
     def list(mod):

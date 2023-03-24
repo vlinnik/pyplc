@@ -1,5 +1,6 @@
 from pyplc.core import PYPLC
-from pyplc.utils import CLI, POSTO
+from pyplc.utils.cli import CLI
+from pyplc.utils.posto import POSTO
 from io import IOBase
 import os,json,re,gc,time
 
@@ -7,9 +8,9 @@ __target_krax = True
 try:
     import krax,network # доступно на micropython только
     from machine import Pin,ADC
-    from .at25640b import AT25640B
+    from kx.at25640b import AT25640B
 except:
-    from .coupler import *  # если не не micropython-e => то режим coupler
+    from kx.coupler import *  # если не не micropython-e => то режим coupler
     __target_krax = False
 
 startAt = time.time()
@@ -123,16 +124,9 @@ class Manager():
             with open('krax.dat', 'rb') as d:
                 krax.restore(d.read())
         krax.online( )
-
-    def load(self):
+        
+    def cleanup(self):
         global cli, posto, plc, hw
-        if Manager.__fexists('krax.json'):
-            with open('krax.json', 'rb') as f:
-                conf = self.conf = json.load(f)
-        conf = self.conf
-        scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-        devs = conf['devs'] if 'devs' in conf else []
-
         try:
             plc
             print('Cleanup objects: cli/posto/plc')
@@ -144,12 +138,28 @@ class Manager():
         except:
             pass
 
-        cli = CLI()  # simple telnet
-        posto = POSTO(port=9004)  # simple share data over tcp
+    def load(self):
+        global cli, posto, plc, hw
+        if Manager.__fexists('krax.json'):
+            with open('krax.json', 'rb') as f:
+                conf = self.conf = json.load(f)
+        conf = self.conf
+        scanTime = conf['scanTime'] if 'scanTime' in conf else 100
+        devs = conf['devs'] if 'devs' in conf else []
+
+        self.cleanup( )
+
+        try:
+            cli = CLI()  # simple telnet
+            posto = POSTO(port=9004)  # simple share data over tcp
+        except Exception as e:
+            print(f'CLI/POSTO in use ({e}).')
+            cli = None
+            posto = None
         plc = PYPLC(devs, period=scanTime, krax=krax, pre=cli, post=posto)
-        # plc = PYPLC(devs, period=scanTime, krax=krax,pre=cli )
         hw = plc.state
         plc.connection = plc  # чтобы  не отличался от coupler
+        plc.cleanup = self.cleanup
 
         if self.__fexists('io.csv'):
             vars = 0
@@ -185,4 +195,6 @@ if __name__ != '__main__' and __target_krax:
     def kx_init():
         manager.load()
         return plc, hw
-    __all__ = ['board', 'kx_init']
+    def kx_term():
+        manager.cleanup()
+    __all__ = ['board', 'kx_init','kx_term']

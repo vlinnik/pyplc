@@ -1,5 +1,6 @@
-import select,socket,sys
-
+import socket,sys,time
+import errno
+from pyplc.utils.buffer import BufferInOut
 """
 TCP Cервер с работой циклами. Синхронно каждый вызов происходит проверка наличия данных и их обработка. 
 Реализация по умолчанию работает как Echo сервер. Необходимо реализовать методы connected,disconnected,received
@@ -9,51 +10,14 @@ TCP Cервер с работой циклами. Синхронно кажды�
         svr()             #логика работы сервера. 
 """
 class TCPServer():
-    class SocketReader():
-        def __init__(self,client: socket,b_size: int = 1024):
-            self.b_size = b_size
-            self.data = bytearray(b_size)
-            self.view = memoryview(self.data)
-            self.used = 0 
-            self.client = client
-            if hasattr(client,'readinto'):
-                self.__recv = client.readinto
-            else:
-                self.__recv = client.recv_into
-            
-        def cleanup(self):
-            del self.view
-            del self.data
-            self.data = None
-            self.view = None
-            self.used = 0
-            
-        def read(self):
-            try:
-                size = self.__recv(self.view[self.used:])
-                if size is not None:
-                    self.used += size
-                    return size
-                return 0
-            except OSError as e:
-                print(f'Exception in TCPServer::SocketReader {e}')
-                if e.errno==11: return 0
-                return -1
-            except Exception as e:
-                if hasattr(sys,'print_exception'): 
-                    sys.print_exception(e)
-                else:
-                    print(f'Exception in TCPServer::SocketReader {e}')                
-                pass
-            
-            return -1   #fatal socket error
-        def processed(self,size):
-            if size<self.used:
-                self.data[0:self.used - size ] = self.data[size:self.used]
-                self.used -= size
-            else:
-                self.used = 0
-    
+    @staticmethod
+    def attention(e: Exception,hint: str=''):
+        if hasattr(sys,'print_exception'): 
+            print(f'Attention: {e}({hint})',end=':')
+            sys.print_exception(e)
+        else:
+            print(f'Attention: {e}({hint})')
+                                                    
     def __init__(self,port:int ,b_size:int=256):
         """Инициализация и запуск сервера на указанном порту
 
@@ -69,78 +33,76 @@ class TCPServer():
         svr.listen( 1 )
         self.clients = [ ]
         self.svr = svr
+        self.pending = None # client socket to be accepted
         self.b_size = b_size
         
     def term(self):
         for s in self.clients:
-            self.close(s.client)
+            self.close(s)
         self.svr.close( )
+        self.svr = None
 
-    def connected(self,sock):
-        print(f'connected client {sock}')
+    def connected(self,sock:BufferInOut):
+        print(f'connected client')
+        
+    def disconnected(self,sock:BufferInOut):
+        print(f'disconnected client')
 
-    def disconnected(self,sock):
-        print(f'disconnected client {sock}')
-
-    def received(self,sock:socket,data:bytearray):
-        print(f'received data {data} from {sock}')
-        sock.send(data)
+    def received(self,client:BufferInOut,data:memoryview):
+        client.send( data ) #default implementation is echo server
         return len(data)
     
-    def routine( self,sock: socket.socket):
+    def routine( self,client: BufferInOut):
         pass
-
-    def close(self,sock: socket.socket):
+    
+    def close(self,sock: BufferInOut):
         for i,s in enumerate(self.clients):
-            if s.client.fileno() == sock.fileno():
-                self.disconnected(sock)
-                self.clients.pop(i).cleanup()
+            if s.client.fileno() == sock.client.fileno():
+                self.disconnected(s)
+                self.clients.pop(i).close()
                 break
 
-    def __call__(self, *args, **kwds):
-        try:
-            client,addr = self.svr.accept( )
-            client.setblocking(False)
-            client.setsockopt(socket.IPPROTO_TCP, 1, 1)
-            self.clients.append( TCPServer.SocketReader(client,self.b_size) )
-            self.connected(client)
-        except:
-            pass
+    def __call__(self):
+        if self.svr is None:
+            return
         
+        try:
+            client,_ = self.svr.accept( )
+            client.setblocking(False)
+            ci = BufferInOut(client)
+            self.clients.append( ci )
+            self.connected(ci)
+        except OSError as e:
+            if e.errno!=errno.EAGAIN:
+                self.attention(e,'TCPServer')
+            else:
+                del e
+        except Exception as e:
+            self.attention(e,'TCPServer')
+                    
         for sock in self.clients:
             try:
                 if sock.read( ) == -1:
                     print(f'Unrecovable error! Closing...')
-                    self.close(sock.client)
+                    self.close(sock)
                     continue
-                if sock.used==0:
-                    continue
-                
-                last_processed = processed = self.received(sock.client,sock.data[:sock.used] )
-                count = 0
-                while last_processed>0 and sock.used>processed:
-                    last_processed=self.received(sock.client,sock.data[processed:])
-                    processed += last_processed
-                    count+=1
-                
-                sock.processed(processed)
-
+                if sock.rx.size()>0:
+                    last_processed = processed = self.received(sock,sock.rx.head( ) )
+                    if last_processed>0:
+                        while last_processed>0 and sock.rx.size()>processed:
+                            last_processed=self.received(sock,sock.rx.head(-processed))
+                            processed += last_processed
+                        sock.rx.purge(processed)
             except OSError as e:
                 pass                    
             except Exception as e:
-                if hasattr(sys,'print_exception'): 
-                    sys.print_exception(e)
-                else:
-                    print(f'Exception in TCPServer {e}')
-                self.close(sock.client)
+                self.attention(e,'TCPServer')
+                self.close(sock)
                 continue
                 
             try:
-                self.routine(sock.client)
+                self.routine(sock)
+                sock.tx.flush( )
             except Exception as e:
-                if hasattr(sys,'print_exception'): 
-                    sys.print_exception(e)
-                else:
-                    print(f'Exception in TCPServer routine:{e}')
-                self.close(sock.client)                
-                
+                self.attention(e,'TCPServer::routine')
+                self.close(sock)                            

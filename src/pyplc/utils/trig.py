@@ -8,7 +8,7 @@ class RTRIG(STL):
         self.q = q
 
     def __call__(self, clk=None) :
-        if clk is None: clk = self.clk
+        clk = self.__arg__('clk',clk)
         self.q = (not self.__clk and clk)
         self.__clk = clk
         return self.q
@@ -21,10 +21,10 @@ class FTRIG(STL):
         self.q = q
 
     def __call__(self,clk = None):
-        if clk is None: clk=self.clk
+        clk = self.__arg__('clk',clk)
         self.q = (self.__clk and not clk)
         self.__clk = clk
-        return self.q        
+        return self.q         
 
 @STL(inputs=['clk'],outputs=['q'])
 class TRIG(STL):
@@ -34,7 +34,7 @@ class TRIG(STL):
         self.q = q
 
     def __call__(self,clk = None):
-        if clk is None: clk = self.clk
+        clk = self.__arg__('clk',clk)
         self.q = (self.__clk and not clk) or (not self.__clk and clk)
         self.__clk = clk
         return self.q        

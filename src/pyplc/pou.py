@@ -12,16 +12,23 @@ x = Trig( )
 class POU():
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None и len(persistent)>0
-    def __pou__(self,**kwargs):   #обновить свойства в соответствии с kwargs и __bindings
+    
+    def __arg__(self,__input: str,__default = None):
+        if __default is None:
+            if __input in self.__bindings__:
+                setattr(self,__input,self.__bindings__[__input]( ))
+            if __input in self.__inputs__:
+                return getattr(self,__input)
+        else:
+            if __input in self.__inputs__:
+                setattr(self,__input,__default)
+                
+        return __default
+    
+    def __pou__(self):   #обновить свойства в соответствии с kwargs и __bindings
         for key in self.__inputs__: #bind inputs to external data source
-            if key in kwargs:
-                setattr(self,key,kwargs[key])
-            else:
-                if key in self.__bindings__:
-                    if key in kwargs:
-                        setattr(self,key,kwargs[key])
-                    else:
-                        setattr(self,key,self.__bindings__[key]( ))
+            if key in self.__bindings__:
+                setattr(self,key,self.__bindings__[key]( ))
                     
     def __init__(self,inputs=[],outputs=[],vars=[],persistent=[],id=None):
         self.__persistent__ = persistent
@@ -80,12 +87,12 @@ class POU():
             if __name in self.__sinks__:
                 for s in self.__sinks__[__name]:
                     s(__value)
-            if __name in self.__persistent__:
+            if not POU.__dirty__ and __name in self.__persistent__:
                 POU.__dirty__ = True
                     
         super().__setattr__(__name,__value)   
  
-    def __get_inputs__(self,**kwargs):  #обработка входных параметров конструктора
+    def __get_inputs__(self,kwargs):  #обработка входных параметров конструктора
         for key in self.__inputs__:
             if key in kwargs:
                 if callable(kwargs[key]):
@@ -99,6 +106,13 @@ class POU():
             kwargs.pop('id')
         
         return kwargs
+    
+    def __parse_args__(self,**kwargs):
+        for key in self.__bindings__: 
+            if kwargs is None or key not in kwargs:
+                setattr(self,key,self.__bindings__[key]( ))
+            else:
+                setattr(self,key,kwargs[key])
     
     def to_bytearray(self):
         off = 0
@@ -137,6 +151,25 @@ class POU():
                 raise TypeError('Unknown type code')
             setattr(self,i,value)
                             
+    @staticmethod
+    def action(method):
+        def __pou_action__(this:POU,*args, **kwargs):
+            POU.__parse_args__(this,**kwargs)
+            return method(this,*args,**kwargs)
+            
+        return __pou_action__
+    
+    def __enter__(self):
+        for key in self.__inputs__: #bind inputs to external data source
+            if key in self.__bindings__:
+                setattr(self,key,self.__bindings__[key]( ))
+
+    def __exit__(self, type, value, traceback):
+        for __name in self.__sinks__:
+            __value = getattr(self,__name)
+            for s in self.__sinks__[__name]:
+                s(__value)
+
     def __call__(self,*args,**kwargs):
         if len(args)==1 and issubclass(args[0],POU):
             cls = args[0]
@@ -147,11 +180,8 @@ class POU():
                     POU.__persistable__.append(self)
                     POU.__init__(self,inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__,id=kwargs['id'] if 'id' in kwargs else helper.id, persistent=helper.__persistent__ )
                     #подменим аргументы из input на значения, а callable outputs  просто уберем (чтобы сработали значения по умолчанию для cls)
-                    kwvals = self.__get_inputs__(*args,**kwargs)
+                    kwvals = self.__get_inputs__(*args,kwargs)
                     cls.__init__(self,*args,**kwvals)
-                def __call__(self,*args,**kwargs):
-                    self.__pou__(**kwargs)
-                    super().__call__(*args,**kwargs)
                     
             return Instance
         super().__call__(*args,**kwargs)

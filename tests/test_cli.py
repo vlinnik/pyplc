@@ -1,10 +1,6 @@
-from pyplc.utils import CLI
-from kx.config import *
-from pyplc.pou import POU
+from pyplc.utils.cli import CLI
 
-g_pi = 3.14
-plc,hw = kx_init( )
+cli = CLI( )
 
 while True:
-    with plc(ctx=globals()):
-        pass
+    cli( ctx=globals() )

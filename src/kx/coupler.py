@@ -1,4 +1,5 @@
-from pyplc.utils import POSTO,Subscriber,CLI
+from pyplc.utils.posto import POSTO,Subscriber
+from pyplc.utils.cli import CLI
 from pyplc.core import PYPLC
 from .misc import exports
 from io import IOBase
@@ -93,7 +94,7 @@ class Manager():
             return True
         except OSError:
             return False
-        
+          
     def load(self):
         conf = { }
         ipv4 = '0.0.0.0'
@@ -146,6 +147,8 @@ if __name__!='__main__':
     manager = Manager( )
     def kx_init():
         return manager.load()
-    __all__ = ['board','kx_init','exports']
+    def kx_term():
+        pass
+    __all__ = ['board','kx_init','kx_term','exports']
 
    

@@ -1,4 +1,5 @@
-import select,socket
+import socket,sys
+from .buffer import BufferInOut
 
 """
 TCP клиент с работой циклами. Синхронно каждый вызов происходит проверка наличия данных и их обработка. 
@@ -9,6 +10,14 @@ TCP клиент с работой циклами. Синхронно кажды
         client()             #логика работы сервера. 
 """
 class TCPClient():
+    @staticmethod
+    def attention(e: Exception,hint: str=''):
+        if hasattr(sys,'print_exception'): 
+            print(f'Attention: {e}({hint})',end=':')
+            sys.print_exception(e)
+        else:
+            print(f'Attention: {e}({hint})')
+    
     def __init__(self,host: str, port:int ,b_size:int=256):
         """Инициализация и запуск клиента по указанному порту
 
@@ -20,36 +29,39 @@ class TCPClient():
         self.port = port
         self.b_size = b_size
         self.buf = bytearray()
-        self.connect()
+        self.sock = None
+        # self.connect()
 
     def connected(self):
-        print(f'connected to server')
+        print(f'Connected to {self.host}:{self.port}')
 
     def disconnected(self):
-        print(f'disconnected from server')
+        print(f'Disconnected from {self.host}:{self.port}')
 
-    def received(self,data:bytearray):
-        print(f'received data {data}')
-        self.sock.send(data)
+    def received(self,data:memoryview):
+        self.send( data )
+        return len(data)
+        
+    def routine(self):
+        pass
 
-    def send(self,data:bytearray):
+    def send(self,data:memoryview):
         if self.sock:
-            self.sock.send(data)
+            self.sock.tx.put(data)
 
     def connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            #self.sock.connect(socket.getaddrinfo(self.host, self.port)[0][-1])
-            self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            self.sock.settimeout(5)
-            self.sock.connect((self.host, self.port))
-            self.sock.settimeout(None)
-            self.sock.setblocking(False)
+            sock.setsockopt(6, 1, 1)    #IP_PROTOTCP,TCP_NODELAY, only on pc
+            sock.settimeout(5)
+            sock.connect((self.host, self.port))
+            sock.settimeout(None)
+            sock.setblocking(False)
+            self.sock = BufferInOut(sock)
             self.connected()
         except Exception as e:
-            self.sock.close()
-            self.sock = None
-
+            sock.close()
+            
     def close(self):
         if self.sock is None:
             return
@@ -63,31 +75,30 @@ class TCPClient():
             self.connect( )
             return
             
-        result = select.select( [self.sock],[ ], [self.sock],0 )    #monitor exception and data arrive
-        
-        if len(result[0])>0:
-            try:
-                data = sock.recv(self.b_size)
-                if len(data)==0:
-                    raise Exception('Arrived zero bytes')
-                data = self.buf + data
-                processed = self.received(data)
-                while processed>0 and len(data)>processed:
-                    data = data[processed:]
-                    processed=self.received(data)
-                self.buf = data[processed:]
-                                        
-            except Exception as e:
-                print(f'Exception {e}')
+        try:
+            if sock.read( ) == -1:
+                print(f'Unrecovable error! Closing...')
                 self.close()
                 return
-
-        elif len(result[2])>0:
+            
+            if sock.rx.size()!=0:
+                last_processed = processed = self.received( sock.rx.head( ) )
+                if processed>0:
+                    while last_processed>0 and sock.rx.size()>processed:
+                        last_processed=self.received(sock.rx.head(-processed))
+                        processed += last_processed
+                    sock.rx.purge(processed)
+        except OSError as e:
+            pass                    
+        except Exception as e:
+            self.attention(e,'TCPClient')
             self.close()
-            return
-
+            
         try:
             self.routine()
         except Exception as e:
-            print(f'Exception in routine: {e}')
-            self.close( )
+            self.attention(e,'TCPClient::routine')
+            self.close() 
+            
+        sock.tx.flush( )
+                           

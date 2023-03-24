@@ -57,13 +57,15 @@ class PYPLC():
         self.__backup__ = None  #состояние из backup восстановлено
         self.__dump__ = None    #текущий dump, который нужно сохранить
         self.__backup_timeout__ = None #сохранение происходит с задержкой, чтобы увеличить срок службы EEPROM
-        self.ms = time.ticks_ms if hasattr(time,'ticks_ms') else lambda: int(time.time_ns()/1000000000)
+        self.persist = None
+        self.ms = time.ticks_ms if hasattr(time,'ticks_ms') else lambda: int(time.time_ns()/1000000)
         self.sleep = time.sleep_ms if hasattr(time,'sleep_ms') else lambda x: time.sleep(x/1000)
         self.has_eeprom = False
         self.slots = []
         self.scanTime = 0
         self.userTime = 0
         self.idleTime = 0
+        self.overRun  = 0   #на сколько максимум превышено время сканирования
         self.__ts = None
         self.pre = pre
         self.post = post
@@ -77,7 +79,7 @@ class PYPLC():
         if krax is not None:
             Module.reader = krax.read_to
             Module.writer = krax.write
-        print(f'Initialized PYPLC with scan time={self.period} sec')
+        print(f'Initialized PYPLC with scan time={self.period} msec!')
 
         def register(t,addr):
             if isinstance(t,int) or isinstance(t,str):
@@ -102,10 +104,22 @@ class PYPLC():
             else:
                 addr=register(t,addr)
 
+    def __str__(self):
+        return f'scan/user/idle/overrun {self.scanTime}/{self.userTime}/{self.idleTime}/{self.overRun}'
+    
+    def cleanup(self):
+        pass
+
     def sync(self,output=True):
         for s in self.slots:
             if (s.family == Module.IN and output==False) or (s.family == Module.OUT and output==True):
                 s.sync()
+    
+    def read(self):
+        self.sync(False)
+        
+    def write(self):
+        self.sync(True)
     
     def config(self,safe:bool=True,persist:IOBase = None,**kwds ):
         self.kwds = kwds
@@ -205,7 +219,10 @@ class PYPLC():
         self.idleTime = (self.period - self.userTime)
         if self.idleTime>0:
             if self.flush(self.idleTime) is None:
-                self.sleep(self.idleTime)
+                if not self.krax: 
+                    time.sleep(self.idleTime/1000)
+        if self.krax: 
+            self.krax.idle( )
         
     def begin(self):
         self.__fts = self.ms( )
@@ -215,10 +232,10 @@ class PYPLC():
                     pre(**self.kwds)
         elif callable(self.pre):
             self.pre( **self.kwds )
-        if self.krax is not None and self.safe:
-            self.krax.master(1) #poll запрос для работы WDT ввода/вывода
+        if self.krax is not None :
+            self.krax.master(1) #dummy krax exchange 
 
-        if POU.__dirty__ and self.__backup_timeout__ is None:
+        if POU.__dirty__ and self.__backup_timeout__ is None and self.persist:
             self.__backup_timeout__ = 5     #5 сек
             print('Backup scheduled after 5 sec')
         elif self.__backup_timeout__ is not None:
@@ -226,15 +243,6 @@ class PYPLC():
             if self.__backup_timeout__<=0:
                 self.__backup_timeout__ = None
                 self.backup( )
-        try:
-            self.idle( )
-        except KeyboardInterrupt:
-            print('Terminating program')
-            if 'main' in sys.modules:
-                sys.modules.pop('main')
-            raise SystemExit
-        except:
-            time.sleep(self.idleTime/1000 or 0)
 
         self.sync( False )
 
@@ -249,8 +257,17 @@ class PYPLC():
                     post(**self.kwds)
         elif callable(self.post):
             self.post( **self.kwds )
-
+            
+        try:
+            self.idle( )
+        except KeyboardInterrupt:
+            print('Terminating program')
+            self.cleanup( )
+            raise SystemExit
+        
         self.scanTime = (self.ms() - self.__fts)
+        if self.scanTime>self.period+self.overRun:
+            self.overRun = self.scanTime - self.period
     
     def __enter__(self):
         self.begin( )

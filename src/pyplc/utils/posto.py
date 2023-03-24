@@ -1,6 +1,7 @@
 from .tcpserver import TCPServer
 from .tcpclient import TCPClient
-import socket,time,struct,sys
+from .buffer import BufferInOut
+import time,struct
 
 class Subscription():
     next_id = 0
@@ -121,7 +122,7 @@ class POSTO(TCPServer):
         self.subscriptions ={ } 
         self.belongs = { }      #map subscription to fileno of socket
         self.modified = []
-        self.keepalive = time.time()
+        self.keepalive = time.time_ns()
         super().__init__(port)
     def find(self,item: str):
         for id in self.subscriptions:
@@ -132,13 +133,12 @@ class POSTO(TCPServer):
         for id in self.subscriptions:
             s = self.subscriptions[id]
             print(f'{s.item} = {s}')
-    def connected(self,sock:socket.socket):
-        print(f'POSTO client {sock.fileno()} online')
-        pass
+    def connected(self,sock:BufferInOut):
+        print(f'POSTO client online')
 
-    def disconnected(self,sock: socket.socket):
+    def disconnected(self,sock: BufferInOut):
         offline = list( filter( lambda x: self.belongs[x]==sock.fileno(), self.belongs ) )
-        print(f'POSTO client {sock.fileno()} offline. available/gone {len(self.subscriptions)}/{len(offline)} subscriptions')
+        print(f'POSTO client offline. available/gone {len(self.subscriptions)}/{len(offline)} subscriptions')
         for s in offline:
             self.unsubscribe(s.local_id)
             s.cleanup( )
@@ -163,8 +163,7 @@ class POSTO(TCPServer):
             s.modified = True
             return s
         except Exception as e:
-            print(f'Exception in subscribe for {item}:',e)
-            # sys.print_exception(e)
+            TCPServer.attention(e,'POSTO::subscribe')
 
         return None
     def unsubscribe(self,local_id: int):
@@ -174,26 +173,30 @@ class POSTO(TCPServer):
             return s
         return None
     
-    def received(self,sock:socket.socket,data:bytearray):
+    def received(self,sock:BufferInOut,data:memoryview):
         if len(data)<8:
             return 0
         cmd,size = struct.unpack('ii',data[:8])
         if size+8>len(data):
             return 0
         size += 8
-        self.keepalive = time.time()
+        self.keepalive = time.time_ns()
         off = 8
+        end   = 8   #сколько байт в ответе
         if cmd==0:  #subscribe
-            response = bytearray()
+            response = sock.tx.data( )
             while off<size:
                 remote_id,slen = struct.unpack_from('!HH',data,off); off+=struct.calcsize('!HH')
                 item, = struct.unpack_from(f'{slen}s',data,off); off+=slen
                 s = self.subscribe(item.decode(),remote_id)
                 if s:
-                    response += struct.pack( '!HH', s.remote_id,s.local_id )
+                    struct.pack_into( '!HH',response,end, s.remote_id,s.local_id )
+                    end+=4
                     self.belongs[s] = sock.fileno()
-            sock.send(struct.pack('ii',0,len(response))+response )                           #response for subscribe command
-            return off
+            
+            struct.pack_into('ii',response,0,0,end-8)
+            sock.tx.grow(end)
+            return off  #сколько обработано
         elif cmd==1:    #unsubscribe
             while off<size:
                 local_id, = struct.unpack_from('!H',data,off); off+=struct.calcsize('!H')
@@ -219,54 +222,64 @@ class POSTO(TCPServer):
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
                     s.remote(value,source=id(sock),ctx=self.ctx)        #получено новое значение
-        elif cmd==3:
-            if size<=8+8:
-                sock.send( struct.pack('ii',3,size) + data[8:size] + struct.pack('q',time.time_ns()) )
+        elif cmd==3:    
+            if size<40:
+                response = sock.tx.data( )
+                struct.pack_into('ii',response,0,3,size)
+                response[8:size]=data[8:size]
+                struct.pack_into('q',response,size,time.time_ns())
+                sock.tx.grow(size+8)
             else:
                 ts_0,ts_1 = struct.unpack_from('qq',data,off)
                 ts_2 = time.time_ns()
-                print(f'keep alive stat {ts_2-ts_0}/{ts_1-ts_0}/{ts_2-ts_1}')
         else:
             pass    #keep alive or unsupported command
         
         return size
 
-    def routine(self,sock: socket.socket):
+    def routine(self,sock: BufferInOut ):
+        self.modified = list(filter( lambda s: s.modified, self.subscriptions.values() ))            
         modified = self.modified
         if len(modified)>0:
-            payload = bytearray()
+            payload = sock.tx.data( )
+            end = 8 #reserverd for response header
             for s in modified:
                 value = s( )
                 remote_id = s.remote_id
                 if value is None or self.belongs[s]!=sock.fileno() or s.source==id(sock):
                     continue
                 elif type(value) is bool:
-                    payload+=struct.pack('!HBHb',remote_id,0,struct.calcsize('b'),value)
+                    struct.pack_into('!HBHb',payload,end,remote_id,0,struct.calcsize('b'),value)
+                    end+=6
                 elif type(value) is int:
-                    payload+=struct.pack('!HBHq',remote_id,1,struct.calcsize('q'),value)
+                    struct.pack_into('!HBHq',payload,end,remote_id,1,struct.calcsize('q'),value)
+                    end+=13
                 elif type(value) is float:
-                    payload+=struct.pack('!HBHd',remote_id,2,struct.calcsize('d'),value)
+                    struct.pack_into('!HBHd',payload,end,remote_id,2,struct.calcsize('d'),value)
+                    end+=13
                 elif type(value) is str:
                     ba = value.encode()
-                    payload+=struct.pack(f'!HBH{len(ba)}s',remote_id,3,len(ba),ba)
+                    struct.pack_into(f'!HBH{len(ba)}s',payload,end,remote_id,3,len(ba),ba)
+                    end+=struct.calcsize(f'!HBH{len(ba)}s')
             try:
-                sock.sendall( struct.pack('ii',2,len(payload))+payload)
-                self.keepalive = time.time()
+                struct.pack_into('ii',payload,0,2,end-8)
+                sock.tx.grow(end)
             except Exception as e:
-                print(f'Exception in POSTO::routine: {e}')
+                self.attention(e,f'POSTO::routine')
                 self.close(sock)
         else:
-            if self.keepalive+5<time.time():
+            if self.keepalive+5000000000<time.time_ns():
                 try:
-                    sock.send( struct.pack('ii',3,0) )  #keep alive
-                    self.keepalive = time.time( )
+                    print(f'send keepalive {time.time_ns( )}')
+                    struct.pack_into('ii',sock.tx.data( ),0, 3,0)  #keep alive
+                    sock.tx.grow(8)
+                    self.keepalive = time.time_ns( )
                 except Exception as e:
-                    print(f'Exception in POSTO::routine during keep alive: {e}')
+                    self.attention(e,'POSTO::keepalive')
                     self.close(sock)
 
     def __call__(self, ctx=None):
         self.ctx = ctx
-        self.modified = list(filter( lambda s: s.modified, self.subscriptions.values() ))            
         
         super().__call__( )
 
@@ -324,7 +337,7 @@ class Subscriber(TCPClient):
         self.items = { }
         self.unsubscribed = [ ]
         self.subscriptions = { }
-        self.keepalive = time.time()
+        self.keepalive = time.time_ns()
         self.state = self.__State(self)
         self.online = False
         self.stat = [None]*3
@@ -360,7 +373,7 @@ class Subscriber(TCPClient):
         setattr(self,local_id,s)
         return s
 
-    def received(self,data):
+    def received(self,data:memoryview):
         if len(data)<8:
             return 0
         cmd,size = struct.unpack('ii',data[:8])
@@ -400,45 +413,46 @@ class Subscriber(TCPClient):
                     s = self.subscriptions[local_id]
                     s.remote( value,source = id(self.sock) )
         elif cmd==3: #keepalive
+            payload = self.sock.tx.data( )
             if size<40:
-                self.send( struct.pack('ii',3,size) + data[8:8+size] + struct.pack('q',time.time_ns()) )
+                struct.pack_into('ii',payload,0,3,size) 
+                payload[8:size] = data[8:size] 
+                struct.pack_into('q',payload,size,time.time_ns())
+                self.sock.tx.grow( 8+size )
             else:
                 ts_0,ts_1,ts_2,ts_3 = struct.unpack_from('qqqq',data,off)   #ts_0 - мы посылали ts_1 - нам в ответ когда отправили ts_2 - мы снова туда отправили ts_3 - нам в ответ
-                ts_0/=1000000
-                ts_1/=1000
-                ts_2/=1000000
-                ts_3/=1000
-                ts_4 = time.time_ns()/1000000
-                self.stat=[(ts_2-ts_0)/2,(ts_3-ts_1)/2,(ts_4-ts_0)/4]
-                print(f'OUT:{self.stat[0]:.0f}/{self.stat[2]:.0f}\tIN:{self.stat[1]:.0f}')
+                ts_4 = time.time_ns()
+                self.stat=[(ts_2-ts_0)>>1,(ts_3-ts_1)>>1,(ts_4-ts_0)>>1]
 
         return size
 
     def routine(self):
         if len(self.unsubscribed)>0:
-            payload = bytearray()
+            payload = self.sock.tx.data( )
             filed = []
+            end = 8
             for i in self.unsubscribed:
-                if len(payload)>self.b_size/2:
+                if end>self.b_size/2:
                     break
                 s = self.subscriptions[i]
                 if s.filed:
                     continue
-                payload+=struct.pack(f'!HH{len(s.item)}s',i,len(s.item),s.item.encode( ) )
+                struct.pack_into(f'!HH{len(s.item)}s',payload,end,i,len(s.item),s.item.encode( ) )
+                end+=struct.calcsize(f'!HH{len(s.item)}s')
                 filed.append(s)
             try:
                 if len(filed)>0:
-                    self.send( struct.pack('ii',0,len(payload))+payload )
+                    struct.pack_into('ii',payload,0,0,end-8)
+                    self.sock.tx.grow( end )
                 for item in filed:
                     item.filed = True
             except:
                 pass
-
-            self.keepalive = time.time()
         else:
             modified = list(filter(lambda s: s.modified,self.subscriptions.values()))
             if len(modified)>0:
-                payload = bytearray()
+                payload = self.sock.tx.data( )
+                end = 8
                 for s in modified:
                     value = s( )
                     remote_id = s.remote_id
@@ -448,20 +462,25 @@ class Subscriber(TCPClient):
                     if value is None or len(payload)>self.b_size-32 or remote_id is None:
                         continue
                     elif type(value) is bool:
-                        payload+=struct.pack('!HBHb',remote_id,0,1,value)
+                        struct.pack_into('!HBHb',payload,end,remote_id,0,1,value)
+                        end+=struct.calcsize('!HBHb')
                     elif type(value) is int:
-                        payload+=struct.pack('!HBHq',remote_id,1,8,value)
+                        struct.pack_into('!HBHq',payload,end,remote_id,1,8,value)
+                        end+=struct.calcsize('!HBHq')
                     elif type(value) is float:
-                        payload+=struct.pack('!HBHd',remote_id,2,8,value)
+                        struct.pack_into('!HBHd',payload,end,remote_id,2,8,value)
+                        end+=struct.calcsize('!HBHd')
                     elif type(value) is str:
-                        payload+=struct.pack('!HBHs',remote_id,3,len(value),value)
+                        struct.pack_into('!HBHs',payload,end,remote_id,3,len(value),value)
+                        end+=struct.calcsize('!HBHs')
                     s.modified = False 
 
-                if len(payload)>0:
-                    self.send( struct.pack('ii',2,len(payload))+payload)
-
-                self.keepalive = time.time()
+                if end>8:
+                    struct.pack_into('ii',payload,0,2,end-8)
+                    self.sock.tx.grow(end)
             else:
-                if time.time()>self.keepalive+5:
-                    self.send( struct.pack('iiq',3,8,time.time_ns()) ) #keep alive
-                    self.keepalive = time.time()
+                payload = self.sock.tx.data( )
+                if time.time_ns()>self.keepalive+5000000000:
+                    struct.pack_into('iiq',payload,0,3,8,time.time_ns()) #keep alive
+                    self.sock.tx.grow(16)
+                    self.keepalive = time.time_ns()

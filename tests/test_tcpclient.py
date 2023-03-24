@@ -1,4 +1,4 @@
-from pyplc.utils import TCPClient
+from pyplc.utils.tcpclient import TCPClient
 
 client = TCPClient('localhost',2455)
 

@@ -173,7 +173,9 @@ class KRAX455(Module):
     def sync(self):
         if callable(Module.reader):
             Module.reader( self.addr, self.mv_data )
-            for i,n_val in enumerate(self.data):
-                if self.channels[i] and n_val!=self.shadow[i]:
-                    self.shadow[i] = n_val
-                    self.channels[i].changed( )
+            index = 0               #таким способом меньше памяти тратится, чем с использованием for
+            while index<4:
+                if self.data[index]!=self.shadow[index]: 
+                    self.shadow[index]=self.data[index]
+                    if self.channels[index] is not None: self.channels[index].changed()
+                index+=1
