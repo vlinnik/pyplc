@@ -11,7 +11,11 @@ class Board():
         self.__comm = False
         self.__err = False
         self.__run = False
+        self.__usr = False
         self.__storage = None
+        
+    def get_usr(self)->bool:
+        return self.__usr
 
     def get_wps(self) -> bool:
         return self.__wps
@@ -28,6 +32,10 @@ class Board():
     def set_run(self, value):
         self.__run = value
 
+    @property
+    def usr(self) -> bool:
+        return self.get_usr()
+    
     @property
     def wps(self) -> bool:
         return self.get_wps()
@@ -107,8 +115,8 @@ class Manager():
         __plc = Subscriber( ipv4 )        
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         devs = conf['devs'] if 'devs' in conf else []
-        cli = CLI(port=2455)           #simple telnet 
-        posto = POSTO( port = 9003)    #simple share data over tcp 
+        cli = CLI(port = 2455)         #simple telnet 
+        posto = POSTO( port = 9004)    #simple share data over tcp 
         plc = PYPLC( devs, period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
         hw = __plc.state
         plc.connection = __plc         #
@@ -134,7 +142,7 @@ class Manager():
                                 s.write = ch #а при получении нового значения от сервера происходит запись в Channel
                             else:
                                 s.write = ch.force
-                            ch.bind(s)  #изменения канала ввода/вывода производит запись в Subscription
+                            ch.bind(s.changed)  #изменения канала ввода/вывода производит запись в Subscription
                             vars = vars+1
                     except Exception as e:
                         print(e,info)

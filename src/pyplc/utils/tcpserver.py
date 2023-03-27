@@ -18,12 +18,13 @@ class TCPServer():
         else:
             print(f'Attention: {e}({hint})')
                                                     
-    def __init__(self,port:int ,b_size:int=256):
+    def __init__(self,port:int ,i_size:int=256, o_size: int = 256):
         """Инициализация и запуск сервера на указанном порту
 
         Args:
             port (int): номер порта
-            b_size (int, optional): Максимальный размер получаемого пакета. Defaults to 256.
+            i_size (int, optional): Максимальный размер получаемого пакета. Defaults to 256.
+            o_size (int, optional): Максимальный размер буфера отправки. Defaults to 256.
         """
         svr = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         svr.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -33,8 +34,8 @@ class TCPServer():
         svr.listen( 1 )
         self.clients = [ ]
         self.svr = svr
-        self.pending = None # client socket to be accepted
-        self.b_size = b_size
+        self.i_size = i_size
+        self.o_size = o_size
         
     def term(self):
         for s in self.clients:
@@ -69,7 +70,7 @@ class TCPServer():
         try:
             client,_ = self.svr.accept( )
             client.setblocking(False)
-            ci = BufferInOut(client)
+            ci = BufferInOut(client,i_size = self.i_size,o_size = self.o_size)
             self.clients.append( ci )
             self.connected(ci)
         except OSError as e:

@@ -1,6 +1,6 @@
-from pyplc.stl import STL
+from pyplc.stl import *
 
-@STL(inputs=['set','reset'],outputs=['q'])
+@stl(inputs=['set','reset'],outputs=['q'])
 class SR(STL):
     """Флаг
     """
@@ -21,17 +21,18 @@ class SR(STL):
         self.q=False
 
     def __call__(self,set=None,reset=None):
-        if set is None: set = self.set
-        if reset is None: reset = self.reset
-        if set:
-            self.q=True
-        if reset and not self.__reset:
-            self.q=False
-        self.__reset = self.reset
+        with self:
+            set = self.overwrite('set',set)
+            reset = self.overwrite('rest',reset)
+            if set:
+                self.q=True
+            if reset and not self.__reset:
+                self.q=False
+            self.__reset = self.reset
 
         return self.q
     
-@STL(inputs=['set','reset'],outputs=['q'])        
+@stl(inputs=['set','reset'],outputs=['q'])        
 class RS(STL):
     def __init__(self,reset=False,set=False,q=False) -> None:
         """Конструктор
@@ -50,16 +51,17 @@ class RS(STL):
         self.q = False
 
     def __call__(self,reset=None,set=None):
-        if reset is None: reset = self.reset
-        if set is None: set = self.set
-        if reset:
-            self.q=False
-        if set and set!=self.__set:
-            self.q=True
+        with self:
+            reset = self.overwrite('reset',reset)
+            set = self.overwrite('set',set)
+            if reset:
+                self.q=False
+            if set and set!=self.__set:
+                self.q=True
 
-        if self.q is None:
-            self.q = False
+            if self.q is None:
+                self.q = False
 
-        self.__set = set
+            self.__set = set
             
         return self.q

@@ -1,6 +1,6 @@
-from pyplc.stl import STL
+from pyplc.stl import *
 
-@STL(inputs=['clk'],outputs=['q'])
+@stl(inputs=['clk'],outputs=['q'])
 class RTRIG(STL):
     def __init__(self,clk=None,q=False) -> None:
         self.__clk = clk
@@ -8,12 +8,13 @@ class RTRIG(STL):
         self.q = q
 
     def __call__(self, clk=None) :
-        clk = self.__arg__('clk',clk)
-        self.q = (not self.__clk and clk)
-        self.__clk = clk
+        with self:
+            clk = self.overwrite('clk',clk)
+            self.q = (not self.__clk and clk)
+            self.__clk = clk
         return self.q
 
-@STL(inputs=['clk'],outputs=['q'])
+@stl(inputs=['clk'],outputs=['q'])
 class FTRIG(STL):
     def __init__(self,clk=False,q=False) -> None:
         self.__clk = clk
@@ -21,12 +22,13 @@ class FTRIG(STL):
         self.q = q
 
     def __call__(self,clk = None):
-        clk = self.__arg__('clk',clk)
-        self.q = (self.__clk and not clk)
-        self.__clk = clk
+        with self:
+            clk = self.overwrite('clk',clk)
+            self.q = (self.__clk and not clk)
+            self.__clk = clk
         return self.q         
 
-@STL(inputs=['clk'],outputs=['q'])
+@stl(inputs=['clk'],outputs=['q'])
 class TRIG(STL):
     def __init__(self,clk=False,q=False) -> None:
         self.__clk = clk
@@ -34,7 +36,8 @@ class TRIG(STL):
         self.q = q
 
     def __call__(self,clk = None):
-        clk = self.__arg__('clk',clk)
-        self.q = (self.__clk and not clk) or (not self.__clk and clk)
-        self.__clk = clk
+        with self:
+            clk = self.overwrite('clk',clk)
+            self.q = (self.__clk and not clk) or (not self.__clk and clk)
+            self.__clk = clk
         return self.q        

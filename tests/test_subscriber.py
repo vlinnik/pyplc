@@ -2,13 +2,10 @@ from pyplc.utils.posto import Subscriber
 from pyplc.utils.cli import CLI
 import time
 
-host = '192.168.1.128'
+host = '192.168.1.140'
 g = Subscriber( host,port=9003 )
 
-g.subscribe('g_pi')
-g.subscribe('prg.a')
-g.subscribe('prg.b')
-g.subscribe('prg.q')
+g.subscribe('S03C01')
 
 cli = CLI( 2456 )
 while True:

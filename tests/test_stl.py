@@ -1,7 +1,7 @@
-from pyplc import STL
+from pyplc.stl import *
 import time
 
-@STL(inputs=['en','i'],outputs=['q'])
+@stl(inputs=['en','i'],outputs=['q'])
 class MOVE(STL):
     def __init__(self,en=True,i=None,q=None):
         self.en = en
@@ -9,11 +9,12 @@ class MOVE(STL):
         self.q = q
         
     def __call__(self,en=None,i=None):
-        if en is None: en = self.en
-        if i is None: i = self.i
-        
-        if en:
-            self.q=i
+        with self:
+            en = self.overwrite('en',en)
+            i = self.overwrite('i',i)
+            
+            if en:
+                self.q=i
             
         return self.q
 

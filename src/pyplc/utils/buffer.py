@@ -128,10 +128,17 @@ class BufferIn(Buffer):
         return -1   #fatal socket error
 
 class BufferInOut(IOBase):
-    def __init__(self,client: socket.socket):
+    def __init__(self,client: socket.socket , i_size: int = 1024, o_size: int=1024 ):
+        """Конструктор буфферезированного ввода/вывода в socket
+
+        Args:
+            client (socket.socket): socket 
+            i_size (int, optional): размер буфера in. Defaults to 1024.
+            o_size (int, optional): размер буфера out. Defaults to 1024.
+        """        
         self.client = client
-        self.rx = BufferIn( client.readinto if hasattr(client,'readinto') else client.recv_into )
-        self.tx = BufferOut( client.send )
+        self.rx = BufferIn( client.readinto if hasattr(client,'readinto') else client.recv_into , size = i_size )
+        self.tx = BufferOut( client.send , size=o_size  )
     
     def close(self):
         self.tx.close( )

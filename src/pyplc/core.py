@@ -258,12 +258,7 @@ class PYPLC():
         elif callable(self.post):
             self.post( **self.kwds )
             
-        try:
-            self.idle( )
-        except KeyboardInterrupt:
-            print('Terminating program')
-            self.cleanup( )
-            raise SystemExit
+        self.idle( )
         
         self.scanTime = (self.ms() - self.__fts)
         if self.scanTime>self.period+self.overRun:

@@ -23,7 +23,12 @@ class Board():
         self.__err = Pin(33, Pin.OUT)
         self.__run = Pin(2, Pin.OUT)
         self.__swps = Pin(32, Pin.OUT)
+        self.__usr = Pin(36,Pin.IN)
+        # self.__run = Pin(39,Pin.IN) - автозапуск проекта. 
         self.__storage = None
+
+    def get_usr(self) -> bool:
+        return self.__usr.value() == 0
 
     def get_wps(self) -> bool:
         return self.__wps.value() == 0
@@ -39,6 +44,10 @@ class Board():
 
     def set_run(self, value):
         self.__run.value(value)
+
+    @property
+    def usr(self) -> bool:
+        return self.get_usr()
 
     @property
     def wps(self) -> bool:

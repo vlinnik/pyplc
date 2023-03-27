@@ -1,17 +1,17 @@
-from pyplc.sfc import SFC,SFCAction
+from pyplc.sfc import *
 import time
 
-@SFC(inputs=['clk','pt'],outputs=['q'])
+@sfc(inputs=['clk','pt'],outputs=['q'])
 class TON(SFC):
     def __init__(self,clk=False,pt=1,q=False):
         self.clk = clk
         self.pt = pt
         self.q = q
 
-    @SFCAction.create
+    @sfcaction
     def main(self) :
-        for x in self.until(self.false,min=1,max=2,step='prepare'):
-            self.log('initializing')
+        for x in self.until(self.false,min=1,max=2,step='heatup'):
+            self.log('heatup')
             yield True
         for x in self.until(lambda : self.clk):
             self.log('wait for clk')
@@ -26,11 +26,14 @@ class TON(SFC):
                 self.log('wait for clk set low')
                 yield True
             self.q = False
+            
     def __call__(self, clk: bool = None, pt: int = None):
-        self.__arg__('clk',clk)
-        self.__arg__('pt',pt)
+        with self:
+            self.overwrite('clk',clk)
+            self.overwrite('pt',pt)
         
-        self.invoke(self.main)
+            self.call( )
+            
         return self.q
 
 x = TON(pt=1)

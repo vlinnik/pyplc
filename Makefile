@@ -16,6 +16,7 @@ dirs:
 	@mkdir -p $(ODIR)/$(INSTALL_DIR)
 
 package:
+	@echo PyPLC_VERSION = \"`git describe`\">src/pyplc/consts.py
 	python -m build && pip install ./dist/pyplc-0.0.7-py3-none-any.whl --force-reinstall
 	
 $(ODIR)/$(INSTALL_DIR)/%.mpy: %.py
