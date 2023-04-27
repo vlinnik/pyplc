@@ -24,10 +24,11 @@ class PYPLC():
             if not __name.endswith('__parent') and __name in self.__parent.vars:
                 obj = self.__item(__name)
                 return obj()
-            try:
-                return super().__getattribute__(__name)
-            except Exception as e:
-                print(f'Exception in PYPLC.State.__getattr__ {e}')
+            # try:
+            return getattr(super(),__name)
+            #     return super().__getattribute__(__name)
+            # except Exception as e:
+            #     print(f'Exception in PYPLC.State.__getattr__ {e}')
 
         def __setattr__(self, __name: str, __value):
             if not __name.endswith('__parent') and __name in self.__parent.vars:
@@ -218,11 +219,11 @@ class PYPLC():
     def idle(self):
         self.idleTime = (self.period - self.userTime)
         if self.idleTime>0:
-            if self.flush(self.idleTime) is None:
-                if not self.krax: 
-                    time.sleep(self.idleTime/1000)
-        if self.krax: 
-            self.krax.idle( )
+            self.flush(self.idleTime)
+
+        now = self.ms( )
+        if self.__fts + self.period > now:
+            self.sleep(self.__fts + self.period - now )
         
     def begin(self):
         self.__fts = self.ms( )
@@ -233,10 +234,10 @@ class PYPLC():
         elif callable(self.pre):
             self.pre( **self.kwds )
         if self.krax is not None :
-            self.krax.master(1) #dummy krax exchange 
+            self.krax.master(1) #dummy krax exchange - only process messages 
 
         if POU.__dirty__ and self.__backup_timeout__ is None and self.persist:
-            self.__backup_timeout__ = 5     #5 сек
+            self.__backup_timeout__ = 5000     #5 сек
             print('Backup scheduled after 5 sec')
         elif self.__backup_timeout__ is not None:
             self.__backup_timeout__-=self.scanTime
@@ -257,6 +258,8 @@ class PYPLC():
                     post(**self.kwds)
         elif callable(self.post):
             self.post( **self.kwds )
+        if self.krax is not None :
+            self.krax.master(2) #krax exchange 
             
         self.idle( )
         

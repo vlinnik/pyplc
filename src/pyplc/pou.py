@@ -22,6 +22,9 @@ class POU():
                 setattr(self,__input,__default)
                 
         return __default
+    
+    def setup(self,inputs=[],outputs=[],vars=[],persistent=[]):
+        pass
                         
     def __init__(self,inputs=[],outputs=[],vars=[],persistent=[],id=None):
         self.__persistent__ = persistent
@@ -74,10 +77,16 @@ class POU():
     def unbind(self,__name,__sink = None):
         if __name in self.__sinks__:
             self.__sinks__[__name] = list(filter( lambda x: (x!=__sink or __sink is None), self.__sinks__[__name] ))
-
+    
+    def is_persistent(self,__name: str):
+        if hasattr(self,'__presistent__') and __name in self.__persistent__:
+            return True
+        return False
+    
     def __setattr__(self, __name: str, __value) -> None:
         if not __name.endswith('__'):
-            if not POU.__dirty__ and __name in self.__persistent__:
+            if not POU.__dirty__ and self.is_persistent(__name):
+                print(f'persistent attribute {__name} of {self.id} changed')
                 POU.__dirty__ = True
                     
         super().__setattr__(__name,__value)   
@@ -120,11 +129,15 @@ class POU():
             setattr(self,i,value)
                                 
     def __enter__(self):
+        if not hasattr(self,'__inputs__'):
+            return
         for key in self.__inputs__: #bind inputs to external data source
             if key in self.__bindings__:
                 setattr(self,key,self.__bindings__[key]( ))
 
     def __exit__(self, type, value, traceback):
+        if not hasattr(self,'__sinks__'):
+            return
         for __name in self.__sinks__ :
             if not hasattr(self,__name):
                 continue

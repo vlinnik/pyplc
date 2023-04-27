@@ -4,8 +4,8 @@ import json
 import krax
 import network
 
-network.WLAN(0).active(True)
-network.WLAN(1).active(True)
+sta = network.WLAN(0)
+ap = network.WLAN(1)
 
 class Setup():
     def __init__(self):
@@ -21,26 +21,46 @@ class Setup():
             return True
         except OSError:
             return False
+        
+    def ifconfig(self,dev):
+        try:
+            ipv4,mask,gw,_ = dev.ifconfig()
+            enabled = True
+        except:
+            ipv4,mask,gw = ('0.0.0.0','255.255.255.0','0.0.0.0')
+            enabled = False
 
+        conf = { 'ipv4': ipv4, 'mask': mask, 'gw' : gw , 'static':False , 'enabled': enabled}
+        try:
+            conf['essid'] = dev.config('essid')
+            conf['pass'] = ''
+        except:
+            pass
+        return conf
+    
     def save(self, node_id, **kwargs):
         layout = krax.devices('mac')
         devs = krax.devices('device_id')
 
-        try:
-            eth = network.LAN(0)
-            ipv4 = eth.ifconfig()[0]
-        except:
-            ipv4 = '0.0.0.0'
-
         with open('krax.json', 'w') as l:
-            conf = {'node_id': node_id, 'layout': layout, 'devs': devs, 'ipv4': ipv4,
-                    'static': False, 'mask': '255.255.255.0', 'gw': '0.0.0.0', 'hostname': 'krax'}
-            conf.update(kwargs)
+            conf = {'node_id': node_id, 'layout': layout, 'devs': devs, 
+                     'eth' : self.ifconfig(network.LAN(0)), 
+                     'ap' : self.ifconfig(network.WLAN(1)), 
+                     'sta' : self.ifconfig(network.WLAN(0)),
+                     'init' : { 'rate':12, 'iface':0 , 'hostname': 'krax','flags':0} }
+            
+            conf['init'].update(kwargs)
             json.dump(conf, l)
         with open('krax.dat', 'w') as d:
             d.write(krax.save())
 
     def __call__(self, node_id: int = 1, **kwargs):
+        global sta,ap
+        sta.active(False)
+        ap.active(False)
+        sta.active(True)
+        ap.active(True)
+        sta.disconnect()
         krax.init(node_id, event=self.on_kevent, **kwargs)
         self.busy = True
         while self.busy:
@@ -51,20 +71,17 @@ class Setup():
         krax.init(node_id)
         print('KRAX.IO setup complete!')
 
-
 wps = Setup()
 if __name__ != '__main__':
     try:
         with open('krax.json', 'rb') as f:
             conf = json.load(f)
-        node_id = conf['node_id'] if 'node_id' in conf else 1
-        rate = conf['rate'] if 'rate' in conf else 12
-        scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-        iface = conf['iface'] if 'iface' in conf else 0
-        print(f'Staring node configuration with id={node_id}...')
-        wps(node_id, rate=rate, scanTime=scanTime, iface=iface)
+        node_id = conf['node_id']
+        init = conf['init']
+        print(f'Staring node configuration with id={node_id}. init=',init)
+        wps(node_id, **init)
     except Exception as e:
         print(e)
         print(f'Staring default configuration with id=1...')
-        wps(1, rate=12, scanTime=100, iface=0)
+        wps(1, rate=12, iface=0)
         pass

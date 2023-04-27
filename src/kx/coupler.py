@@ -109,9 +109,12 @@ class Manager():
         if Manager.__fexists('src/krax.json'):
             with open('src/krax.json','rb') as f:
                 conf = json.load(f)
-                if 'ipv4' in conf:
-                    ipv4=conf['ipv4']
+                if 'via' in conf:
+                    ipv4=conf['via']
+                elif 'ipv4' in conf['eth']:
+                    ipv4=conf['eth']['ipv4']
 
+        print(f'Connecting PLC via {ipv4}:9003')
         __plc = Subscriber( ipv4 )        
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         devs = conf['devs'] if 'devs' in conf else []

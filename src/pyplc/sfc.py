@@ -76,21 +76,26 @@ class SFC(POU):
         self.sfc_continue = False
 
     class main():
+        __shortname__ = 'no_main'
         def __init__(self, sfc):
             raise AttributeError(
                 f'SFC {sfc.__shortname__} should have SFCAction named <main>')
 
     def invoke(self, t: type):
-        if t.__name__ not in self.step:
-            self.step[t.__name__] = t(self)
+        if not hasattr(self,'step'):
+            self.step = { }
+            
+        if t.__shortname__ not in self.step:
+            self.step[t.__shortname__] = t(self)
 
-        if isinstance(self.step[t.__name__], SFCAction):
-            self.T = self.step[t.__name__].sfc__T
-            self.step[t.__name__]()
+        if isinstance(self.step[t.__shortname__], SFCAction):
+            self.T = self.step[t.__shortname__].sfc__T
+            self.step[t.__shortname__]()
             
     def call( self ):
-        for s in self.subtasks:
-            s()
+        if hasattr(self,'subtasks'):
+            for s in self.subtasks:
+                s()
 
         self.invoke(self.main)
 
@@ -108,7 +113,10 @@ class SFCAction():
         self.sfc__step = None
 
     def __getattr__(self, __name: str):
-        return getattr(self.sfc__sfc, __name)
+        if hasattr(self.sfc__sfc,__name):
+            return getattr(self.sfc__sfc, __name)
+        
+        raise AttributeError(self,__name)
 
     def __setattr__(self, __name: str, __value) -> None:
         if not __name.startswith('sfc__'):
@@ -122,8 +130,8 @@ class SFCAction():
     def __call__(self):
         try:
             if self.sfc__step is not None:
-                self.sfc__T += (self.time() - self.sfc__xT)
                 next(self.sfc__step)
+                self.sfc__T += (self.time() - self.sfc__xT)
             else:
                 raise StopIteration
         except StopIteration:
@@ -135,7 +143,7 @@ class SFCAction():
 
 def sfcaction(method: callable):
     class SFCActionImpl(SFCAction):
-        __shortname__ = f'Action<{method.__name__}>'
+        __shortname__ = f'{method.__name__}'
         def __init__(self, sfc: SFC) -> None:
             super().__init__(sfc)
             setattr(sfc, method.__name__, self.__class__)
