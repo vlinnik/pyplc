@@ -238,16 +238,18 @@ class POSTO(TCPServer):
                     s = self.subscriptions[local_id]
                     # получено новое значение
                     s.remote(value, source=id(sock), ctx=self.ctx)
-        elif cmd == 3:
-            if size < 40:
+        elif cmd == 3:  #received keepalive message
+            if size < 24:   #client initiates keepalive message, just answer
                 response = sock.tx.data()
                 struct.pack_into('ii', response, 0, 3, size)
                 response[8:size] = data[8:size]
                 struct.pack_into('q', response, size, time.time_ns())
                 sock.tx.grow(size+8)
+                print('got keepalive from client')
             else:
-                ts_0, ts_1 = struct.unpack_from('qq', data, off)
+                ts_0,  = struct.unpack_from('qq', data, off)
                 ts_2 = time.time_ns()
+                print(f'server->client->server rtt time is {ts_2-ts_0} ns')
         else:
             pass  # keep alive or unsupported command
 
@@ -298,7 +300,7 @@ class POSTO(TCPServer):
         else:
             if self.keepalive+5000000000 < time.time_ns():
                 try:
-                    print(f'send keepalive {time.time_ns( )}')
+                    print(f'server send keepalive...')
                     struct.pack_into('ii', sock.tx.data(),
                                      0, 3, 0)  # keep alive
                     sock.tx.grow(8)
@@ -454,17 +456,16 @@ class Subscriber(TCPClient):
                     s.remote(value, source=id(self.sock))
         elif cmd == 3:  # keepalive
             payload = self.sock.tx.data()
-            if size < 40:
+            if size < 24:
                 struct.pack_into('ii', payload, 0, 3, size)
                 payload[8:size] = data[8:size]
                 struct.pack_into('q', payload, size, time.time_ns())
                 self.sock.tx.grow(8+size)
             else:
                 # ts_0 - мы посылали ts_1 - нам в ответ когда отправили ts_2 - мы снова туда отправили ts_3 - нам в ответ
-                ts_0, ts_1, ts_2, ts_3 = struct.unpack_from('qqqq', data, off)
-                ts_4 = time.time_ns()
-                self.stat = [(ts_2-ts_0) >> 1, (ts_3-ts_1)
-                             >> 1, (ts_4-ts_0) >> 1]
+                ts_0,  = struct.unpack_from('q', data, off)
+                ts_2 = time.time_ns()
+                self.stat = [(ts_2-ts_0) >> 1]
 
         return size
 

@@ -21,8 +21,8 @@ class MOVE(POU):
             except:
                 pass
 
-x = MOVE(en=lambda: False,q = print ,id='x')
-y = MOVE(en=lambda: True,q = print ,id='x')
+x = MOVE(en=lambda: False,q = print )
+y = MOVE(en=lambda: True,q = print )
 
 x( i = 14   )
 y( i = 3.14 )

@@ -119,12 +119,15 @@ class Manager():
     def ifup(self,dev,conf: dict):
         enabled = conf['enabled'] if 'enabled' in conf else True
         if not enabled:
+            dev.active(False)
             return
         ifname = conf['essid'] if 'essid' in conf else 'LAN'
         print(f'Startup network interface {ifname}.',end='')
         try:
             if not dev.active():
                 dev.active(True)
+                while not dev.active():
+                    time.sleep(1)
             static = conf['static'] if 'static' in conf else False
             if static:
                 ipv4 = conf['ipv4']
@@ -178,38 +181,43 @@ class Manager():
         try:
             plc
             print('Cleanup objects: cli/posto/plc')
-            cli.term()
-            posto.term()
+            if cli is not None: cli.term()
+            if posto is not None: posto.term()
             del cli
             del posto
             del plc
-        except:
+        except Exception as e:
+            print('Exception in Manager.cleanup',e)
             pass
+        krax.deinit( )
 
-    def load(self):
+    def load(self,passive: bool=False):
         global cli, posto, plc, hw
         if Manager.__fexists('krax.json'):
             with open('krax.json', 'rb') as f:
                 conf = self.conf = json.load(f)
         conf = self.conf
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-        devs = conf['devs'] if 'devs' in conf else []
+        devs = conf['devs'] if 'devs' in conf and not passive else []
 
         self.cleanup( )
+        cli = None
+        posto = None
 
-        try:
-            cli = CLI()  # simple telnet
-            posto = POSTO(port=9004)  # simple share data over tcp
-        except Exception as e:
-            print(f'CLI/POSTO in use ({e}).')
-            cli = None
-            posto = None
+        if not passive:
+            try:
+                cli = CLI()  # simple telnet
+                posto = POSTO(port=9004)  # simple share data over tcp
+            except Exception as e:
+                print(f'CLI/POSTO in use ({e}).')
+                cli = None
+                posto = None
         plc = PYPLC(devs, period=scanTime, krax=krax, pre=cli, post=posto)
         hw = plc.state
         plc.connection = plc  # чтобы  не отличался от coupler
         plc.cleanup = self.cleanup
 
-        if self.__fexists('io.csv'):
+        if self.__fexists('io.csv') and not passive:
             vars = 0
             errs = 0
             with open('io.csv', 'r') as csv:
@@ -240,8 +248,8 @@ if __name__ != '__main__' and __target_krax:
     board = Board()
     manager = Manager()
 
-    def kx_init():
-        manager.load()
+    def kx_init(passive: bool = False):
+        manager.load(passive=passive)
         return plc, hw
     def kx_term():
         manager.cleanup()

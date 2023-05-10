@@ -1,12 +1,30 @@
 from pyplc.sfc import *
 import time
 
-@sfc(inputs=['clk','pt'],outputs=['q'])
-class TON(SFC):
-    def __init__(self,clk=False,pt=1,q=False):
+class Logic(SFC):
+    def __init__(self,clk = False) -> None:
+        super().__init__()
         self.clk = clk
+        
+@sfc(inputs=['clk','pt'],outputs=['q'])
+class TON(Logic):
+    def __init__(self,clk=False,pt=1,q=False):
+        super().__init__(clk=clk)
         self.pt = pt
         self.q = q
+    
+    @sfcaction
+    def timeout500ms(self):
+        for x in self.pause(500,step='timeout'):
+            self.log(f'timeout {self.T}')
+            yield x
+    
+    @sfcaction
+    def dump(self):
+        while True:
+            for x in self.pause(1000):
+                yield x
+            self.log(f'dump: {self.sfc}')
 
     @sfcaction
     def main(self) :
@@ -19,6 +37,9 @@ class TON(SFC):
         for x in self.till(lambda: self.clk ,max=self.pt):
             self.log('delay')
             yield True
+            
+        for x in self.action(self.timeout500ms).wait:
+            yield x
 
         if self.clk:
             self.q = True
@@ -36,12 +57,14 @@ class TON(SFC):
             
         return self.q
 
-x = TON(pt=1)
+x = TON(clk=lambda: True, pt=3000 )
+
+x.exec(x.dump)
 
 cycle = 0 
 start_ts = time.time_ns()
 while not x.q:
-    x( clk = True )
+    x(  )
     cycle+=1
     time.sleep(0.1)
 end_ts = time.time_ns()

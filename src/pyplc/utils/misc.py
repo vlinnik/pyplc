@@ -59,9 +59,10 @@ class TON(SFC):
             self.q = self.et >= self.pt
             yield x
 
-    def __call__(self, pt: int = None):
+    def __call__(self,clk: bool = None, pt: int = None):
         with self:
             self.overwrite('pt', pt)
+            self.overwrite('clk', clk)
             self.call() 
         return self.q
 
@@ -87,8 +88,9 @@ class TOF(SFC):
                 self.q = self.et <= self.pt and self.q
                 yield x
 
-    def __call__(self, pt: int = None):
+    def __call__(self,clk: bool = None, pt: int = None):
         with self:
+            self.overwrite('clk',clk)
             self.overwrite('pt', pt)
             self.call()
         return self.q
@@ -109,13 +111,41 @@ class BLINK(SFC):
             yield False
         for x in self.pause(self.t_on):
             self.q = True
-            yield True
+            yield x
         for x in self.pause(self.t_off):
             self.q = False
-            yield False
+            yield x
 
     def __call__(self, enable: bool = None):
         with self:
             self.overwrite('enable', enable)
+            self.call( )
+        return self.q
+
+@sfc(inputs=['clk', 't_on', 't_off'], outputs=['q'], id='tp')
+class TP(SFC):
+    def __init__(self, clk=False, t_on: int = 1000, t_off: int = 0):
+        self.clk = clk
+        self.t_on = t_on
+        self.t_off = t_off
+        self.q = False
+
+    @sfcaction
+    def main(self):
+        while not self.clk:
+            self.q = False
+            yield False
+        if self.t_on>0:
+            for x in self.pause(self.t_on):
+                self.q = True
+                yield x
+        if self.t_off>0:
+            for x in self.till(lambda: self.clk,min = self.t_off):
+                self.q = False
+                yield x
+
+    def __call__(self, clk: bool = None):
+        with self:
+            self.overwrite('clk', clk)
             self.call( )
         return self.q
