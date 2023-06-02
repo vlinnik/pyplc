@@ -53,7 +53,7 @@ class SFC(POU):
         Выполнять пока выполняется условие
         """
 
-        self.sfc_step = f'{step}'
+        if step is not None: self.sfc_step = f'{step}'
         if min is not None:
             min = self.time() + min
         if max is not None:
@@ -103,20 +103,25 @@ class SFC(POU):
         Returns:
             _type_: _description_
         """        
-        job = t(self)
+        job = t(sfc=self)
         if isinstance(job, SFCAction):
             job( )
             return job
         return None
         
-    def exec(self,t: type):
+    def exec(self,act ):
         """Создать SFCAction и добавить его в фоновое выполнение (однократное выполнение)
 
         Args:
-            t (type): _description_
+            t (type): Имя функции, объявленной с помощью @sfcaction
         """        
-        job = self.action(t)
+        if not isinstance(act,SFCAction):
+            self.log( 'SFC.exec first argument should be SFCAction instance')
+            return
+        act.act_sfc = self
+        job = act
         if job: self.jobs.append(job)
+        return job
             
     def call( self ):
         if hasattr(self,'subtasks'):
@@ -136,6 +141,13 @@ class SFC(POU):
             self.jobs = list( filter( lambda item: not item.act_complete,self.jobs ))
 
     def __call__(self):
+        if self.sfc_reset:
+            for job in self.jobs:
+                job.close()
+            self.jobs.clear( )
+            if self.sfc_main: 
+                self.sfc_main.close()
+            
         with self:
             self.call( )
 
@@ -175,7 +187,13 @@ class SFCAction():
         
     @property
     def wait(self):
+        if self.act_step is None and self.act_init:
+            self( )
         return self.act_step
+    
+    def close(self):
+        if self.act_step is not None:
+            self.act_step.close()
 
     def __call__(self):
         try:
@@ -199,12 +217,15 @@ class SFCAction():
 def sfcaction(method: callable):
     class SFCActionImpl(SFCAction):
         __shortname__ = f'{method.__name__}'
-        def __init__(self, sfc: SFC) -> None:
+        def __init__(self, *args, sfc: SFC = None, **kwargs ) -> None:
             super().__init__(sfc)
-            setattr(sfc, method.__name__, self.__class__)
+            if sfc is not None:
+                setattr(sfc, method.__name__, self.__class__)
+            self.act_args = args
+            self.act_kwargs = kwargs
 
         def main(self):
-            return method(self)
+            return method(self,*self.act_args,**self.act_kwargs)
 
     return SFCActionImpl
 
@@ -219,7 +240,7 @@ class sfc(pou):
 
                 def __init__(self, *args, **kwargs) -> None:
                     id = kwargs['id'] if 'id' in kwargs else helper.id
-                    POU.setup( self, inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__, persistent=helper.__persistent__ ,id = id )
+                    POU.setup( self, inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__, persistent=helper.__persistent__, hidden=helper.__hidden__, id = id )
                     kwvals = helper.process_inputs(self,**kwargs)
                     super().__init__(*args, **kwvals)
                     if not hasattr(self,'sfc_step'):

@@ -23,14 +23,14 @@ class POU():
                 
         return __default
     
-    def setup(self,inputs=[],outputs=[],vars=[],persistent=[],id = None):
+    def setup(self,inputs=[],outputs=[],vars=[],persistent=[],hidden=[],id = None):
         self.__sinks__ = { } # куда подключать выходы
         self.__bindings__ = { } # подключение входов
         self.__persistent__ = persistent # что сохраняется в EEPROM
         self.__inputs__ = inputs # какие входы
         self.__outputs__ = outputs # какие выходы
         self.__vars__ = vars # переменные доступные для POSTO.Subscriber
-        self.__syms__ = inputs + outputs + vars # все переменные 
+        self.__syms__ = [i for i in inputs + outputs + vars if i not in hidden ] # все переменные кроме hidden 
         self.id = id
         if id is not None and len(persistent)>0 : POU.__persistable__.append(self)
                         
@@ -45,7 +45,9 @@ class POU():
             self.__syms__ = [ ]
             self.id = None
                         
-    def export(self,__name: str):
+    def export(self,__name: str,initial = None):
+        if initial is not None:
+            setattr(self,__name,initial)
         self.__syms__.append(__name)
     
     def __dump__(self,items: list[str])->dict:
@@ -150,11 +152,12 @@ class POU():
                 s(__value)
         
 class pou():
-    def __init__(self,inputs=[],outputs=[],vars=[],persistent=[],id=None):
+    def __init__(self,inputs=[],outputs=[],vars=[],persistent=[],hidden=[],id=None):
         self.__persistent__ = persistent
         self.__inputs__ = inputs
         self.__outputs__ = outputs
         self.__vars__ = vars
+        self.__hidden__ = hidden
         self.id = id
 
     def process_inputs(self,target:POU,**kwargs):  #обработка входных параметров конструктора
@@ -182,7 +185,7 @@ class pou():
                     id = kwargs['id'] if 'id' in kwargs else helper.id
                     #POU.__init__(self,inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__,id=kwargs['id'] if 'id' in kwargs else helper.id, persistent=helper.__persistent__ )
                     #подменим аргументы из input на значения, а callable outputs  просто уберем (чтобы сработали значения по умолчанию для cls)
-                    POU.setup(self, inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__, persistent=helper.__persistent__,id = id )
+                    POU.setup(self, inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__, persistent=helper.__persistent__,hidden=helper.__hidden__, id = id )
                     kwvals = helper.process_inputs(self,*args,**kwargs)
                     cls.__init__(self,*args,**kwvals)
                     

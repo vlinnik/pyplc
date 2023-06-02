@@ -126,6 +126,7 @@ class POSTO(TCPServer):
         self.subscriptions = {}
         self.belongs = {}  # map subscription to fileno of socket
         self.keepalive = time.time_ns()
+        self.mcount = 0 # сколько раз переменные изменялись
         super().__init__(port,i_size = 1024, o_size = 4096)
 
     def find(self, item: str):
@@ -291,6 +292,9 @@ class POSTO(TCPServer):
                     struct.pack_into(
                         f'!HBH{len(ba)}s', payload, end, remote_id, 3, len(ba), ba)
                     end += struct.calcsize(f'!HBH{len(ba)}s')
+                else: print(f'POSTO::routine unsupported type of subscribed item')
+                # s.modified = False
+                self.mcount += 1
             try:
                 struct.pack_into('ii', payload, 0, 2, end-8)
                 sock.tx.grow(end)
@@ -348,7 +352,7 @@ class Subscriber(TCPClient):
             if not __name.endswith('__parent') and __name in self.__parent.items:
                 obj = self.__item(__name)
                 if obj.remote_id is not None:
-                    obj(__value)
+                    obj.changed(__value)
                 return
 
             return super().__setattr__(__name, __value)
@@ -430,6 +434,8 @@ class Subscriber(TCPClient):
                     s.filed = False
                     if local_id in self.unsubscribed:
                         self.unsubscribed.remove(local_id)
+                    s.changed(None)
+                    s.modified = False
             if len(self.unsubscribed) == 0:
                 self.online = True
             return off

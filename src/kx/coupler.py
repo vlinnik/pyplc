@@ -151,7 +151,7 @@ class Manager():
                         print(e,info)
                         errs = errs+1
             print(f'Declared {vars} variable, have {errs} errors')
-        return plc,hw
+        return plc,plc.state
 
 if __name__!='__main__':
     board = Board( )

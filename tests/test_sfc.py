@@ -20,9 +20,9 @@ class TON(Logic):
             yield x
     
     @sfcaction
-    def dump(self):
+    def dump(self,period: int):
         while True:
-            for x in self.pause(1000):
+            for x in self.pause(period):
                 yield x
             self.log(f'dump: {self.sfc}')
 
@@ -59,13 +59,15 @@ class TON(Logic):
 
 x = TON(clk=lambda: True, pt=3000 )
 
-x.exec(x.dump)
+dump = x.exec(x.dump( 100 ))
 
 cycle = 0 
 start_ts = time.time_ns()
 while not x.q:
     x(  )
     cycle+=1
+    if cycle==20:
+        dump.close( )
     time.sleep(0.1)
 end_ts = time.time_ns()
 print(f'{(end_ts-start_ts)/cycle/1000000} ms/call')
