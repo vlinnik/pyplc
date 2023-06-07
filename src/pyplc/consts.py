@@ -1,1 +1,1 @@
-PyPLC_VERSION = "v0.0.2-3"
+PyPLC_VERSION = "v0.0.2-3-1-g08cc88e"

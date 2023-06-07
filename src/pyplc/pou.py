@@ -136,7 +136,8 @@ class POU():
                 off+=8
             else:
                 raise TypeError('Unknown type code')
-            setattr(self,i,value)
+            if hasattr(self,i):
+                setattr(self,i,value)
                                 
     def __enter__(self):
         for key in self.__inputs__: #bind inputs to external data source

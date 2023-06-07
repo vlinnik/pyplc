@@ -55,7 +55,6 @@ class PYPLC():
 
     def __init__(self,*args,krax=None,pre=None,post=None,period:int=100):
         POU.__persistable__.clear( ) 
-        self.__backup__ = None  #состояние из backup восстановлено
         self.__dump__ = None    #текущий dump, который нужно сохранить
         self.__backup_timeout__ = None #сохранение происходит с задержкой, чтобы увеличить срок службы EEPROM
         self.persist = None
@@ -76,6 +75,14 @@ class PYPLC():
         self.state = self.__State(self)
         self.kwds = {}
         self.safe = True
+        """
+        Всего 32 секции по 8 байт. 256 байт в начале eeprom. Каждая секция 
+        2 байта смещение в eeprom 
+        2 байта размер
+        4 байта порядковый номер. Порядковый номер % 32 === номер записи [0,31]
+        """
+        self.sect_n = 0 # номер секции, в которой будет сохранение persistent производиться. 
+        self.sect_off = 256 
         addr = 0
         if krax is not None:
             Module.reader = krax.read_to
@@ -121,41 +128,85 @@ class PYPLC():
         
     def write(self):
         self.sync(True)
+        
+    def restore(self,off: int = None):
+        """Восстановить значение переменных из EEPROM
+
+        Args:
+            off (int, optional): Смещение в EEPROM по которому начинается снимок значений переменных. Defaults to None.
+
+        Raises:
+            f: 
+
+        Returns:
+            bool: True если удачно False иначе
+        """        
+        if not self.persist:
+            return False
+        
+        if off is not None:
+            self.persist.seek(off)
+        else:
+            self.sect_off = off
+            
+        try:
+            with open('persist.json','r') as f:
+                info = json.load(f)
+                
+            backup = POU.__persistable__    # объекты persistable
+            for i in info:  #info - список словарей, для каждого persistable объекта с указанием имени объекта, его свойств, sha1 хеша свойств и размера для сохранения
+                name = i['item']
+                size = i['size']
+                sha1 = i['sha1']
+                properties = i['properties']
+
+                so = list( filter( lambda x: x.id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
+                crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
+                if crc != sha1:
+                    raise f"sha1 digest properties list is invalid: {so.id}"
+                
+                data = self.persist.read(size)
+                so.from_bytearray( data, properties )
+        except Exception as e:
+            print(f'Cannot restore backup({e}). Section at {self.sect_off}')
+            return False
+        return True
     
     def config(self,safe:bool=True,persist:IOBase = None,**kwds ):
         self.kwds = kwds
         self.safe = safe
         self.persist = persist
         if persist: #восстановление & подготовка следующей резервной копии
+            if hasattr(persist,'chip_id'):
+                self.has_eeprom = True
             info = [ ]
-            try:
-                with open('persist.json','r') as f:
-                    info = json.load(f)
-                    
-                backup = POU.__persistable__
-                for i in info:
-                    name = i['item']
-                    size = i['size']
-                    sha1 = i['sha1']
-                    properties = i['properties']
-
-                    so = list( filter( lambda x: x.id==name ,backup ) )[0]
-                    crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
-                    if crc != sha1:
-                        raise f"Backup broken on {so.id}"
-                    
-                    self.__backup__ = data = persist.read(size)
-                    so.from_bytearray( data, properties )
-                try:
-                    success = persist.truncate( 0 )        #на на python truncate доступно, на micropython-e нет. а AT25640b truncate выдает не 0
-                    if success!=0:
-                        self.has_eeprom = True
-                except:
-                    pass
-            except:
-                self.__backup__ = None
-                print('persist.json is not found or backup broken...')
-                            
+            persist.seek( 0 )
+            fat = persist.read( 256 )
+            last = ( 256,0,0 )
+            if len(fat)==256:
+                off = 0
+                while off<256:
+                    sect_off,sect_size,sect_n = struct.unpack_from('HHI',fat,off)
+                    if last[2]<=sect_n and sect_off!=0xFFFF and sect_off>=256 and sect_size<8192/2 and sect_size!=0x0 and (sect_n % 32) * 8 == off:
+                        last = (sect_off,sect_size,sect_n)
+                        print(f'Found section {last}...')
+                    off+=8
+                if last[1]>0:
+                    if self.restore( last[0] ):
+                        self.sect_n = last[2]+1
+                        self.sect_off = last[0]+last[1]
+                        self.persist.seek( self.sect_off )
+                    else:
+                        self.sect_n = last[2]
+                        self.sect_off = last[0]
+                        self.persist.seek( last[0] )
+                print(f'restoring from section in persistent memory off/size/num: {last}')
+                print(f'now index at {(self.sect_n % 32)*8} section at {self.sect_off}')
+            else:
+                self.sect_n = 0
+                self.sect_off = 256
+                persist.seek(self.sect_off)
+                                            
             POU.__dirty__=False
             info.clear()
             for so in POU.__persistable__:
@@ -179,41 +230,35 @@ class PYPLC():
             buf.extend( so.to_bytearray( ) )            
         buf.extend(struct.pack('!q',len(buf)))  #последнее записанное = размер backup
         self.__dump__ = buf
-        self.persist.seek( 0 )       #переход на начало файла, !!!на  файлах a+b не работает. поэтому файл persist.dat будет расти!!!
         POU.__dirty__=False
         print('Backup started...')
     
     def flush(self,timeout_ms:int = 10 ):       #сохранение persistable переменных теневое
         if self.__dump__ is None or self.persist is None:
             return
-        done = self.persist.tell()    #где находимся
+        done = self.persist.tell() - self.sect_off   #где находимся, сколько уже сохранили
         size = len(self.__dump__)
-        written = 0 
-        try:
-            if done==0 and not self.has_eeprom:
-                self.persist.truncate(0)                    #файлы на micropython-e не поддерживают truncate
-            self.persist.seek(0)
-        except:
-            pass
+        written = 0 #сколько записали за этот вызов
         
         start_ts = time.time_ns( )
         while done<size and time.time_ns()-start_ts<=timeout_ms*1000000:
             npage=min(32,size-done)
-            if self.has_eeprom and self.__backup__ is not None and len(self.__backup__)>done+npage:
-                if self.__dump__[done:done+npage]!=self.__backup__[done:done+npage]:
-                    self.persist.write( self.__dump__[done:done+npage] )
-                else:
-                    self.persist.seek(done+npage)
-            else:
-                self.persist.write( self.__dump__[done:done+npage])
+            self.persist.write( self.__dump__[done:done+npage])
             done+=npage
             written+=npage
         if done>=size:
-            self.__backup__ = self.__dump__
             self.__dump__ = None                #все сохранили
             self.persist.flush( )
             if self.has_eeprom:
-                self.persist.seek( 0 )          #все сначала
+                print(f'writing index at {(self.sect_n % 32)*8} section at {self.sect_off}')
+                self.persist.seek( (self.sect_n % 32)*8 )
+                self.persist.write( struct.pack( "HHI", self.sect_off,done,self.sect_n ) )
+                self.sect_off += done
+                self.sect_n += 1
+                if self.sect_off + done>=8192:
+                    self.sect_off = 256
+                print(f'next index at {(self.sect_n % 32)*8} section at {self.sect_off}')
+                self.persist.seek( self.sect_off )          
         return written
     
     def idle(self):

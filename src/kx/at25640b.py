@@ -5,13 +5,14 @@ import time
 
 class AT25640B(IOBase):
     WREN = const(0b0000_0110)
-    WRDI = 0b0000_0100
-    RDSR = 0b0000_0101
-    WRSR = 0b0000_0001
-    READ = 0b0000_0011
-    WRITE= 0b0000_0010
+    WRDI = const(0b0000_0100)
+    RDSR = const(0b0000_0101)
+    WRSR = const(0b0000_0001)
+    READ = const(0b0000_0011)
+    WRITE= const(0b0000_0010)
     
     def __init__(self):
+        self.chip_id = 'AT25640B'
         self._hspi = SPI(1, baudrate=10_000_000, polarity=1, phase=1, bits=8, firstbit=SPI.MSB, sck=Pin(14), mosi=Pin(13), miso=Pin(12))
         self._cs = Pin(5,Pin.OUT,1)
         self._addr = 0x0000
@@ -33,6 +34,10 @@ class AT25640B(IOBase):
         return self._addr
     def flush(self):
         print(f'Backup successfully created. Total {self._addr}/8192 bytes ')
+    def erase(self):
+        self.seek(0)
+        self.write(bytearray([0xff]*8192))
+        self.seek(0)
         
     def write(self,data):
         mvp = self._mvp
@@ -81,6 +86,6 @@ class AT25640B(IOBase):
             self._addr+=offset
         else:
             raise ValueError('Unsupported "whence" value')
-        
+               
     def truncate(self,size=None):
         return 4096

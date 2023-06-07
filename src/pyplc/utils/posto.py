@@ -28,6 +28,8 @@ class Subscription():
         self.no_exec = False
         self.__sinks = []
         self.local_id = Subscription.next_id
+        self.tx = 0 #сколько раз отправлено
+        self.rx = 0 #сколько раз получено
         Subscription.next_id += 1
 
     def __str__(self) -> str:
@@ -69,6 +71,7 @@ class Subscription():
         self.source = source  # запомним откуда прилитело изменение
         modified = self.__value != value
         self.modify(value)  # произведем
+        self.rx +=1
         if modified:
             if self.write and callable(self.write):
                 try:
@@ -126,7 +129,6 @@ class POSTO(TCPServer):
         self.subscriptions = {}
         self.belongs = {}  # map subscription to fileno of socket
         self.keepalive = time.time_ns()
-        self.mcount = 0 # сколько раз переменные изменялись
         super().__init__(port,i_size = 1024, o_size = 4096)
 
     def find(self, item: str):
@@ -293,8 +295,7 @@ class POSTO(TCPServer):
                         f'!HBH{len(ba)}s', payload, end, remote_id, 3, len(ba), ba)
                     end += struct.calcsize(f'!HBH{len(ba)}s')
                 else: print(f'POSTO::routine unsupported type of subscribed item')
-                # s.modified = False
-                self.mcount += 1
+                s.tx+=1 #счетчик отправлений 
             try:
                 struct.pack_into('ii', payload, 0, 2, end-8)
                 sock.tx.grow(end)
@@ -320,7 +321,7 @@ class POSTO(TCPServer):
 
         for k in self.subscriptions:
             s = self.subscriptions[k]
-            if not s.modified:
+            if not s.modified or s.tx<2:
                 continue
             s.modified = False
 

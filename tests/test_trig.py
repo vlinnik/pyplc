@@ -1,4 +1,4 @@
-from pyplc.utils.trig import RTRIG,FTRIG,TRIG
+from pyplc.utils.trig import RTRIG,FTRIG,TRIG,TRANS
 import time
 
 test = 0
