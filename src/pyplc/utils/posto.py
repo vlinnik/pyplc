@@ -37,9 +37,10 @@ class Subscription():
 
     def cleanup(self):
         if self.bound:
-            self.bound[1].unbind(self.bound[0], self)
-            self.bound = None
-            self.write = None
+            self.bound[1].unbind(self.bound[0], self.bound[2])
+        self.__sinks.clear( )
+        self.bound = None
+        self.write = None
 
     def modify(self, value):  # modify current value for underlying subscription's item
         """Изменить значение текущее __value
@@ -68,7 +69,7 @@ class Subscription():
             source (_type_, optional): Идентификатор кто менял. чтобы не послать ему уведомление об изменении
             ctx (_type_, optional): Если write не доступен, то в случае no_exec = False произойдет изменение значения через exec (глобальные переменные и тп)
         """
-        self.source = source  # запомним откуда прилитело изменение
+        self.source = source  # запомним откуда прилетело изменение
         modified = self.__value != value
         self.modify(value)  # произведем
         self.rx +=1
@@ -162,8 +163,9 @@ class POSTO(TCPServer):
 
                 if source and hasattr(source, 'bind') and not isinstance(source, type): # на статические атрибуты классов другой механизм 
                     s = Subscription(str(item), remote_id)
-                    s.bound = (path[-1], source)                 # сохраним информацию для unbind
-                    s.write = source.bind(path[-1], s.changed )  # POU.bind может возвращать функцию для записи в указанное свойство
+                    callback = s.changed
+                    s.bound = (path[-1], source,id(callback))                 # сохраним информацию для unbind
+                    s.write = source.bind(path[-1], callback )  # POU.bind может возвращать функцию для записи в указанное свойство
                     self.subscriptions[s.local_id] = s
                     s.modified = True
                     return s

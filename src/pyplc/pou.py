@@ -31,6 +31,7 @@ class POU():
         self.__outputs__ = outputs # какие выходы
         self.__vars__ = vars # переменные доступные для POSTO.Subscriber
         self.__syms__ = [i for i in inputs + outputs + vars if i not in hidden ] # все переменные кроме hidden 
+        self.__cached__ = { }   #последнее значения для каждого self.__sinks__
         self.id = id
         if id is not None and len(persistent)>0 : POU.__persistable__.append(self)
                         
@@ -43,6 +44,7 @@ class POU():
             self.__outputs__ = [ ]
             self.__vars__ = [ ]
             self.__syms__ = [ ]
+            self.__cached__ = { }   #последнее значения для каждого self.__sinks__
             self.id = None
                         
     def export(self,__name: str,initial = None):
@@ -86,7 +88,9 @@ class POU():
 
     def unbind(self,__name,__sink = None):
         if __name in self.__sinks__:
-            self.__sinks__[__name] = list(filter( lambda x: (x!=__sink or __sink is None), self.__sinks__[__name] ))
+            self.__sinks__[__name] = list(filter( lambda x: ( id(x)!=__sink and x!=__sink and __sink is not None), self.__sinks__[__name] ))
+        else:
+            print(f'warnings: required unbind attribute {__name} not found')
     
     def __setattr__(self, __name: str, __value) -> None:
         if not __name.endswith('__'):
@@ -149,8 +153,10 @@ class POU():
             if not hasattr(self,__name):
                 continue
             __value = getattr(self,__name)
-            for s in self.__sinks__[__name]:
-                s(__value)
+            if __name not in self.__cached__ or self.__cached__[__name]!=__value:
+                self.__cached__[__name] = __value
+                for s in self.__sinks__[__name]:
+                    s(__value)
         
 class pou():
     def __init__(self,inputs=[],outputs=[],vars=[],persistent=[],hidden=[],id=None):
