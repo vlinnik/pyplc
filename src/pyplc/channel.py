@@ -1,3 +1,5 @@
+import struct
+
 class Channel(object):
     def __init__(self, name='', init_val=None, rw=False):
         self.rw = rw
@@ -29,6 +31,17 @@ class Channel(object):
                 c(value)
 
     def bind(self, callback):
+        """Соединить канал IO c функцией оповещения. 
+        Если значение переменной изменится, то будет вызвана функция оповещения.
+        При этом возвращается функция, с помощью которой можно производить запись
+        в IO, если это доступно.
+
+        Args:
+            callback (function): _description_
+
+        Returns:
+            callable: функция для доступа к изменению переменной 
+        """        
         try:
             callback(self.read())
             self.callbacks.append(callback)
@@ -56,6 +69,9 @@ class Channel(object):
         value = self()
         for c in self.callbacks:
             c(value)
+            
+    def sync(self):
+        pass
 
     def __call__(self, value=None):
         if value is None:
@@ -70,3 +86,102 @@ class Channel(object):
             if isinstance(s, Channel):
                 r[i] = s
         return r
+
+class IBool(Channel):
+    def __init__(self,addr,num,name=''):
+        self.addr = addr
+        self.num = num
+        self.mask = 1<<num
+        self.forced = None
+        super( ).__init__(name)
+
+    def read(self):
+        if self.forced:
+            return self.forced
+        return super().read( )
+
+    def write(self,val):
+        if self.read()!=val:
+            raise Exception('IXBool is read only',self)
+
+    def __invert__(self):
+        return lambda: not self.read()
+
+    def __str__(self):
+        if self.name!='':
+            return f'IXBool({self.name} AT %IX{self.addr}.{self.num}={self()})'
+        else:
+            return f'IXBool(%IX{self.addr}.{self.num}={self()})'                
+
+    def sync(self,data: memoryview, dirty: memoryview ):
+        o_val = self.read()
+        self.value = (data[ self.addr ] & self.mask)!=0
+        if o_val!=self.value:
+            self.changed( )
+
+class QBool(Channel):
+    def __init__(self, addr, num: int, name=''):
+        self.addr = addr
+        self.num = num
+        self.mask = 1<<num
+        self.dirty= False
+        super().__init__(name,rw=True)
+
+    def write(self,val):
+        self.dirty = True
+        super().write(val)
+
+    def __invert__(self):
+        return lambda: not self.read()
+
+    def __str__(self):
+        if self.name!='':
+            return f'QXBool({self.name} AT %QX{self.addr}.{self.num}={self()})'
+        else:
+            return f'QXBool(%QX{self.addr}.{self.num}={self()})'
+            
+    def set(self):
+        self.write(True)
+
+    def clear(self):
+        self.write(False)
+
+    def sync(self,data: memoryview, dirty: memoryview ):
+        if self.dirty:
+            if self.value:
+                data[self.addr] |= self.mask
+            else:
+                data[self.addr] &= ~self.mask
+            self.dirty = False
+        else:
+            o_val = self.read()
+            self.value = (data[ self.addr ] & self.mask)!=0
+            if self.value!=o_val:
+                self.changed( )
+
+class IWord(Channel):
+    def __init__(self,addr,name=''):
+        self.addr = addr
+        self.forced = None
+        super( ).__init__(name)
+
+    def read(self):
+        if self.forced:
+            return self.forced
+        return super().read( )
+
+    def write(self,val):
+        if val!=self.read():
+            raise Exception('IWord is read only',self)
+
+    def __str__(self):
+        if self.name!='':
+            return f'IWord({self.name} AT %IW{self.addr}={self():02x})'
+        else:
+            return f'IWord(%IW{self.addr}={self():02x})'                
+    
+    def sync(self,data: memoryview,dirty: memoryview):
+        o_val = self.value
+        self.value, = struct.unpack_from('H',data,self.addr)
+        if self.value!=o_val:
+            self.changed()

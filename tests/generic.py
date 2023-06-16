@@ -1,31 +1,26 @@
-class Base():
-    def __init__(self,message=None):
-        self.message = message
-        print(f'base {message}')
-        
-    def __base__(self):
-        print(f'__base__ {self.message}')
-    
-    def __call__(self,*args,**kwargs):
-        if len(args)==1 and issubclass(args[0],Base):
-            cls = args[0]
-            helper = self
-            class Wrapper(cls):
-                def __init__(self):
-                    print(f'Wrapper {helper.message}')
-                    Base.__init__(self,message = 'wrapped: '+helper.message)
-                    cls.__init__(self)
-                def __call__(self,*args,**kwargs):
-                    self.__base__()
-                    super().__call__(*args,**kwargs)
-            return Wrapper
+from pyplc.channel import *
 
-@Base(message='From Foo')
-class Foo(Base):
-    def __init__(self):
-        print(f'foo {self.message}')
-    def __call__(self, hint: str):
-        print(f'foo __call__: {hint}')
+data = memoryview( bytearray(32) )
+dirty = memoryview( bytearray(32) )
 
-foo = Foo()
-foo('hint')
+def on_changed(val):
+    print(f'changed {val}')
+
+data[0] = 0xAB
+data[1] = 0xCD
+data[2] = 0x08
+
+ix = IBool(2,3,'_IX_')
+qx = QBool(2,3,'_QX_')
+iw = IWord(0,'_IW_')
+
+ix.bind(on_changed); qx.bind(on_changed); iw.bind(on_changed)
+
+ix.sync( data,dirty )
+ix.sync( data,dirty )
+qx.sync( data,dirty )
+qx.sync( data,dirty )
+iw.sync( data,dirty )
+iw.sync( data,dirty )
+
+print(ix,qx,iw)

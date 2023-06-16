@@ -31,7 +31,7 @@ class POU():
         self.__outputs__ = outputs # какие выходы
         self.__vars__ = vars # переменные доступные для POSTO.Subscriber
         self.__syms__ = [i for i in inputs + outputs + vars if i not in hidden ] # все переменные кроме hidden 
-        self.__cached__ = { }   #последнее значения для каждого self.__sinks__
+        self.__touched__ = { } #защита от выход не прописывается (проблема с одновременным доступом)
         self.id = id
         if id is not None and len(persistent)>0 : POU.__persistable__.append(self)
                         
@@ -44,7 +44,7 @@ class POU():
             self.__outputs__ = [ ]
             self.__vars__ = [ ]
             self.__syms__ = [ ]
-            self.__cached__ = { }   #последнее значения для каждого self.__sinks__
+            self.__touched__ = { }  #флаг для контроля доступа к выходам. если в блоке небыло записи, то и в __sinks__ не надо оповещать
             self.id = None
                         
     def export(self,__name: str,initial = None):
@@ -96,6 +96,8 @@ class POU():
         if not __name.endswith('__'):
             if not POU.__dirty__ and __name in self.__persistent__:
                 POU.__dirty__ = True
+            if __name in self.__sinks__:
+                self.__touched__[__name] = True
                     
         super().__setattr__(__name,__value)   
          
@@ -153,8 +155,8 @@ class POU():
             if not hasattr(self,__name):
                 continue
             __value = getattr(self,__name)
-            if __name not in self.__cached__ or self.__cached__[__name]!=__value:
-                self.__cached__[__name] = __value
+            if __name in self.__touched__ and self.__touched__[__name]:
+                self.__touched__[__name] = False
                 for s in self.__sinks__[__name]:
                     s(__value)
         
