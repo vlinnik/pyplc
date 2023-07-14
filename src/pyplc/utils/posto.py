@@ -122,7 +122,7 @@ Cервер "Почта" доступа к переменным на порте 
 1) Подписка на переменную (издает клиент)
 2) Запись в переменную (клиент и сервер могут вызывать)
 """
-
+import gc
 
 class POSTO(TCPServer):
     def __init__(self, port=9003):
@@ -145,6 +145,7 @@ class POSTO(TCPServer):
 
     def connected(self, sock: BufferInOut):
         print(f'POSTO client online')
+        gc.collect()
 
     def disconnected(self, sock: BufferInOut):
         offline = list(

@@ -39,11 +39,12 @@ class Setup():
         return conf
     
     def save(self, node_id, **kwargs):
-        layout = krax.devices('mac')
-        devs = krax.devices('device_id')
+        layout = krax.devices('mac')     #mac устройств
+        devs = krax.devices('device_id') #наименование модулей
+        slots = krax.devices('size')     #сколько байт занимает каждый модуль
 
         with open('krax.json', 'w') as l:
-            conf = {'node_id': node_id, 'layout': layout, 'devs': devs, 
+            conf = {'node_id': node_id, 'layout': layout, 'devs': devs, 'slots' : slots,
                      'eth' : self.ifconfig(network.LAN(0)), 
                      'ap' : self.ifconfig(network.WLAN(1)), 
                      'sta' : self.ifconfig(network.WLAN(0)),

@@ -3,16 +3,26 @@ import time
 
 
 class SFC(POU):
+    HAS_TICKS_MS = None
+    HAS_TICKS_ADD = None
+    TICKS_MAX = 0
+    TIME_BIAS = 0     #поправка времени
+    TIME_MS = 0       #значение time.ticks_ms в последний вызов synctime
+    TIME_NOW = None   #время 
     STEP = type((lambda: (yield))())
     
     def __init__(self) -> None:
         POU.__init__(self)
 
-        if hasattr(time, 'ticks_ms'):
-            self.time = time.ticks_ms
-        else:
-            self.time = lambda: int(time.time_ns()/1000000)
-
+        if SFC.HAS_TICKS_MS is None:
+            SFC.HAS_TICKS_MS = hasattr(time, 'ticks_ms')
+        if SFC.HAS_TICKS_ADD is None:
+            SFC.HAS_TICKS_ADD = hasattr(time,'ticks_add')
+        if SFC.HAS_TICKS_ADD and SFC.TICKS_MAX==0:
+            SFC.TICKS_MAX = time.ticks_add(0,-1)
+        if SFC.TIME_NOW == None:
+            SFC.synctime( )
+                        
         self.born = self.time()
         self.jobs = []
         self.durance = 0
@@ -21,6 +31,27 @@ class SFC(POU):
         self.sfc_continue = False
         self.sfc_main = None
 
+    def time(self):
+        return SFC.TIME_NOW
+                
+    @staticmethod
+    def synctime():
+        """обновить текущее время SFC
+        
+        Время в msec, которое получается из time.ticks_ms() ограничено и по достижении предела начинается с 0
+        Чтобы можно было производить арифметические операции +/- с временем приходится вести свой отсчет времени в мсек
+        с начала подачи питания.  
+        """        
+        if not SFC.HAS_TICKS_MS:
+            SFC.TIME_NOW = int(time.time_ns()/1000000)
+            return
+
+        if SFC.TIME_MS>time.ticks_ms(): #переход через максимум произошел с последнего вызова
+            SFC.TIME_BIAS+=SFC.TICKS_MAX
+            
+        SFC.TIME_NOW = SFC.TIME_BIAS + time.ticks_ms( )
+        SFC.TIME_MS = time.ticks_ms()
+        
     @property
     def T(self):
         return self.time() - self.born
@@ -38,12 +69,13 @@ class SFC(POU):
     @staticmethod
     def isgenerator(x):
         return isinstance(x, SFC.STEP)
-
+    
     def pause(self, T: int, step: str = None):
         if step is not None:
             self.sfc_step = step
-        T = self.time() + T
-        while not self.sfc_reset and self.time() < T and not self.sfc_continue:
+        entry_T = self.time( )
+        T = entry_T + T
+        while not self.sfc_reset and self.time()<T and not self.sfc_continue:
             yield True
 
         self.sfc_continue = False
@@ -54,15 +86,17 @@ class SFC(POU):
         """
 
         if step is not None: self.sfc_step = f'{step}'
+        
+        entry_T = self.time()
         if min is not None:
-            min = self.time() + min
+            min = entry_T + min
         if max is not None:
-            max = self.time() + max
+            max = entry_T + max
 
         if callable(enter) and not self.sfc_reset:
             enter()
 
-        while not self.sfc_reset and ((min is not None and self.time() < min) or cond()) and (max is None or self.time() < max):
+        while not self.sfc_reset and ((min is not None and self.time() < min) or cond()) and (max is None or self.time()<max):
             if callable(step):
                 step()
             yield True
@@ -124,6 +158,8 @@ class SFC(POU):
         return job
             
     def call( self ):
+        SFC.synctime( ) #синхронизируем время
+
         if hasattr(self,'subtasks'):
             for s in self.subtasks:
                 s()
@@ -211,8 +247,6 @@ class SFCAction():
             self.act_from = self.time( )
             if not self.act_init: 
                 self.act_complete = True
-
-
 
 def sfcaction(method: callable):
     class SFCActionImpl(SFCAction):
