@@ -15,8 +15,11 @@ all: dirs $(OBJS)
 dirs:
 	@mkdir -p $(ODIR)/$(INSTALL_DIR)
 
-package:
+release:
 	@echo PyPLC_VERSION = \"`python -m setuptools_git_versioning`\">src/pyplc/consts.py
+	@git commit -a
+
+package:
 	python -m build
 	pip install ./dist/pyplc-`python -m setuptools_git_versioning`-py3-none-any.whl --force-reinstall
 $(ODIR)/$(INSTALL_DIR)/%.mpy: %.py
