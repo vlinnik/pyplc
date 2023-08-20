@@ -1,11 +1,13 @@
-from .modules import KRAX530, KRAX430,KRAX455, Module
 from .channel import Channel
 from .pou import POU
 from io import IOBase
-import time,re,sys,json
+import time,re,json,array
 import hashlib,struct
 
 class PYPLC():
+    HAS_TICKS_MS = hasattr(time,'ticks_ms') #в micropython есть в python нет
+    TICKS_MAX = 0                           #сколько максиальное значение ms()
+    
     class __State():
         """
         прокси для удобного доступа к значениям переменных ввода вывода
@@ -53,15 +55,19 @@ class PYPLC():
             s = self.__item(__name)
             s.unbind( __notify )
 
-    def __init__(self,*args,krax=None,pre=None,post=None,period:int=100):
+    def __init__(self,io_size:int,krax=None,pre=None,post=None,period:int=100):
         POU.__persistable__.clear( ) 
         self.__dump__ = None    #текущий dump, который нужно сохранить
         self.__backup_timeout__ = None #сохранение происходит с задержкой, чтобы увеличить срок службы EEPROM
         self.persist = None
-        self.ms = time.ticks_ms if hasattr(time,'ticks_ms') else lambda: int(time.time_ns()/1000000)
-        self.sleep = time.sleep_ms if hasattr(time,'sleep_ms') else lambda x: time.sleep(x/1000)
+        if PYPLC.HAS_TICKS_MS:
+            self.ms = time.ticks_ms 
+            self.sleep = time.sleep_ms
+            PYPLC.TICKS_MAX = time.ticks_add(0,-1)
+        else:   
+            self.ms = lambda: int(time.time_ns()/1000000)
+            self.sleep = lambda x: time.sleep(x/1000)
         self.has_eeprom = False
-        self.slots = []
         self.scanTime = 0
         self.userTime = 0
         self.idleTime = 0
@@ -75,6 +81,8 @@ class PYPLC():
         self.state = self.__State(self)
         self.kwds = {}
         self.safe = True
+        self.reader = None
+        self.writer = None
         """
         Всего 32 секции по 8 байт. 256 байт в начале eeprom. Каждая секция 
         2 байта смещение в eeprom 
@@ -83,35 +91,18 @@ class PYPLC():
         """
         self.sect_n = 0 # номер секции, в которой будет сохранение persistent производиться. 
         self.sect_off = 256 
-        addr = 0
+        # addr = 0
         if krax is not None:
-            Module.reader = krax.read_to
-            Module.writer = krax.write
+            self.reader = krax.read_to
+            self.writer = krax.write
+        
+        self.data = array.array('B',[0x00]*io_size) #что писать
+        self.mask = array.array('B',[0x00]*io_size) #бит из data писать только если бит=1
+        self.dirty = memoryview(self.mask)          #оптимизация
+        self.mv_data = memoryview(self.data)        #оптимизация
+        
         print(f'Initialized PYPLC with scan time={self.period} msec!')
-
-        def register(t,addr):
-            if isinstance(t,int) or isinstance(t,str):
-                if t == 430 or t == 'KRAX DI-430':
-                    return register(KRAX430,addr)
-                elif t == 530 or t == 'KRAX DO-530':
-                    return register(KRAX530,addr)
-                elif t == 455 or t == 'KRAX AI-455':
-                    return register(KRAX455,addr)
-                else:
-                    raise Exception(f'Requested unsupported module {t}')
-            elif isinstance(t,type) and issubclass(t,Module):
-                self.slots.append(t(addr))
-                addr = addr+self.slots[-1].size
-            else:
-                raise Exception('All arguments should be subclass of Module')            
-            return addr
-        for t in args:
-            if isinstance(t,list):
-                for s in t:
-                    addr = register(s,addr)
-            else:
-                addr=register(t,addr)
-
+    
     def __str__(self):
         return f'scan/user/idle/overrun {self.scanTime}/{self.userTime}/{self.idleTime}/{self.overRun}'
     
@@ -119,9 +110,20 @@ class PYPLC():
         pass
 
     def sync(self,output=True):
-        for s in self.slots:
-            if (s.family == Module.IN and output==False) or (s.family == Module.OUT and output==True):
-                s.sync()
+        if output and self.writer:
+            for var in self.vars.values():
+                if var.rw:
+                    var.sync( self.mv_data, self.dirty )    #если были изменения self.dirty установится
+            self.writer(0, self.mv_data, self.dirty )       #запись по маске (только если dirty)
+            for var in self.vars.values():                  #второй раз уже dirty сбросится.
+                if var.rw:
+                    var.sync( self.mv_data, self.dirty )    #только чтение значений
+            
+        elif not output and self.reader:
+            self.reader(0,self.mv_data)
+            for var in self.vars.values():
+                if not var.rw:
+                    var.sync( self.mv_data,self.dirty )
     
     def read(self):
         self.sync(False)
@@ -240,12 +242,17 @@ class PYPLC():
         size = len(self.__dump__)
         written = 0 #сколько записали за этот вызов
         
-        start_ts = time.time_ns( )
-        while done<size and time.time_ns()-start_ts<=timeout_ms*1000000:
+        now = time.time_ns( )
+        start_ts = now
+        end_ts = start_ts + timeout_ms*1000000
+            
+        while done<size and start_ts<=now and now<end_ts:
             npage=min(32,size-done)
             self.persist.write( self.__dump__[done:done+npage])
             done+=npage
             written+=npage
+            now = time.time_ns()
+            
         if done>=size:
             self.__dump__ = None                #все сохранили
             self.persist.flush( )
@@ -294,7 +301,9 @@ class PYPLC():
 
         self.__ts = self.ms()
     def end(self):
-        self.userTime = (self.ms() - self.__ts)
+        now = self.ms( )
+        if now>self.__ts:
+            self.userTime = (now - self.__ts)
         self.sync(True)
 
         if isinstance(self.post,list):
@@ -308,7 +317,9 @@ class PYPLC():
             
         self.idle( )
         
-        self.scanTime = (self.ms() - self.__fts)
+        now = self.ms( )
+        if self.__fts<now:
+            self.scanTime = (now - self.__fts)
         if self.scanTime>self.period+self.overRun:
             self.overRun = self.scanTime - self.period
     

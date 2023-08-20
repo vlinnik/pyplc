@@ -1,1 +1,45 @@
-{"init": {"flags": 0, "iface": 0, "hostname": "krax", "rate": 12}, "node_id": 1, "ap": {"enabled": true, "mask": "255.255.255.0", "gw": "192.168.4.1", "pass": "", "essid": "ESP_767595", "ipv4": "192.168.4.1", "static": false}, "devs": ["KRAX DO-530", "KRAX DO-530", "KRAX DO-530"], "sta": {"enabled": true, "mask": "0.0.0.0", "gw": "0.0.0.0", "pass": "", "essid": "", "ipv4": "0.0.0.0", "static": false}, "layout": ["24:d7:eb:10:66:3c", "24:d7:eb:10:de:84", "24:d7:eb:10:64:18"], "eth": {"ipv4": "0.0.0.0", "mask": "0.0.0.0", "gw": "0.0.0.0", "static": false, "enabled": true}}
+{
+    "init": {
+        "flags": 0,
+        "iface": 0,
+        "hostname": "krax",
+        "rate": 12
+    },
+    "node_id": 1,
+    "ap": {
+        "enabled": true,
+        "mask": "255.255.255.0",
+        "gw": "192.168.4.1",
+        "pass": "",
+        "essid": "ESP_767595",
+        "ipv4": "192.168.4.1",
+        "static": false
+    },
+    "devs": [
+        "KRAX DI-430",
+        "KRAX DO-530",
+    ],
+    "slots": [1,1],
+    "sta": {
+        "enabled": true,
+        "mask": "0.0.0.0",
+        "gw": "0.0.0.0",
+        "pass": "",
+        "essid": "",
+        "ipv4": "0.0.0.0",
+        "static": false
+    },
+    "layout": [
+        "24:d7:eb:10:66:3c",
+        "24:d7:eb:10:de:84",
+        "24:d7:eb:10:64:18"
+    ],
+    "eth": {
+        "ipv4": "0.0.0.0",
+        "mask": "0.0.0.0",
+        "gw": "0.0.0.0",
+        "static": false,
+        "enabled": true
+    },
+    "via" : "192.168.1.128"
+}

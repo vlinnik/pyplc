@@ -7,6 +7,8 @@ from kx.config import *
 нужно изменить. Для того чтобы опрос производился необходимо выполнить пустую программу (например kx.config.passive() ).
 """
 
+plc,hw = kx_init( )
+
 while True:
     with plc:
         print(hw.MIXER_ISON_1)

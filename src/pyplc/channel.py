@@ -70,7 +70,7 @@ class Channel(object):
         for c in self.callbacks:
             c(value)
             
-    def sync(self):
+    def sync(self,data: memoryview, dirty: memoryview):
         pass
 
     def __call__(self, value=None):
@@ -147,17 +147,27 @@ class QBool(Channel):
         self.write(False)
 
     def sync(self,data: memoryview, dirty: memoryview ):
-        if self.dirty:
+        """если есть изменения, то dirty&data будут изменены, если нет,
+        то dirty будет очищен, а данные из data прочитаны
+
+        Args:
+            data (memoryview): данные
+            dirty (memoryview): контроль изменений
+        """        
+        if self.dirty: #были изменения QBool через write
             if self.value:
                 data[self.addr] |= self.mask
             else:
                 data[self.addr] &= ~self.mask
             self.dirty = False
-        else:
+            dirty[self.addr] |= self.mask
+        else:           #нет изменений через write
             o_val = self.read()
             self.value = (data[ self.addr ] & self.mask)!=0
             if self.value!=o_val:
                 self.changed( )
+            self.dirty = False
+            dirty[self.addr] &= ~self.mask 
 
 class IWord(Channel):
     def __init__(self,addr,name=''):
@@ -185,3 +195,41 @@ class IWord(Channel):
         self.value, = struct.unpack_from('H',data,self.addr)
         if self.value!=o_val:
             self.changed()
+
+class ICounter8(Channel):
+    def __init__(self,addr,name=''):
+        self.addr = addr
+        self.forced = None
+        self.cnt8 = 0
+        super( ).__init__(name)
+        
+    def reset(self):
+        self.value = 0
+
+    def read(self):
+        if self.forced:
+            return self.forced
+        return super().read( )
+
+    def write(self,val):
+        if val!=self.read():
+            raise Exception('ICounter8 is read only',self)
+
+    def __str__(self):
+        if self.name!='':
+            return f'ICounter({self.name} AT %IB{self.addr}={self():02x})'
+        else:
+            return f'ICounter(%IB{self.addr}={self():02x})'                
+    
+    def sync(self,data: memoryview,dirty: memoryview):
+        o_val = self.cnt8
+        n_val, = struct.unpack_from('B',data,self.addr)
+        if self.value is None:
+            self.value = 0 
+        if n_val!=o_val:
+            if n_val<o_val:
+                self.value+=(256 - o_val + n_val)
+            else:
+                self.value+=(n_val - o_val)
+            self.changed()            
+            self.cnt8 = n_val

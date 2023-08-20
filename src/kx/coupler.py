@@ -1,6 +1,7 @@
 from pyplc.utils.posto import POSTO,Subscriber
 from pyplc.utils.cli import CLI
 from pyplc.core import PYPLC
+from pyplc.channel import IBool,QBool,IWord
 from .misc import exports
 from io import IOBase
 import os,re,json,struct
@@ -118,9 +119,10 @@ class Manager():
         __plc = Subscriber( ipv4 )        
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         devs = conf['devs'] if 'devs' in conf else []
+        slots = conf['slots'] if 'slots' in conf else []
         cli = CLI(port = 2455)         #simple telnet 
         posto = POSTO( port = 9004)    #simple share data over tcp 
-        plc = PYPLC( devs, period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
+        plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
         hw = __plc.state
         plc.connection = __plc         #
         
@@ -139,7 +141,12 @@ class Manager():
                             slot = int(info[-2])
                             ch_num = int(info[-1])
                             s = __plc.subscribe( f'S{slot:02}C{ch_num:02}',info[0] )
-                            ch = eval( f'plc.slots[{info[-2]}-1].channel({info[-1]}-1)' )
+                            if info[1].upper() == 'DI':
+                                ch = IBool(sum(slots[:slot]),ch_num,info[0])
+                            elif info[1].upper() == 'DO':
+                                ch = QBool(sum(slots[:slot]),ch_num,info[0])
+                            elif info[1].upper() == 'AI':
+                                ch = IWord(sum(slots[:slot]),ch_num,info[0])                               
                             plc.declare(ch,info[0])
                             if ch.rw:
                                 s.write = ch #а при получении нового значения от сервера происходит запись в Channel

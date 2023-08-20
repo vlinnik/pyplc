@@ -1,4 +1,5 @@
 from pyplc.core import PYPLC
+from pyplc.channel import IBool,QBool,IWord,ICounter8
 from pyplc.utils.cli import CLI
 from pyplc.utils.posto import POSTO
 from io import IOBase
@@ -199,6 +200,7 @@ class Manager():
         conf = self.conf
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         devs = conf['devs'] if 'devs' in conf and not passive else []
+        slots = conf['slots'] if 'slots' in conf else []
 
         self.cleanup( )
         cli = None
@@ -212,7 +214,7 @@ class Manager():
                 print(f'CLI/POSTO in use ({e}).')
                 cli = None
                 posto = None
-        plc = PYPLC(devs, period=scanTime, krax=krax, pre=cli, post=posto)
+        plc = PYPLC(sum(slots), period=scanTime, krax=krax, pre=cli, post=posto)
         hw = plc.state
         plc.connection = plc  # чтобы  не отличался от coupler
         plc.cleanup = self.cleanup
@@ -231,12 +233,22 @@ class Manager():
                             continue
                         if id.match(info[0]) and num.match(info[-2]) and num.match(info[-1]):
                             info = [i.strip() for i in info]
-                            ch = plc.slots[int(info[-2]) -
-                                           1].channel(int(info[-1])-1)
+                            slot_n = int(info[-2])
+                            ch_n = int(info[-1])
+                            addr = sum(slots[:slot_n-1])
+                            if info[1].upper( ) == 'DI':
+                                ch = IBool(addr,ch_n-1,info[0])
+                            elif info[1].upper( ) == 'DO':
+                                ch = QBool(addr,ch_n-1,info[0])
+                            elif info[1].upper( ) == 'AI':
+                                ch = IWord(addr+((ch_n-1)<<1),info[0])                               
+                            elif info[1].upper( ) == 'CNT8':
+                                ch = ICounter8(addr+ch_n,info[0])                               
                             plc.declare(ch, info[0])
                             vars = vars+1
                     except Exception as e:
                         print(e, info)
+                        sys.print_exception(e)
                         errs = errs+1
             gc.collect()
             print(

@@ -5,3 +5,6 @@ depricated
 dist
 src/pyplc.egg-info
 upydev_.config
+src/io.csv
+krax.json
+src/io.csv
