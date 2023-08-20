@@ -1,10 +1,13 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0","setuptools-git-versioning"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools-git-versioning]
+enabled = true
+
 [project]
+dynamic = ["version"]
 name = "pyplc"
-version = "0.0.7"
 authors = [
   { name="Linnik V.V.", email="vlinnik@mail.ru" },
 ]
@@ -19,5 +22,5 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/vlinnik/pyplct"
+"Homepage" = "https://github.com/vlinnik/pyplc"
 "Bug Tracker" = "https://github.com/vlinnik/pyplc/issues"

@@ -17,8 +17,7 @@ dirs:
 
 package:
 	@echo PyPLC_VERSION = \"`git describe`\">src/pyplc/consts.py
-	python -m build && pip install ./dist/pyplc-0.0.7-py3-none-any.whl --force-reinstall
-	
+	python -m build && echo pip install ./dist/pyplc-`git describe`-py3-none-any.whl --force-reinstall
 $(ODIR)/$(INSTALL_DIR)/%.mpy: %.py
 	@echo Compiling $<
 	@$(MPY-CROSS) $< -o $@
