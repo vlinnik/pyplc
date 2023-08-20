@@ -1,5 +1,5 @@
-from .consts import *
-print(f'Welcome to PyPLC version {PyPLC_VERSION}: ',end='')
+from .version import *
+print(f'Welcome to PyPLC version {PYPLC_VERSION}: ',end='')
 
 if __name__!="__main__":
     try:
