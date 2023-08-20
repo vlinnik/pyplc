@@ -16,7 +16,7 @@ dirs:
 	@mkdir -p $(ODIR)/$(INSTALL_DIR)
 
 release:
-	@echo PyPLC_VERSION = \"`python -m setuptools_git_versioning`\">src/pyplc/consts.py
+	@echo PyPLC_VERSION = \"`python -m setuptools_git_versioning`\">src/pyplc/version.py
 
 package:
 	python -m build

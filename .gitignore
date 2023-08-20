@@ -8,3 +8,4 @@ upydev_.config
 src/io.csv
 krax.json
 src/io.csv
+src/pyplc/version.py
