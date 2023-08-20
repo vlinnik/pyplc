@@ -17,7 +17,6 @@ dirs:
 
 release:
 	@echo PyPLC_VERSION = \"`python -m setuptools_git_versioning`\">src/pyplc/consts.py
-	@git commit -a
 
 package:
 	python -m build
