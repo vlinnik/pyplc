@@ -16,9 +16,9 @@ dirs:
 	@mkdir -p $(ODIR)/$(INSTALL_DIR)
 
 package:
-	@echo PyPLC_VERSION = \"`git describe`\">src/pyplc/consts.py
+	@echo PyPLC_VERSION = \"`python -m setuptools_git_versioning`\">src/pyplc/consts.py
 	python -m build
-	@echo pip install ./dist/pyplc-`git describe`-py3-none-any.whl --force-reinstall
+	pip install ./dist/pyplc-`python -m setuptools_git_versioning`-py3-none-any.whl --force-reinstall
 $(ODIR)/$(INSTALL_DIR)/%.mpy: %.py
 	@echo Compiling $<
 	@$(MPY-CROSS) $< -o $@
