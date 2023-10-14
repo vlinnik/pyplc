@@ -10,7 +10,7 @@ class Channel(object):
 
     def __str__(self):
         if self.name != '':
-            return f'{self.name}={self.value}'
+            return f'{self.name}={self.read()}'
         return f'{self.value}'
 
     def force(self, value):
@@ -20,7 +20,7 @@ class Channel(object):
             self.changed()
 
     def read(self):
-        if self.forced:
+        if self.forced is not None:
             return self.forced
         return self.value
 

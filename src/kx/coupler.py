@@ -1,7 +1,7 @@
 from pyplc.utils.posto import POSTO,Subscriber
 from pyplc.utils.cli import CLI
 from pyplc.core import PYPLC
-from pyplc.channel import IBool,QBool,IWord
+from pyplc.channel import IBool,QBool,IWord,ICounter8
 from .misc import exports
 from io import IOBase
 import os,re,json,struct
@@ -138,15 +138,18 @@ class Manager():
                         info = [i.strip() for i in info.split(';')]
                         if id.match(info[0]) and num.match(info[-2]) and num.match(info[-1]) :
                             info = [ i.strip() for i in info ]
-                            slot = int(info[-2])
-                            ch_num = int(info[-1])
-                            s = __plc.subscribe( f'S{slot:02}C{ch_num:02}',info[0] )
-                            if info[1].upper() == 'DI':
-                                ch = IBool(sum(slots[:slot]),ch_num,info[0])
-                            elif info[1].upper() == 'DO':
-                                ch = QBool(sum(slots[:slot]),ch_num,info[0])
-                            elif info[1].upper() == 'AI':
-                                ch = IWord(sum(slots[:slot]),ch_num,info[0])                               
+                            slot_n = int(info[-2])
+                            ch_n = int(info[-1])
+                            addr = sum(slots[:slot_n-1])
+                            s = __plc.subscribe( f'S{slot_n:02}C{ch_n:02}',info[0] )
+                            if info[1].upper( ) == 'DI':
+                                ch = IBool(addr,ch_n-1,info[0])
+                            elif info[1].upper( ) == 'DO':
+                                ch = QBool(addr,ch_n-1,info[0])
+                            elif info[1].upper( ) == 'AI':
+                                ch = IWord(addr+((ch_n-1)<<1),info[0])                               
+                            elif info[1].upper( ) == 'CNT8':
+                                ch = ICounter8(addr+ch_n,info[0])                               
                             plc.declare(ch,info[0])
                             if ch.rw:
                                 s.write = ch #а при получении нового значения от сервера происходит запись в Channel
