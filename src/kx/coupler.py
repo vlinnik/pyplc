@@ -1,4 +1,5 @@
-from pyplc.utils.posto import POSTO,Subscriber
+from pyplc.utils.posto import POSTO
+from pyplc.utils.subscriber import Subscriber
 from pyplc.utils.cli import CLI
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8
@@ -152,10 +153,12 @@ class Manager():
                                 ch = ICounter8(addr+ch_n,info[0])                               
                             plc.declare(ch,info[0])
                             if ch.rw:
-                                s.write = ch #а при получении нового значения от сервера происходит запись в Channel
+                                s.bind( ch )
+                                #s.write = ch #а при получении нового значения от сервера происходит запись в Channel
                             else:
-                                s.write = ch.force
-                            ch.bind(s.changed)  #изменения канала ввода/вывода производит запись в Subscription
+                                s.bind( ch.force )
+                                #s.write = ch.force
+                            ch.bind(s.write)  #изменения канала ввода/вывода производит запись в Subscription
                             vars = vars+1
                     except Exception as e:
                         print(e,info)

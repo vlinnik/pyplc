@@ -89,11 +89,11 @@ class Channel(object):
 
 class IBool(Channel):
     def __init__(self,addr,num,name=''):
+        super( ).__init__(name,init_val=False)
         self.addr = addr
         self.num = num
         self.mask = 1<<num
         self.forced = None
-        super( ).__init__(name)
 
     def read(self):
         if self.forced:
@@ -121,11 +121,11 @@ class IBool(Channel):
 
 class QBool(Channel):
     def __init__(self, addr, num: int, name=''):
+        super().__init__(name,init_val=False,rw=True)
         self.addr = addr
         self.num = num
         self.mask = 1<<num
         self.dirty= False
-        super().__init__(name,rw=True)
 
     def write(self,val):
         self.dirty = True
@@ -171,9 +171,9 @@ class QBool(Channel):
 
 class IWord(Channel):
     def __init__(self,addr,name=''):
+        super( ).__init__(name,init_val=int(0))
         self.addr = addr
         self.forced = None
-        super( ).__init__(name)
 
     def read(self):
         if self.forced:
@@ -198,10 +198,10 @@ class IWord(Channel):
 
 class ICounter8(Channel):
     def __init__(self,addr,name=''):
+        super( ).__init__(name,init_val=int(0))
         self.addr = addr
         self.forced = None
         self.cnt8 = 0
-        super( ).__init__(name)
         
     def reset(self):
         self.value = 0

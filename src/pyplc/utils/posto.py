@@ -249,11 +249,9 @@ class POSTO(TCPServer):
                 response[8:size] = data[8:size]
                 struct.pack_into('q', response, size, time.time_ns())
                 sock.tx.grow(size+8)
-                print('got keepalive from client')
             else:
                 ts_0,  = struct.unpack_from('qq', data, off)
                 ts_2 = time.time_ns()
-                print(f'server->client->server rtt time is {ts_2-ts_0} ns')
         else:
             pass  # keep alive or unsupported command
 
@@ -306,7 +304,6 @@ class POSTO(TCPServer):
         else:
             if self.keepalive+5000000000 < time.time_ns():
                 try:
-                    print(f'server send keepalive...')
                     struct.pack_into('ii', sock.tx.data(),
                                      0, 3, 0)  # keep alive
                     sock.tx.grow(8)

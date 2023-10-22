@@ -273,11 +273,11 @@ class sfc(pou):
                 __shortname__ = cls.__name__
 
                 def __init__(self, *args, **kwargs) -> None:
+                    if not hasattr(self,'sfc_step'):
+                        SFC.__init__(self)
                     id = kwargs['id'] if 'id' in kwargs else helper.id
                     POU.setup( self, inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__, persistent=helper.__persistent__, hidden=helper.__hidden__, id = id )
                     kwvals = helper.process_inputs(self,**kwargs)
                     super().__init__(*args, **kwvals)
-                    if not hasattr(self,'sfc_step'):
-                        SFC.__init__(self)
 
             return Wrapped
