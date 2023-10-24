@@ -153,11 +153,10 @@ class POU():
     def to_bytearray(self):
         off = 0
         buf = bytearray(b'\x00'*64)
-        state = self.__save__( )
-        for i in state:
+        for i in self.__persistent__:
             if off>len(buf)-9:
                 buf.extend(b'\x00'*64)
-            value = state[i]
+            value = getattr(self,i)
             try:
                 if type(value) is bool:
                     struct.pack_into('!Bb',buf,off,0,value)
@@ -174,7 +173,7 @@ class POU():
         return buf[:off]
     
     def from_bytearray(self,buf: bytearray,items: list[str]=[]):
-        if len(items)==0: items = self.__save__().keys( )
+        if len(items)==0: items = self.__persistent__
         off = 0
         for i in items:
             t, = struct.unpack_from('!B',buf,off)
