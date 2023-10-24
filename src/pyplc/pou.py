@@ -139,7 +139,7 @@ class POU():
 
     def __save__(self):
         d = {}
-        for key in self.__peristent__:
+        for key in self.__persistent__:
             try:
                 d[key] = getattr(self,key)
             except:
