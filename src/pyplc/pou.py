@@ -139,11 +139,9 @@ class POU():
 
     def __save__(self):
         d = {}
-        for key in dir(type(self)):
+        for key in self.__peristent__:
             try:
-                attr = getattr(type(self),key)
-                if isinstance(attr,POU.var) and attr._persistent:
-                    d[key] = getattr(self,key)
+                d[key] = getattr(self,key)
             except:
                 pass
         return d
