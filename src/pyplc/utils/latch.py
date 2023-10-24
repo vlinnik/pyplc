@@ -1,9 +1,12 @@
-from pyplc.stl import *
+from pyplc.pou import POU
 
-@stl(inputs=['set','reset'],outputs=['q'])
-class SR(STL):
+class SR(POU):
     """Флаг
     """
+    set     = POU.input( False )
+    reset   = POU.input( False )
+    q       = POU.output( False)
+    @POU.init
     def __init__(self,set=False,reset=False,q=False) -> None:
         """Конструктор
 
@@ -12,6 +15,7 @@ class SR(STL):
             reset (bool, optional): Сбросить флаг. Defaults to False.
             q (bool, optional): Текущее состояние. Defaults to False.
         """
+        super().__init__( )
         self.set = set
         self.reset = reset 
         self.__reset = reset
@@ -23,7 +27,7 @@ class SR(STL):
     def __call__(self,set=None,reset=None):
         with self:
             set = self.overwrite('set',set)
-            reset = self.overwrite('rest',reset)
+            reset = self.overwrite('reset',reset)
             if set:
                 self.q=True
             if reset and not self.__reset:
@@ -32,8 +36,11 @@ class SR(STL):
 
         return self.q
     
-@stl(inputs=['set','reset'],outputs=['q'])        
-class RS(STL):
+class RS(POU):
+    set     = POU.input(False)
+    reset   = POU.input(False)
+    q       = POU.output(False)
+    @POU.init
     def __init__(self,reset=False,set=False,q=False) -> None:
         """Конструктор
 
@@ -42,6 +49,7 @@ class RS(STL):
             set (bool, optional): Установить флаг. Defaults to False.
             q (bool, optional): Текущее состояние. Defaults to False.
         """
+        super().__init__( )
         self.set = set
         self.reset = reset 
         self.__set   = set

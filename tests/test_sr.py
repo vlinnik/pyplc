@@ -1,4 +1,4 @@
-from pyplc.utils import SR,RS
+from pyplc.utils.latch import SR,RS
 import time
 
 test = 0
@@ -21,8 +21,8 @@ def get_reset():
     except:
         pass
 
-x = SR( set = get_set,reset=get_reset, q=False )
-result_check = result_sr
+x = RS( set = get_set,reset=get_reset, q=False )
+result_check = result_rs
 print(x)
 
 begin_ts = time.time_ns()

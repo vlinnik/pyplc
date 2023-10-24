@@ -11,6 +11,216 @@ x = Trig( )
 
 class POU():
     __dirty__ = False
+    __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
+
+    class var():
+        def __init__(self, init_val, hidden:bool =False, persistent: bool = False,notify: bool = True):
+            self._name = None
+            self._member = None
+            self._value = init_val
+            self._hidden = hidden
+            self._persistent = persistent
+            self._notify = notify  
+
+        def setup(self,obj,__name: str):
+            self._name = __name
+            self._member = '_'+__name
+            setattr(obj,self._member, self._value)
+            if hasattr(obj,'id') and obj.id is not None and self._persistent:
+                POU.__persistable__.append(obj)
+
+        def __get__(self, obj, objtype=None):
+            if obj is None:
+                return self
+            return getattr(obj,self._member)       
+             
+        def __set__(self,obj,value):
+            if self._persistent:
+                POU.__dirty__ = True
+            setattr(obj,self._member,value)
+            if self._notify:
+                obj.__touched__[self._name] = True
+
+    class input(var):
+        def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
+            super().__init__(init_val, hidden=hidden, persistent=persistent,notify=False)
+
+        def __set__(self,obj,value):
+            _value = super().__get__(obj)
+            super().__set__(obj,value)
+            if _value!=value and self._name in obj.__touched__:                       #оповещение только при изменении
+                obj.__touched__[self._name] = True
+            
+
+                        
+    class output(var):
+        def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
+            super().__init__(init_val, hidden=hidden, persistent=persistent)
+
+    def __init__(self,id:str = None) -> None:
+        if id is not None:
+            self.id = id
+
+    def join(self, input: str, fn: callable):
+        self.__inputs__[input] = fn
+
+    def bind(self,output,__sink):   #bind and atrribute to callback
+        if output in self.__sinks__:
+            self.__sinks__[output].append( __sink )
+        else:
+            self.__sinks__[output] = [ __sink ]
+        __sink( getattr(self,output) )
+        self.__touched__[output] = True
+        return id(__sink)
+
+    def unbind(self,__name,__sink = None):
+        if __name in self.__sinks__:
+            self.__sinks__[__name] = list(filter( lambda x: ( id(x)!=__sink and x!=__sink and __sink is not None), self.__sinks__[__name] ))
+
+    def __enter__(self):
+        for key in self.__inputs__: 
+            setattr(self,key,self.__inputs__[key]( ))
+
+    def __exit__(self, type, value, traceback):
+        for __name in self.__sinks__ :
+            if not hasattr(self,__name):
+                continue
+            __value = getattr(self,__name)
+            if __name in self.__touched__ and self.__touched__[__name]:
+                self.__touched__[__name] = False
+                for s in self.__sinks__[__name]:
+                    s(__value)
+
+    def overwrite(self,__input: str,__default = None):
+        if __default is None:
+            if hasattr(self,__input):
+                return getattr(self,__input)
+        else:
+            setattr(self,__input,__default)
+                
+        return __default
+
+    def export(self,__name: str,initial = None):
+        attr = POU.var(initial)
+        setattr(type(self),__name,attr)
+        attr.setup( self, __name)
+
+    def __str__(self):
+        if self.id is not None:
+            return f'{self.id}={self.__data__()}'
+        return f'{self.__data__()}'
+
+    def __dump__(self,items: list[str])->dict:
+        d = {}
+        for key in items:
+            d[key] = getattr(self,key)
+        return d
+
+    def __data__(self):
+        d = {}
+        for key in dir(type(self)):
+            try:
+                attr = getattr(type(self),key)
+                if isinstance(attr,POU.var) and not attr._hidden:
+                    d[key] = getattr(self,key)
+            except:
+                pass
+        return d
+    def __restore__(self,items: dict ):
+        for key in items:
+            setattr( self,key,items[key] )
+
+    def __save__(self):
+        d = {}
+        for key in dir(type(self)):
+            try:
+                attr = getattr(type(self),key)
+                if isinstance(attr,POU.var) and attr._persistent:
+                    d[key] = getattr(self,key)
+            except:
+                pass
+        return d
+    
+    def __call__(self):
+        with self:
+            pass
+
+    def to_bytearray(self):
+        off = 0
+        buf = bytearray(b'\x00'*64)
+        state = self.__save__( )
+        for i in state:
+            if off>len(buf)-9:
+                buf.extend(b'\x00'*64)
+            value = state[i]
+            try:
+                if type(value) is bool:
+                    struct.pack_into('!Bb',buf,off,0,value)
+                    off+=2
+                elif type(value) is int:
+                    struct.pack_into('!Bq',buf,off,1,value)
+                    off+=9
+                elif type(value) is float:
+                    struct.pack_into('!Bd',buf,off,2,value)
+                    off+=9
+            except Exception as e:
+                import sys
+                sys.print_exception(e)
+        return buf[:off]
+    
+    def from_bytearray(self,buf: bytearray,items: list[str]=[]):
+        if len(items)==0: items = self.__save__().keys( )
+        off = 0
+        for i in items:
+            t, = struct.unpack_from('!B',buf,off)
+            off+=1
+            if t==0:
+                value,=struct.unpack_from('!b',buf,off)
+                value = bool(value!=0)
+                off+=1
+            elif t==1:
+                value,=struct.unpack_from('!q',buf,off)
+                off+=8
+            elif t==2:
+                value,=struct.unpack_from('!d',buf,off)
+                off+=8
+            else:
+                raise TypeError('Unknown type code')
+            if hasattr(self,i):
+                setattr(self,i,value)
+
+    @staticmethod
+    def init(fun):
+        def pou_init(self,*args,id:str = None, **kwargs):
+            self.__inputs__= { }
+            self.__sinks__ = { }
+            self.__touched__ = { }
+            self.id = id
+            kwvals = kwargs.copy( ) 
+            for key in dir(type(self)):
+                try:
+                    attr = getattr(type(self),key)
+                    if isinstance(attr,POU.var):
+                        attr.setup(self,key)
+                    else:
+                        continue
+                    if key not in kwargs:
+                        continue
+                    if callable(kwargs[key]):
+                        if isinstance(attr,POU.input):
+                            self.join( key, kwargs[key])
+                            kwvals[key]=kwargs[key]( )
+                        if isinstance(attr,POU.output):
+                            self.bind( key, kwargs[key])
+                            kwvals.pop(key)
+                except:
+                    pass
+            fun(self,*args,**kwvals)
+        return pou_init
+
+
+class _POU():
+    __dirty__ = False
     __persistable__ = []    #все POU с id!=None и len(persistent)>0
     
     def overwrite(self,__input: str,__default = None):
@@ -160,7 +370,7 @@ class POU():
                 for s in self.__sinks__[__name]:
                     s(__value)
         
-class pou():
+class pou_():
     def __init__(self,inputs=[],outputs=[],vars=[],persistent=[],hidden=[],id=None):
         self.__persistent__ = persistent
         self.__inputs__ = inputs

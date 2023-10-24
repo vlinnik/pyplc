@@ -1,7 +1,6 @@
 from .pou import *
 import time
 
-
 class SFC(POU):
     HAS_TICKS_MS = None
     HAS_TICKS_ADD = None
@@ -12,7 +11,7 @@ class SFC(POU):
     STEP = type((lambda: (yield))())
     
     def __init__(self) -> None:
-        POU.__init__(self)
+        super().__init__( )
 
         if SFC.HAS_TICKS_MS is None:
             SFC.HAS_TICKS_MS = hasattr(time, 'ticks_ms')
@@ -264,20 +263,20 @@ def sfcaction(method: callable):
     return SFCActionImpl
 
 
-class sfc(pou):
-    def __call__(self, cls: SFC):
-        if issubclass(cls, SFC):
-            helper = self
+# class sfc(pou):
+#     def __call__(self, cls: SFC):
+#         if issubclass(cls, SFC):
+#             helper = self
 
-            class Wrapped(cls):
-                __shortname__ = cls.__name__
+#             class Wrapped(cls):
+#                 __shortname__ = cls.__name__
 
-                def __init__(self, *args, **kwargs) -> None:
-                    if not hasattr(self,'sfc_step'):
-                        SFC.__init__(self)
-                    id = kwargs['id'] if 'id' in kwargs else helper.id
-                    POU.setup( self, inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__, persistent=helper.__persistent__, hidden=helper.__hidden__, id = id )
-                    kwvals = helper.process_inputs(self,**kwargs)
-                    super().__init__(*args, **kwvals)
+#                 def __init__(self, *args, **kwargs) -> None:
+#                     if not hasattr(self,'sfc_step'):
+#                         SFC.__init__(self)
+#                     id = kwargs['id'] if 'id' in kwargs else helper.id
+#                     POU.setup( self, inputs=helper.__inputs__,outputs=helper.__outputs__,vars=helper.__vars__, persistent=helper.__persistent__, hidden=helper.__hidden__, id = id )
+#                     kwvals = helper.process_inputs(self,**kwargs)
+#                     super().__init__(*args, **kwvals)
 
-            return Wrapped
+#             return Wrapped

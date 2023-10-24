@@ -1,8 +1,12 @@
-from pyplc.stl import *
+from pyplc.pou import POU
 
-@stl(inputs=['clk'],outputs=['q'])
-class RTRIG(STL):
+# @stl(inputs=['clk'],outputs=['q'])
+class RTRIG(POU):
+    clk = POU.input(False)
+    q = POU.output(False)
+    @POU.init
     def __init__(self,clk=None,value=None,q=False,out=None) -> None:
+        super().__init__( )
         self.__clk = clk
         self.clk = clk
         self.q = q
@@ -14,9 +18,13 @@ class RTRIG(STL):
             self.__clk = clk
         return self.q
 
-@stl(inputs=['clk'],outputs=['q'])
-class FTRIG(STL):
+# @stl(inputs=['clk'],outputs=['q'])
+class FTRIG(POU):
+    clk = POU.input(False)
+    q = POU.output(False)
+    @POU.init
     def __init__(self,clk=False,q=False) -> None:
+        super().__init__( )
         self.__clk = clk
         self.clk = clk
         self.q = q
@@ -28,9 +36,13 @@ class FTRIG(STL):
             self.__clk = clk
         return self.q         
 
-@stl(inputs=['clk'],outputs=['q'])
-class TRIG(STL):
+# @stl(inputs=['clk'],outputs=['q'])
+class TRIG(POU):
+    clk = POU.input(False)
+    q = POU.output(False)
+    @POU.init
     def __init__(self,clk=False,q=False) -> None:
+        super().__init__( )
         self.__clk = clk
         self.clk = clk
         self.q = q
@@ -42,12 +54,18 @@ class TRIG(STL):
             self.__clk = clk
         return self.q        
 
-@stl(inputs=['clk','value'],outputs=['q','out'])
-class TRANS(STL):
+# @stl(inputs=['clk','value'],outputs=['q','out'])
+class TRANS(POU):
     """Передача данных по фронту clk (аналог SPI.CLK)"""    
     RAISING_EDGE = 0x1
     FALLING_EDGE = 0x2
+    clk = POU.input(False)
+    value=POU.input(None)
+    q = POU.output(False)
+    out = POU.output(None)
+    @POU.init
     def __init__(self,clk=False,q=False,value=None,mode = RAISING_EDGE | FALLING_EDGE) -> None:
+        super().__init__()
         self.__clk = clk
         self.clk = clk
         self.q = q

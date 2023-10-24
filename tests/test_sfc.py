@@ -6,9 +6,12 @@ class Logic(SFC):
         super().__init__()
         self.clk = clk
         
-@sfc(inputs=['clk','pt'],outputs=['q'])
+# @sfc(inputs=['clk','pt'],outputs=['q'])
 class TON(Logic):
-    def __init__(self,clk=False,pt=1,q=False):
+    clk = POU.input( False )
+    pt = POU.input( 1000 )
+    @POU.init
+    def __init__(self,clk:bool=False,pt:int=1000,q:bool=False):
         super().__init__(clk=clk)
         self.pt = pt
         self.q = q

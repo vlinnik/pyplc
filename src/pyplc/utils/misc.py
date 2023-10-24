@@ -1,15 +1,18 @@
 from pyplc.sfc import *
 
-
-@sfc(inputs=['clk', 'pt', 'reset'], outputs=['q', 'et'])
+# @sfc(inputs=['clk', 'pt', 'reset'], outputs=['q', 'et'])
 class Stopwatch(SFC):
     """Таймер с настраевыемым моментом сработки. Подобие часов используемых при игре в шахматы
 
     Через установленное время (pt) при clk = True q -> True
     et отображает время, в течении которого clk = True. 
     """
-
+    clk     = POU.input(False)
+    pt      = POU.input(1000)
+    reset   = POU.input(False)
+    @POU.init
     def __init__(self, clk=False, pt=0.0, reset=False):
+        super().__init__()
         self.clk = clk
         self.pt = pt
         self.q = False
@@ -39,9 +42,15 @@ class Stopwatch(SFC):
         return self.q
 
 
-@sfc(inputs=['clk', 'pt'], outputs=['q', 'et'])
+# @sfc(inputs=['clk', 'pt'], outputs=['q', 'et'])
 class TON(SFC):
+    clk = POU.input(False)
+    pt  = POU.input(1000)
+    q   = POU.output(False)
+    et  = POU.output( 0 )
+    @POU.init
     def __init__(self, clk: bool = False, pt: int = 1000):
+        super().__init__( )
         self.clk = clk
         self.pt = pt
         self.q = False
@@ -67,9 +76,15 @@ class TON(SFC):
         return self.q
 
 
-@sfc(inputs=['clk', 'pt'], outputs=['q', 'et'])
+# @sfc(inputs=['clk', 'pt'], outputs=['q', 'et'])
 class TOF(SFC):
+    clk = POU.input(False)
+    pt  = POU.input(1000)
+    q   = POU.output(False)
+    et  = POU.output( 0 )
+    @POU.init
     def __init__(self, clk: bool = False, pt: int = 1000):
+        super().__init__( )
         self.clk = clk
         self.pt = pt
         self.q = False
@@ -96,9 +111,15 @@ class TOF(SFC):
         return self.q
 
 
-@sfc(inputs=['enable', 't_on', 't_off'], outputs=['q'], id='blink')
+# @sfc(inputs=['enable', 't_on', 't_off'], outputs=['q'], id='blink')
 class BLINK(SFC):
+    enable = POU.input(False)
+    t_on = POU.input(1000)
+    t_off= POU.input(1000)
+    q = POU.output(False)
+    @POU.init
     def __init__(self, enable=False, t_on: int = 1000, t_off: int = 1000):
+        super().__init__( )
         self.enable = enable
         self.t_on = t_on
         self.t_off = t_off
@@ -122,9 +143,15 @@ class BLINK(SFC):
             self.call( )
         return self.q
 
-@sfc(inputs=['clk', 't_on', 't_off'], outputs=['q'], id='tp')
+# @sfc(inputs=['clk', 't_on', 't_off'], outputs=['q'], id='tp')
 class TP(SFC):
+    clk = POU.input(False)
+    t_on= POU.input(1000)
+    t_off=POU.input(0)
+    q = POU.output(False)
+    @POU.init
     def __init__(self, clk=False, t_on: int = 1000, t_off: int = 0):
+        super().__init__()
         self.clk = clk
         self.t_on = t_on
         self.t_off = t_off
