@@ -27,7 +27,14 @@ class POU():
             self._member = '_'+__name
             setattr(obj,self._member, self._value)
             if hasattr(obj,'id') and obj.id is not None and self._persistent:
-                POU.__persistable__.append(obj)
+                obj.__persistent__.append(__name)
+                found = False
+                for o in POU.__persistable__:
+                    if o.id == obj.id:
+                        found = True
+                        break
+                if not found:
+                    POU.__persistable__.append(obj)
 
         def __get__(self, obj, objtype=None):
             if obj is None:
@@ -195,6 +202,7 @@ class POU():
             self.__inputs__= { }
             self.__sinks__ = { }
             self.__touched__ = { }
+            self.__persistent__ = []
             self.id = id
             kwvals = kwargs.copy( ) 
             for key in dir(type(self)):
