@@ -42,7 +42,7 @@ class POU():
             return getattr(obj,self._member)       
              
         def __set__(self,obj,value):
-            if self._persistent:
+            if self._persistent and getattr(obj,self._member)!=value:
                 POU.__dirty__ = True
             setattr(obj,self._member,value)
             if self._notify:
