@@ -9,3 +9,4 @@ src/io.csv
 krax.json
 src/io.csv
 src/pyplc/version.py
+_version.py
