@@ -1,7 +1,11 @@
-from pyplc.pou import *
+from pyplc.pou import POU
 
-@pou(inputs=['en','i'],outputs=['q'],persistent=['en','key','safe'])
+# @pou(inputs=['en','i'],outputs=['q'],persistent=['en','key','safe'])
 class MOVE(POU):
+    en = POU.input(False)
+    i = POU.input(None)
+    q = POU.output(None)
+    @POU.init
     def __init__(self,en=False,i=None,q=None): #параметры проходят первоначальную обработку в POU.Instance.__init__
         self.en = en
         self.i = i
@@ -21,8 +25,10 @@ class MOVE(POU):
             except:
                 pass
 
-x = MOVE(en=lambda: False,q = print )
+x = MOVE( )
 y = MOVE(en=lambda: True,q = print )
+MOVE.en.connect(x,lambda: False)
+MOVE.q.connect(x,print)
 
 x( i = 14   )
 y( i = 3.14 )

@@ -57,12 +57,16 @@ class POU():
             super().__set__(obj,value)
             if _value!=value and self._name in obj.__touched__:                       #оповещение только при изменении
                 obj.__touched__[self._name] = True
-            
-
+        
+        def connect(self,obj,source):
+            obj.join( self._name, source)     
                         
     class output(var):
         def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
             super().__init__(init_val, hidden=hidden, persistent=persistent)
+        
+        def connect(self,obj,target:callable):
+            return obj.bind(self._name,target)
 
     def __init__(self,id:str = None) -> None:
         if id is not None:
