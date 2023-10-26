@@ -1,5 +1,5 @@
-from .version import *
-print(f'Welcome to PyPLC version {PYPLC_VERSION}: ',end='')
+from ._version import version
+print(f'Loading PyPLC version {version}: ',end='')
 
 if __name__!="__main__":
     try:
