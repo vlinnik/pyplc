@@ -22,21 +22,21 @@ class Setup():
         except OSError:
             return False
         
-    def ifconfig(self,dev):
-        try:
-            ipv4,mask,gw,_ = dev.ifconfig()
-            enabled = True
-        except:
-            ipv4,mask,gw = ('0.0.0.0','255.255.255.0','0.0.0.0')
-            enabled = False
+    # def ifconfig(self,dev):
+    #     try:
+    #         ipv4,mask,gw,_ = dev.ifconfig()
+    #         enabled = True
+    #     except:
+    #         ipv4,mask,gw = ('0.0.0.0','255.255.255.0','0.0.0.0')
+    #         enabled = False
 
-        conf = { 'ipv4': ipv4, 'mask': mask, 'gw' : gw , 'static':False , 'enabled': enabled}
-        try:
-            conf['essid'] = dev.config('essid')
-            conf['pass'] = ''
-        except:
-            pass
-        return conf
+    #     conf = { 'ipv4': ipv4, 'mask': mask, 'gw' : gw , 'static':False , 'enabled': enabled}
+    #     try:
+    #         conf['essid'] = dev.config('essid')
+    #         conf['pass'] = ''
+    #     except:
+    #         pass
+    #     return conf
     
     def save(self, node_id, **kwargs):
         layout = krax.devices('mac')     #mac устройств
@@ -45,9 +45,9 @@ class Setup():
 
         with open('krax.json', 'w') as l:
             conf = {'node_id': node_id, 'layout': layout, 'devs': devs, 'slots' : slots,
-                     'eth' : self.ifconfig(network.LAN(0)), 
-                     'ap' : self.ifconfig(network.WLAN(1)), 
-                     'sta' : self.ifconfig(network.WLAN(0)),
+                    #  'eth' : self.ifconfig(network.LAN(0)), 
+                    #  'ap' : self.ifconfig(network.WLAN(1)), 
+                    #  'sta' : self.ifconfig(network.WLAN(0)),
                      'init' : { 'rate':12, 'iface':0 , 'hostname': 'krax','flags':0} }
             
             conf['init'].update(kwargs)
@@ -56,12 +56,12 @@ class Setup():
             d.write(krax.save())
 
     def __call__(self, node_id: int = 1, **kwargs):
-        global sta,ap
-        sta.active(False)
-        ap.active(False)
-        sta.active(True)
-        ap.active(True)
-        sta.disconnect()
+        # global sta,ap
+        # sta.active(False)
+        # ap.active(False)
+        # sta.active(True)
+        # ap.active(True)
+        # sta.disconnect()
         krax.init(node_id, event=self.on_kevent, **kwargs)
         self.busy = True
         while self.busy:
