@@ -11,9 +11,9 @@ try:
     from machine import Pin,ADC
     from kx.at25640b import AT25640B
     
-    sta = network.WLAN(0)
-    ap = network.WLAN(1)
-    eth = network.LAN(0)
+    # sta = network.WLAN(0)
+    # ap = network.WLAN(1)
+    # eth = network.LAN(0)
 except:
     from kx.coupler import *  # если не не micropython-e => то режим coupler
     __target_krax = False
@@ -151,9 +151,9 @@ class Manager():
 
     def __init__(self):
         self.conf = {'node_id': 1, 'layout': [], 'devs': [], 'AP' : True, 'STA' : True, 
-                     'eth' : self.ifconfig(network.LAN(0)), 
-                     'ap' : self.ifconfig(network.WLAN(1)), 
-                     'sta' : self.ifconfig(network.WLAN(0)),
+                    #  'eth' : self.ifconfig(network.LAN(0)), 
+                    #  'ap' : self.ifconfig(network.WLAN(1)), 
+                    #  'sta' : self.ifconfig(network.WLAN(0)),
                      'init' : { 'iface': 0, 'hostname' : 'krax'} }
         pass
 
@@ -166,11 +166,11 @@ class Manager():
             return False
 
     def __krax_init(self):
-        global eth,sta,ap
+        # global eth,sta,ap
         conf = self.conf
-        self.ifup( sta, conf['sta'] )
-        self.ifup( ap, conf['ap'] )
-        self.ifup( eth, conf['eth'] )
+        # self.ifup( sta, conf['sta'] )
+        # self.ifup( ap, conf['ap'] )
+        # self.ifup( eth, conf['eth'] )
         print('Init KRAX with init=',conf['init'])
         krax.init(conf['node_id'],**conf['init'])
         if Manager.__fexists('krax.dat'):
