@@ -7,6 +7,7 @@ class Channel(object):
         self.value = init_val
         self.forced = None
         self.callbacks = []
+        self.comment = ''
 
     def __str__(self):
         if self.name != '':
@@ -109,9 +110,9 @@ class IBool(Channel):
 
     def __str__(self):
         if self.name!='':
-            return f'IXBool({self.name} AT %IX{self.addr}.{self.num}={self()})'
+            return f'IXBool({self.name} AT %IX{self.addr}.{self.num}={self()}) #{self.comment}'
         else:
-            return f'IXBool(%IX{self.addr}.{self.num}={self()})'                
+            return f'IXBool(%IX{self.addr}.{self.num}={self()}) #{self.comment}'                
 
     def sync(self,data: memoryview, dirty: memoryview ):
         o_val = self.read()
@@ -136,9 +137,9 @@ class QBool(Channel):
 
     def __str__(self):
         if self.name!='':
-            return f'QXBool({self.name} AT %QX{self.addr}.{self.num}={self()})'
+            return f'QXBool({self.name} AT %QX{self.addr}.{self.num}={self()}) #{self.comment}'
         else:
-            return f'QXBool(%QX{self.addr}.{self.num}={self()})'
+            return f'QXBool(%QX{self.addr}.{self.num}={self()}) #{self.comment}'
             
     def set(self):
         self.write(True)
@@ -186,9 +187,9 @@ class IWord(Channel):
 
     def __str__(self):
         if self.name!='':
-            return f'IWord({self.name} AT %IW{self.addr}={self():02x})'
+            return f'IWord({self.name} AT %IW{self.addr}={self():02x}) #{self.comment}'
         else:
-            return f'IWord(%IW{self.addr}={self():02x})'                
+            return f'IWord(%IW{self.addr}={self():02x}) #{self.comment}'                
     
     def sync(self,data: memoryview,dirty: memoryview):
         o_val = self.value
@@ -217,9 +218,9 @@ class ICounter8(Channel):
 
     def __str__(self):
         if self.name!='':
-            return f'ICounter({self.name} AT %IB{self.addr}={self():02x})'
+            return f'ICounter({self.name} AT %IB{self.addr}={self():02x}) #{self.comment}'
         else:
-            return f'ICounter(%IB{self.addr}={self():02x})'                
+            return f'ICounter(%IB{self.addr}={self():02x}) #{self.comment}'                
     
     def sync(self,data: memoryview,dirty: memoryview):
         o_val = self.cnt8

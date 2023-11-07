@@ -150,7 +150,8 @@ class Manager():
                             elif info[1].upper( ) == 'AI':
                                 ch = IWord(addr+((ch_n-1)<<1),info[0])                               
                             elif info[1].upper( ) == 'CNT8':
-                                ch = ICounter8(addr+ch_n,info[0])                               
+                                ch = ICounter8(addr+ch_n,info[0])   
+                            ch.comment = f'S{slot_n:02}C{ch_n:02}'                            
                             plc.declare(ch,info[0])
                             if ch.rw:
                                 s.bind( ch )
