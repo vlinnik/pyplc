@@ -113,17 +113,26 @@ class PYPLC():
         if output and self.writer:
             for var in self.vars.values():
                 if var.rw:
-                    var.sync( self.mv_data, self.dirty )    #если были изменения self.dirty установится
+                    try:
+                        var.sync( self.mv_data, self.dirty )    #если были изменения self.dirty установится
+                    except Exception as e:
+                        print(f'Exception {e} in sync {var}')
             self.writer(0, self.mv_data, self.dirty )       #запись по маске (только если dirty)
             for var in self.vars.values():                  #второй раз уже dirty сбросится.
                 if var.rw:
-                    var.sync( self.mv_data, self.dirty )    #только чтение значений
+                    try:
+                        var.sync( self.mv_data, self.dirty )    #только чтение значений
+                    except Exception as e:
+                        print(f'Exception {e} in sync {var}')
             
         elif not output and self.reader:
             self.reader(0,self.mv_data)
             for var in self.vars.values():
                 if not var.rw:
-                    var.sync( self.mv_data,self.dirty )
+                    try:
+                        var.sync( self.mv_data,self.dirty )
+                    except Exception as e:
+                        print(f'Exception {e} in sync {var}')
     
     def read(self):
         self.sync(False)

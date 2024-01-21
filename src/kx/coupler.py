@@ -113,8 +113,6 @@ class Manager():
                 conf = json.load(f)
                 if 'via' in conf:
                     ipv4=conf['via']
-                elif 'ipv4' in conf['eth']:
-                    ipv4=conf['eth']['ipv4']
 
         print(f'Connecting PLC via {ipv4}:9003')
         __plc = Subscriber( ipv4 )        
