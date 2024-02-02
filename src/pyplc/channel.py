@@ -1,4 +1,6 @@
 import struct,re
+from types import UnionType
+from typing import Any
 
 class Channel(object):        
     def __init__(self, name='', init_val=None, rw=False):
@@ -20,6 +22,8 @@ class Channel(object):
         return self.value>__value
     def __ge__(self,__value: object) -> bool:
         return self.value>=__value
+    def __pos__(self):
+        return self.value
 
     def __str__(self):
         if self.name != '':
@@ -165,7 +169,7 @@ class QBool(Channel):
         super().write(val)
 
     def __invert__(self):
-        return lambda: not self.read()
+        return self.opposite
 
     def __str__(self):
         if self.name!='':
@@ -178,6 +182,9 @@ class QBool(Channel):
 
     def clear(self):
         self.write(False)
+    
+    def opposite(self,val):
+        self.write(not val)
 
     def sync(self,data: memoryview, dirty: memoryview ):
         """если есть изменения, то dirty&data будут изменены, если нет,
