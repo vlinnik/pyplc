@@ -191,6 +191,14 @@ class IWord(Channel):
         super( ).__init__(name,init_val=int(0))
         self.addr = addr
         self.forced = None
+    @staticmethod
+    def at(addr: str)->'IWord':
+        rx = re.compile(r'%I(W|B)([0-9]+)')
+        mh=rx.match(addr)
+        if mh is None:
+            print(f'Error: invalid IWord variable address {addr} ') 
+            return None
+        return IWord( int(mh.group(2))*(2 if mh.group(1)=='W' else 1), addr )
 
     def read(self):
         if self.forced:

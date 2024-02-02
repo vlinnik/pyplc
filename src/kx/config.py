@@ -199,7 +199,6 @@ class Manager():
                 conf = self.conf = json.load(f)
         conf = self.conf
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-        devs = conf['devs'] if 'devs' in conf and not passive else []
         slots = conf['slots'] if 'slots' in conf else []
 
         self.cleanup( )
