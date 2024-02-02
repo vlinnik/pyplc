@@ -1,6 +1,6 @@
 import struct,re
 
-class Channel(object):
+class Channel(object):        
     def __init__(self, name='', init_val=None, rw=False):
         self.rw = rw
         self.name = name
@@ -8,6 +8,18 @@ class Channel(object):
         self.forced = None
         self.callbacks = []
         self.comment = ''
+    def __eq__(self, __value: object) -> bool:
+        return self.value==__value
+    def __ne__(self, __value: object) -> bool:
+        return self.value!=__value
+    def __lt__(self,__value: object) -> bool:
+        return self.value<__value
+    def __le__(self,__value: object) -> bool:
+        return self.value<=__value
+    def __gt__(self,__value: object) -> bool:
+        return self.value>__value
+    def __ge__(self,__value: object) -> bool:
+        return self.value>=__value
 
     def __str__(self):
         if self.name != '':
@@ -95,6 +107,8 @@ class IBool(Channel):
         self.num = num
         self.mask = 1<<num
         self.forced = None
+    def __bool__(self)->bool:
+        return self.read()==True
     @staticmethod
     def at(addr: str)->'IBool':
         rx = re.compile(r'%IX([0-9]+)\.([0-9]+)')
@@ -135,6 +149,8 @@ class QBool(Channel):
         self.num = num
         self.mask = 1<<num
         self.dirty= False
+    def __bool__(self)->bool:
+        return self.read()==True
     @staticmethod
     def at(addr: str)->'QBool':
         rx = re.compile(r'%QX([0-9]+)\.([0-9]+)')
