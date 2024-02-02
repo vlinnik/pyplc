@@ -184,7 +184,7 @@ class PYPLC():
             return False
         return True
     
-    def config(self,safe:bool=True,persist:IOBase = None,instances=[],**kwds ):
+    def config(self,safe:bool=True,persist:IOBase = None,**kwds ):
         if 'ctx' in kwds:
             ctx = kwds['ctx']
             for x in ctx:
@@ -194,8 +194,6 @@ class PYPLC():
         self.kwds = kwds
         self.safe = safe
         self.persist = persist
-        if instances is None: self.instances = []
-        else: self.instances+=instances 
         if persist: #восстановление & подготовка следующей резервной копии
             if hasattr(persist,'chip_id'):
                 self.has_eeprom = True
@@ -389,9 +387,14 @@ class PYPLC():
             ch.unbind( __notify )
         except Exception as e:
             print(f'PLC cant make unbind item {__name}: {e}')
-    def run(self):
+    def run(self,instances=None,**kwds ):
+        if instances is not None: self.instances = instances
+        self.config( **kwds )
         try:
             while True:
                 self.scan( )
         except KeyboardInterrupt as kbi:
-            pass
+            from sys import modules
+            print('PYPLC: Task aborted!')
+            self.cleanup( )
+            if 'kx.config' in modules: modules.pop('kx.config')
