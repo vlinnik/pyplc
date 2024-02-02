@@ -93,10 +93,8 @@ class Manager():
     """Управление настройками KRAX.IO - загрузка настроек и подготовка глобальных переменных plc,hw,posto,cli
     """
     def __init__(self):
-        ipv4 = '0.0.0.0'
-        self.conf = {'ipv4': ipv4, 'node_id': 1, 'scanTime': 100,
+        self.conf = {'node_id': 1, 'scanTime': 100,
                      'layout': [], 'devs': [], 'iface': 0}
-        pass
     @staticmethod
     def __fexists(filename):
         try:
@@ -106,18 +104,20 @@ class Manager():
             return False
           
     def load(self):
-        conf = { }
+        global plc,hw
+        """Загрузка файла krax.json и io.csv
+        """        
         ipv4 = '0.0.0.0'
+        conf = { }
         if Manager.__fexists('src/krax.json'):
             with open('src/krax.json','rb') as f:
                 conf = json.load(f)
                 if 'via' in conf:
                     ipv4=conf['via']
 
-        print(f'Connecting PLC via {ipv4}:9003')
+        print(f'Connecting PLC via {ipv4}:9004')
         __plc = Subscriber( ipv4 )        
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-        devs = conf['devs'] if 'devs' in conf else []
         slots = conf['slots'] if 'slots' in conf else []
         cli = CLI(port = 2455)         #simple telnet 
         posto = POSTO( port = 9004)    #simple share data over tcp 
@@ -140,7 +140,7 @@ class Manager():
                             slot_n = int(info[-2])
                             ch_n = int(info[-1])
                             addr = sum(slots[:slot_n-1])
-                            s = __plc.subscribe( f'S{slot_n:02}C{ch_n:02}',info[0] )
+                            s = __plc.subscribe( f'hw.{info[0]}',info[0] )
                             if info[1].upper( ) == 'DI':
                                 ch = IBool(addr,ch_n-1,info[0])
                             elif info[1].upper( ) == 'DO':
@@ -165,13 +165,16 @@ class Manager():
             print(f'Declared {vars} variable, have {errs} errors')
         return plc,plc.state
 
+def kx_init():
+    global plc,hw
+    print('Warning: kx_init deprivated')
+    return plc,hw
+
+def kx_term():
+    pass
+
 if __name__!='__main__':
     board = Board( )
     manager = Manager( )
-    def kx_init():
-        return manager.load()
-    def kx_term():
-        pass
-    __all__ = ['board','kx_init','kx_term','exports']
-
-   
+    manager.load( )
+    __all__ = ['board','plc','hw','kx_init','kx_term','exports']

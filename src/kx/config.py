@@ -260,10 +260,11 @@ class Manager():
 if __name__ != '__main__' and __target_krax:
     board = Board()
     manager = Manager()
+    manager.load( )
 
-    def kx_init(passive: bool = False):
-        manager.load(passive=passive)
+    def kx_init(**kwds):
+        print('Warning: kx_init is deprecated. plc,hw now available globally in kx.config module')
         return plc, hw
     def kx_term():
         manager.cleanup()
-    __all__ = ['board', 'kx_init','kx_term']
+    __all__ = ['board', 'kx_init','kx_term','plc','hw']

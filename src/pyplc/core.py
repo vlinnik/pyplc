@@ -100,6 +100,7 @@ class PYPLC():
         self.mask = array.array('B',[0x00]*io_size) #бит из data писать только если бит=1
         self.dirty = memoryview(self.mask)          #оптимизация
         self.mv_data = memoryview(self.data)        #оптимизация
+        self.instances = []                         #пользовательские программы которые надо выполнять каждое сканирование
         
         print(f'Initialized PYPLC with scan time={self.period} msec!')
     
@@ -183,10 +184,18 @@ class PYPLC():
             return False
         return True
     
-    def config(self,safe:bool=True,persist:IOBase = None,**kwds ):
+    def config(self,safe:bool=True,persist:IOBase = None,instances=[],**kwds ):
+        if 'ctx' in kwds:
+            ctx = kwds['ctx']
+            for x in ctx:
+                var = ctx[x]
+                if isinstance(var,Channel):
+                    self.declare( var, x )
         self.kwds = kwds
         self.safe = safe
         self.persist = persist
+        if instances is None: self.instances = []
+        else: self.instances+=instances 
         if persist: #восстановление & подготовка следующей резервной копии
             if hasattr(persist,'chip_id'):
                 self.has_eeprom = True
@@ -352,7 +361,8 @@ class PYPLC():
 
     def scan(self):
         with self:
-            pass
+            for i in self.instances:
+                i( )
     
     def declare(self,channel: Channel, name: str = None):
         if not name:
@@ -379,3 +389,9 @@ class PYPLC():
             ch.unbind( __notify )
         except Exception as e:
             print(f'PLC cant make unbind item {__name}: {e}')
+    def run(self):
+        try:
+            while True:
+                self.scan( )
+        except KeyboardInterrupt as kbi:
+            pass

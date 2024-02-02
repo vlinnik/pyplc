@@ -1,4 +1,4 @@
-import struct
+import struct,re
 
 class Channel(object):
     def __init__(self, name='', init_val=None, rw=False):
@@ -95,6 +95,14 @@ class IBool(Channel):
         self.num = num
         self.mask = 1<<num
         self.forced = None
+    @staticmethod
+    def at(addr: str)->'IBool':
+        rx = re.compile(r'%IX([0-9]+)\.([0-9]+)')
+        mh=rx.match(addr)
+        if mh is None:
+            print(f'Error: invalid IBool variable address {addr} ') 
+            return None
+        return IBool( int(mh[1]),int(mh[2]), addr )
 
     def read(self):
         if self.forced:
@@ -127,6 +135,14 @@ class QBool(Channel):
         self.num = num
         self.mask = 1<<num
         self.dirty= False
+    @staticmethod
+    def at(addr: str)->'QBool':
+        rx = re.compile(r'%QX([0-9]+)\.([0-9]+)')
+        mh=rx.match(addr)
+        if mh is None:
+            print(f'Error: invalid QBool variable address {addr} ') 
+            return None
+        return QBool( int(mh[1]),int(mh[2]), addr )
 
     def write(self,val):
         self.dirty = True
