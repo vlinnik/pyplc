@@ -102,7 +102,7 @@ class IBool(Channel):
         if mh is None:
             print(f'Error: invalid IBool variable address {addr} ') 
             return None
-        return IBool( int(mh[1]),int(mh[2]), addr )
+        return IBool( int(mh.group(1)),int(mh.group(2)), addr )
 
     def read(self):
         if self.forced:
@@ -142,7 +142,7 @@ class QBool(Channel):
         if mh is None:
             print(f'Error: invalid QBool variable address {addr} ') 
             return None
-        return QBool( int(mh[1]),int(mh[2]), addr )
+        return QBool( int(mh.group(1)),int(mh.group(2)), addr )
 
     def write(self,val):
         self.dirty = True
