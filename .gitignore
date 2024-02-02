@@ -11,3 +11,4 @@ src/io.csv
 src/pyplc/version.py
 _version.py
 build
+tests/lesson#*.py
