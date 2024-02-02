@@ -1,6 +1,4 @@
 import struct,re
-from types import UnionType
-from typing import Any
 
 class Channel(object):        
     def __init__(self, name='', init_val=None, rw=False):
