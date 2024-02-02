@@ -232,4 +232,6 @@ class LD(POU):
     def all(*args):
         return Contact( lambda: all( [x() for x in args ] ) )
     def nor(*args):
-        return Contact( lambda: not all( [ not x() for x in args ] ))
+        return Contact( lambda: not any( [  x() for x in args ] ))
+    def xor(*args):
+        return Contact( lambda: (sum( [  1 if x() else 0 for x in args ])%2) == 1 )
