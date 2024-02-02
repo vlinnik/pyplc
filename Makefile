@@ -18,7 +18,7 @@ dirs:
 package:
 	# @echo PYPLC_VERSION = \"`git-versioner --python`\">src/pyplc/version.py
 	python -m build --wheel
-	pip install ./dist/pyplc-`git-versioner --python`-py3-none-any.whl --force-reinstall
+	# pip install ./dist/pyplc-`git-versioner --python`-py3-none-any.whl --force-reinstall
 $(ODIR)/$(INSTALL_DIR)/%.mpy: %.py
 	@echo Compiling $<
 	@$(MPY-CROSS) $< -o $@

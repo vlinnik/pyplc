@@ -24,11 +24,11 @@ class Coil():
             if self._what is not None: self._what( value )
         elif self._kind==Coil.TYPE_SET:
             if self._last==False and clk==True:
-                if self._what is not None: self._what( value )
+                if self._what is not None: self._what( True )
                 ret = True
         elif self._kind==Coil.TYPE_RST:                
             if self._last==True and clk==False:
-                if self._what is not None: self._what( value )
+                if self._what is not None: self._what( False )
                 ret = True
         elif self._kind==Coil.TYPE_CTU:
             if self._last==False and clk==True:
@@ -67,12 +67,15 @@ class Contact():
             kind (int, optional): _description_. Defaults to TYPE_NO.
             action (callable, optional): _description_. Defaults to None.
         """
+        self._id   = 1
         self._cond = cond
         self._kind = kind
         self._action = action   #Coil. будет вызван с clk = результатом вычисления cond
         self._next = None       #Contact.  Вызывается с state = state and cond
         self._prev = None       #Contact который нас создал
         self._state= None       #Состояние после последнего вызова __call__
+        self._value= None       #последнее входное значение
+        self._last = None       #последнее значение выражения cond()
 
     @property
     def state(self)->bool:
@@ -98,6 +101,7 @@ class Contact():
     def next(self,contact):
         self._next = contact
         self._next._prev = self
+        self._next._id = self._id+1
         return self._next
     
     def no(self,cond: callable)->'Contact':
@@ -143,8 +147,10 @@ class Contact():
             clk = value==True if self._prev is None else state==True
         else: 
             clk = self._cond( )
+        self._last = clk
         if self._kind==Contact.TYPE_NC: clk=not clk
         self._state = clk and state
+        self._value= value
         try:
             if self._action is not None and (clk or self._kind!=Contact.TYPE_IF):
                 fn = self._action( value=value,clk = clk )
@@ -158,6 +164,17 @@ class Contact():
         except:
             pass
         return self._state
+    def __str__(self)->str:
+        if self._kind==Contact.TYPE_NO:
+            return f'Contact#{self._id}(NO,state={self._last},value={self._value})'
+        elif self._kind==Contact.TYPE_NC:
+            return f'Contact#{self._id}(NC,state={self._last},value={self._value})'
+        elif self._kind==Contact.TYPE_FN:
+            return f'Contact#{self._id}(FN,state={self._last},value={self._value})'
+        elif self._kind==Contact.TYPE_IF:
+            return f'Contact#{self._id}(IF,state={self._last},value={self._value})'
+        
+        return f'Contact#{self._id}(?,state={self._last},value={self._value})'
 
 class LD(POU):
     def __init__(self):
@@ -214,3 +231,5 @@ class LD(POU):
         return Contact( lambda: any( [x() for x in args ] ) )
     def all(*args):
         return Contact( lambda: all( [x() for x in args ] ) )
+    def nor(*args):
+        return Contact( lambda: not all( [ not x() for x in args ] ))
