@@ -175,7 +175,7 @@ class RST(Cell):
             return self._next( value=value,state=self._last) and state
         return self._last
     def __str__(self):
-        return f'─(\{self._last:1} )─'
+        return f'─(\\{self._last:1} )─'
 class CTU(Cell):
     def __init__(self,max:int ):
         super().__init__()
