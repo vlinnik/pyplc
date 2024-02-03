@@ -1,5 +1,224 @@
 from pyplc.pou import POU
-from pyplc.utils.misc import BLINK
+
+class Cell():
+    def __init__(self):
+        self._id   = 1
+        self._last = None
+        self._prev = None
+        self._next = None
+
+    def __call__(self,value=None,state:bool=None)->bool:
+        if state is None:
+            if self._prev is not None:
+                first = self._prev
+                while first._prev is not None:
+                    first = first._prev
+
+                return first( value, True )
+            else:
+                return self( value, True )
+        self._last = None
+        return None
+    
+    def end(self)->'Cell':
+        if self._prev is None:
+            return self
+        
+        first = self._prev
+        while first._prev is not None:
+            first = first._prev
+        
+        return first
+    def print(self):
+        print(self.dump())
+
+    def dump(self)->str:
+        if self._next:
+            return ('├─' if self._prev is None else '' ) + str(self)+self._next.dump()
+        return str(self)+'─┤'
+
+    def __str__(self)->str:
+        return f'{self.__class__.__name__}#{self._id}({self._last:1})'
+    
+    def next(self,cell)->'Cell':
+        self._next = cell
+        self._next._prev = self
+        self._next._id = self._id+1
+        return self._next
+    
+    def no(self,cond)->'NO':
+        return self.next(NO(cond))
+
+    def nc(self,cond)->'NC':
+        return self.next(NC(cond))
+    
+    def out(self,what)->'OUT':
+        return self.next(OUT(what))
+    
+    def mov(self,what)->'MOV':
+        return self.next(MOV(what))
+    
+    def set(self,what)->'SET':
+        return self.next(SET(what))
+
+    def rst(self,what)->'RST':
+        return self.next(RST(what))
+    def ctu(self,max)->'CTU':
+        return self.next(CTU(max))
+    def ctd(self,max)->'CTD':
+        return self.next(CTD(max))
+
+class NO(Cell):
+    def __init__(self,cond: callable = None):
+        super().__init__()
+        self._cond = cond
+
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        if self._cond is None:
+            self._last = False
+        else:
+            self._last = self._cond()==True
+        if self._next:
+            tail = self._next( value=value,state=self._last and state)
+            return self._last and state and tail
+        return self._last and state
+    def __str__(self):
+        return f'─┤ {self._last:1} ├─'
+
+class NC(Cell):
+    def __init__(self,cond: callable = None):
+        super().__init__()
+        self._cond = cond
+
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        if self._cond is None:
+            self._last = True
+        else:
+            self._last = self._cond()==False
+        if self._next:
+            tail = self._next( value=value,state=self._last and state)
+            return self._last and state and tail
+        return self._last and state
+    def __str__(self):
+        return f'─┤║{self._last:1}║├─'
+class OUT(Cell):
+    def __init__(self,what: callable = None):
+        super().__init__()
+        self._what = what
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        self._last = state
+        if self._what is not None:
+            self._what(state)
+        if self._next:
+            return self._next( value=value,state=self._last) and state
+        return self._last
+    def __str__(self):
+        return f'─({self._last})─'
+class MOV(Cell):
+    def __init__(self,what: callable = None):
+        super().__init__()
+        self._what = what
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        self._last = state
+        if self._what is not None:
+            if state: self._what(state if value is None else value)
+        if self._next:
+            return self._next( value=value,state=self._last) and state
+        return self._last
+    def __str__(self):
+        return f'─[ {self._last:1} ]─'
+class SET(Cell):
+    def __init__(self,what: callable = None):
+        super().__init__()
+        self._what = what
+        self._before = None
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        self._last = state
+        if self._what is not None and self._before==False and state==True:
+            self._what(state)
+        self._before = state 
+        if self._next:
+            return self._next( value=value,state=self._last) and state
+        return self._last
+    
+    def __str__(self):
+        return f'─(/{self._last:1} )─'
+class RST(Cell):
+    def __init__(self,what: callable = None):
+        super().__init__()
+        self._what = what
+        self._before = None
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        self._last = state
+        if self._what is not None and self._before==True and state==False:
+            self._what(state)
+        self._before = state 
+        if self._next:
+            return self._next( value=value,state=self._last) and state
+        return self._last
+    def __str__(self):
+        return f'─(\{self._last:1} )─'
+class CTU(Cell):
+    def __init__(self,max:int ):
+        super().__init__()
+        self._max = max
+        self._before = None
+        self._cnt = 0
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        self._last = False
+        if self._before==False and state==True:
+            self._cnt = (self._cnt+1) % self._max
+            if self._cnt==0: self._last = state
+        self._before = state 
+        if self._next:
+            return self._next( value=value,state=self._last) and state
+        return self._last
+    def __str__(self):
+        return f'─[┌{self._last:1}┘]─'
+class CTD(Cell):
+    def __init__(self,max:int ):
+        super().__init__()
+        self._max = max
+        self._before = None
+        self._cnt = max - 1 
+    def __call__(self,value=None,state:bool=None)->bool:
+        ret = super().__call__( value=value, state=state)
+        if ret is not None:
+            return ret
+        self._last = False
+        if self._before==True and state==False:
+            if self._cnt==0: 
+                self._last = True
+                self._cnt = self._max - 1
+            else:
+                self._cnt -= 1
+        self._before = state 
+        if self._next:
+            return self._next( value=value,state=self._last) and state
+        return self._last
+    def __str__(self):
+        return f'─[└{self._last:1}┐]─'
 
 class Coil():
     """Типы Coil: OUT копирует вход в указанное место SET устанавливает True при положительном фронте, 
@@ -48,134 +267,6 @@ class Coil():
         self._last = clk==True
         return ret
 
-
-class Contact():
-    """Релизация LD контакта: NO - нормально открытый NC - нормально закрытый IF - выполняет action только когда TRUE 
-       FN - выполняет action и результат становиться нашим state
-    """
-    TYPE_NO = 0
-    TYPE_NC = 1
-    TYPE_IF = 2
-    TYPE_FN = 3
-
-    def __init__(self,cond: callable=None,kind:int = TYPE_NO, action: callable=None):
-        """Контакт вычисляет значение cond() если задан, иначе вместо него используется значение state
-        Если возможно выполняет action (и возможно использует его результат)
-
-        Args:
-            cond (callable, optional): _description_. Defaults to None.
-            kind (int, optional): _description_. Defaults to TYPE_NO.
-            action (callable, optional): _description_. Defaults to None.
-        """
-        self._id   = 1
-        self._cond = cond
-        self._kind = kind
-        self._action = action   #Coil. будет вызван с clk = результатом вычисления cond
-        self._next = None       #Contact.  Вызывается с state = state and cond
-        self._prev = None       #Contact который нас создал
-        self._state= None       #Состояние после последнего вызова __call__
-        self._value= None       #последнее входное значение
-        self._last = None       #последнее значение выражения cond()
-
-    @property
-    def state(self)->bool:
-        """Что получилось после последнего выполнения, может зависеть от пред LD контактов цепочки
-
-        Returns:
-            bool:  что получилось после последнего вызова, может быть None
-        """
-        return self._state
-
-    def end(self):
-        if self._prev: return self._prev.end()
-        return self
-    
-    @staticmethod
-    def true():
-        return True
-    
-    @staticmethod
-    def false():
-        return False
-    
-    def next(self,contact):
-        self._next = contact
-        self._next._prev = self
-        self._next._id = self._id+1
-        return self._next
-    
-    def no(self,cond: callable)->'Contact':
-        """Создать NO контакт следом с указанным выражением
-
-        Параметры:
-            cond (callable): Выражение для проверки состояния NO контакта
-
-        На выходе:
-            Contact: Созданный NO контакт
-        """
-        return self.next(Contact( cond,kind=Contact.TYPE_NO))
-    
-    def nc(self,cond: callable)->'Contact':
-        return self.next(Contact( cond,kind=Contact.TYPE_NC ))
-    
-    def out(self,what: callable)->'Contact':
-        return self.next(Contact( lambda: self._state, kind = Contact.TYPE_NO, action = Coil(what,kind = Coil.TYPE_OUT)))
-    
-    def set(self,what: callable)->'Contact':
-        return self.next(Contact( lambda: self._state, kind = Contact.TYPE_NO, action=Coil( what, kind = Coil.TYPE_SET) ))
-    
-    def rst(self,what: callable)->'Contact':
-        return self.next(Contact( lambda: self._state, kind = Contact.TYPE_NO, action=Coil( what, kind = Coil.TYPE_RST) ))
-    
-    def ctu(self,cond: callable, what: callable = None)->'Contact':
-        return self.next(Contact( cond, kind = Contact.TYPE_FN, action=Coil( what, kind = Coil.TYPE_CTU) ))
-    
-    def to(self,what: callable)->'Contact':
-        return self.next(Contact( lambda: self._state, kind = Contact.TYPE_IF, action = Coil(what,kind = Coil.TYPE_OUT))).end( )
-        
-    def __call__(self,value = None,state: bool = True)->bool:
-        """Выполнить последовательность LD логики
-
-        Параметры:
-            value (Any, optional): LD логика может принимать параметр. Если !=None вся цепочка будет передавать это значение
-            state (bool, optional): Состояние цепочки LD логики. В зависимости от kind меняется содержимое. Defaults to True.
-
-        Returns:
-            bool: Состояние цепочки LD логики после выполнения
-        """
-        if self._cond is None:
-            clk = value==True if self._prev is None else state==True
-        else: 
-            clk = self._cond( )
-        self._last = clk
-        if self._kind==Contact.TYPE_NC: clk=not clk
-        self._state = clk and state
-        self._value= value
-        try:
-            if self._action is not None and (clk or self._kind!=Contact.TYPE_IF):
-                fn = self._action( value=value,clk = clk )
-                if self._kind==Contact.TYPE_FN:
-                    if fn is not None and fn==True:
-                        self._state = fn and state
-                    else:
-                        self._state = False
-
-            if self._next: self._next( self.state if value is None else value,state = self._state )
-        except:
-            pass
-        return self._state
-    def __str__(self)->str:
-        if self._kind==Contact.TYPE_NO:
-            return f'Contact#{self._id}(NO,state={self._last},value={self._value})'
-        elif self._kind==Contact.TYPE_NC:
-            return f'Contact#{self._id}(NC,state={self._last},value={self._value})'
-        elif self._kind==Contact.TYPE_FN:
-            return f'Contact#{self._id}(FN,state={self._last},value={self._value})'
-        elif self._kind==Contact.TYPE_IF:
-            return f'Contact#{self._id}(IF,state={self._last},value={self._value})'
-        
-        return f'Contact#{self._id}(?,state={self._last},value={self._value})'
-
 class LD(POU):
     def __init__(self):
         self.rails = []
@@ -189,7 +280,15 @@ class LD(POU):
         print(f'{self.id}:',*args)
 
     @staticmethod
-    def no(cond: callable=None)->Contact:
+    def true():
+        return True
+    
+    @staticmethod
+    def false():
+        return False
+
+    @staticmethod
+    def no(cond: callable=None)->NO:
         """Создать NO контакт следом с указанным выражением. 
 
         Параметры:
@@ -198,11 +297,9 @@ class LD(POU):
         На выходе:
             Contact: Созданный NO контакт
         """
-        if cond is None:
-            return Contact( kind=Contact.TYPE_IF)
-        return Contact(cond,kind=Contact.TYPE_NO)
+        return NO(cond)
     @staticmethod
-    def nc(cond: callable=None)->Contact:
+    def nc(cond: callable=None)->NC:
         """Создать NС контакт следом с указанным выражением
 
         Параметры:
@@ -211,27 +308,20 @@ class LD(POU):
         На выходе:
             Contact: Созданный NO контакт
         """
-        return Contact(cond,kind=Contact.TYPE_NC)
-    @staticmethod
-    def set(cond: callable=None,what:callable=None)->Contact:
-        return Contact( cond, kind = Contact.TYPE_FN, action=Coil( kind = Coil.TYPE_SET ) ).next(Contact( kind = Contact.TYPE_IF, action = Coil(what,kind = Coil.TYPE_OUT)))
-
-    @staticmethod
-    def rst(cond: callable=None,what:callable=None)->Contact:
-        return Contact( cond, kind = Contact.TYPE_FN, action=Coil( kind = Coil.TYPE_RST ) ).next(Contact( kind = Contact.TYPE_IF, action = Coil(what,kind = Coil.TYPE_OUT)))
-
-    @staticmethod
-    def ctu(max:int=1,cond: callable=None,what: callable=None)->Contact:
-        return Contact(cond,kind=Contact.TYPE_FN,action=Coil( what, kind=Coil.TYPE_CTU , max=max))
-    @staticmethod
-    def ctd(max:int=1,cond: callable=None,what: callable=None)->Contact:
-        return Contact(cond,kind=Contact.TYPE_FN,action=Coil( what, kind=Coil.TYPE_CTD , max=max))
+        return NC(cond)
     
+    @staticmethod
     def any(*args):
-        return Contact( lambda: any( [x() for x in args ] ) )
+        return NO( lambda: any( [x() for x in args ] ) )
+    
+    @staticmethod
     def all(*args):
-        return Contact( lambda: all( [x() for x in args ] ) )
+        return NO( lambda: all( [x() for x in args ] ) )
+    
+    @staticmethod
     def nor(*args):
-        return Contact( lambda: not any( [  x() for x in args ] ))
+        return NC( lambda: any( [  x() for x in args ] ))
+    
+    @staticmethod
     def xor(*args):
-        return Contact( lambda: (sum( [  1 if x() else 0 for x in args ])%2) == 1 )
+        return NO( lambda: (sum( [  1 if x() else 0 for x in args ])%2) == 1 )
