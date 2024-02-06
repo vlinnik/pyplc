@@ -167,7 +167,7 @@ class QBool(Channel):
         super().write(val)
 
     def __invert__(self):
-        return self.opposite
+        return lambda: not self.read()
 
     def __str__(self):
         if self.name!='':
@@ -183,6 +183,9 @@ class QBool(Channel):
     
     def opposite(self,val):
         self.write(not val)
+
+    def __neg__(self):
+        return self.opposite
 
     def sync(self,data: memoryview, dirty: memoryview ):
         """если есть изменения, то dirty&data будут изменены, если нет,
