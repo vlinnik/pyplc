@@ -1,4 +1,5 @@
 from kx.config import *
+# если в io.csv нет, то можно ниже объявить переменные IO
 # from pyplc.channel import QBool,IBool
 
 # POWER = QBool.at( '%QX0.0' )
