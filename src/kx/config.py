@@ -211,7 +211,7 @@ class Manager():
                 posto = None
         plc = PYPLC(sum(slots), period=scanTime, krax=krax, pre=cli, post=posto)
         hw = plc.state
-        plc.connection = plc  # чтобы  не отличался от coupler
+        plc.connection = None 
         plc.cleanup = self.cleanup
 
         if self.__fexists('io.csv') and not passive:

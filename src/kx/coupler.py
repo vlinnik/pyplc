@@ -140,7 +140,6 @@ class Manager():
                             slot_n = int(info[-2])
                             ch_n = int(info[-1])
                             addr = sum(slots[:slot_n-1])
-                            s = __plc.subscribe( f'hw.{info[0]}',info[0] )
                             if info[1].upper( ) == 'DI':
                                 ch = IBool(addr,ch_n-1,info[0])
                             elif info[1].upper( ) == 'DO':
@@ -151,13 +150,6 @@ class Manager():
                                 ch = ICounter8(addr+ch_n,info[0])   
                             ch.comment = f'S{slot_n:02}C{ch_n:02}'                            
                             plc.declare(ch,info[0])
-                            if ch.rw:
-                                s.bind( ch )
-                                #s.write = ch #а при получении нового значения от сервера происходит запись в Channel
-                            else:
-                                s.bind( ch.force )
-                                #s.write = ch.force
-                            ch.bind(s.write)  #изменения канала ввода/вывода производит запись в Subscription
                             vars = vars+1
                     except Exception as e:
                         print(e,info)

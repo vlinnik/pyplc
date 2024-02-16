@@ -190,6 +190,7 @@ class PYPLC():
             for x in ctx:
                 var = ctx[x]
                 if isinstance(var,Channel):
+                    var.name = x
                     self.declare( var, x )
         self.kwds = kwds
         self.safe = safe
@@ -367,6 +368,13 @@ class PYPLC():
             name = channel.name
         self.vars[name] = channel
         setattr(self,name,channel)
+        if self.connection is not None: #в режиме Coupler здесь Subscriber подключенный к физическому PLC
+            remote = self.connection.subscribe(f'hw.{name}')
+            if channel.rw:
+                remote.bind( channel )
+            else:
+                remote.bind( channel.force )
+            channel.bind(remote.write)  #изменения канала ввода/вывода производит запись в Subscription
         #setattr(self.state,name,channel())
         return channel
     def bind(self,__name:str,__notify: callable):
