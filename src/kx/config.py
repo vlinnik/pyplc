@@ -10,10 +10,6 @@ try:
     import krax,network # доступно на micropython только
     from machine import Pin,ADC
     from kx.at25640b import AT25640B
-    
-    # sta = network.WLAN(0)
-    # ap = network.WLAN(1)
-    # eth = network.LAN(0)
 except:
     from kx.coupler import *  # если не не micropython-e => то режим coupler
     __target_krax = False

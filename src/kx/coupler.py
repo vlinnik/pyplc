@@ -116,7 +116,7 @@ class Manager():
                     ipv4=conf['via']
 
         print(f'Connecting PLC via {ipv4}:9004')
-        __plc = Subscriber( ipv4 )        
+        __plc = Subscriber( ipv4,9004 )        
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         slots = conf['slots'] if 'slots' in conf else []
         cli = CLI(port = 2455)         #simple telnet 
@@ -163,7 +163,8 @@ class Manager():
                         print(e,info)
                         errs = errs+1
             print(f'Declared {vars} variable, have {errs} errors')
-        return plc,plc.state
+            __plc.connect()
+        return plc,hw
 
 def kx_init():
     global plc,hw

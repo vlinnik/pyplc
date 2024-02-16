@@ -80,7 +80,7 @@ class Subscriber(TCPClient):
         def __data__(self):
             return {var: self.__item(var)() for var in self.__parent.items}
 
-    def __init__(self, host, port=9003):
+    def __init__(self, host, port=9004):
         self.items = {}
         self.unsubscribed = []
         self.subscriptions = {}
@@ -156,6 +156,7 @@ class Subscriber(TCPClient):
                     value, = struct.unpack_from('!d', data, off)
                 elif type_id == 3 and off+d_size <= size:  # string
                     value, = struct.unpack_from(f'{d_size}s', data, off)
+                    value = str(value,'utf-8')
 
                 off += d_size
                 if local_id in self.subscriptions and value is not None:

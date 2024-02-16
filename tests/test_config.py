@@ -1,11 +1,9 @@
 from kx.config import *
-import time
 
-plc,hw = kx_init ( )
 
-plc.config( persist = board.eeprom )
+def demo():
+    hw.POWER = not hw.POWER
+    hw.LED = hw.ISON
 
-start = time.time()
-while time.time()-start<10:
-    with plc(ctx=globals()):
-        pass
+plc.config( ctx=globals() )
+plc.run( instances=[demo], ctx=globals() )
