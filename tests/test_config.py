@@ -1,6 +1,5 @@
 from kx.config import *
 
-
 def demo():
     hw.POWER = not hw.POWER
     hw.LED = hw.ISON
