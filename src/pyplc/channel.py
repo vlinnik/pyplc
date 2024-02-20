@@ -245,6 +245,48 @@ class IWord(Channel):
         if self.value!=o_val:
             self.changed()
 
+class QWord(Channel):
+    def __init__(self,addr,name=''):
+        super( ).__init__(name,init_val=int(0))
+        self.addr = addr
+        self.forced = None
+        self.dirty = True
+    @staticmethod
+    def at(addr: str)->'QWord':
+        rx = re.compile(r'%Q(W|B)([0-9]+)')
+        mh=rx.match(addr)
+        if mh is None:
+            print(f'Error: invalid QWord variable address {addr} ') 
+            return None
+        return QWord( int(mh.group(2))*(2 if mh.group(1)=='W' else 1), addr )
+
+    def read(self):
+        if self.forced:
+            return self.forced
+        return super().read( )
+
+    def write(self,val):
+        self.dirty = True
+        super().write(val)
+
+    def __str__(self):
+        if self.name!='':
+            return f'QWord({self.name} AT %QB{self.addr}={self():02x}) #{self.comment}'
+        else:
+            return f'QWord(%QB{self.addr}={self():02x}) #{self.comment}'                
+    
+    def sync(self,data: memoryview,dirty: memoryview):
+        if self.dirty:
+            struct.pack_into('H',data,self.addr,self.read() )
+            dirty[self.addr+0] = 0xFF
+            dirty[self.addr+1] = 0xFF
+            self.dirty = False
+        else:            
+            o_val = self.value
+            self.value, = struct.unpack_from('H',data,self.addr)
+            if self.value!=o_val:
+                self.changed()
+
 class ICounter8(Channel):
     def __init__(self,addr,name=''):
         super( ).__init__(name,init_val=int(0))
