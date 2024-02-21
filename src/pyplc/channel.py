@@ -22,7 +22,10 @@ class Channel(object):
         return self.value>=__value
     def __pos__(self):
         return self.value
-
+    def __add__(self,__value):
+        return self.read() + __value
+    def __sub__(self,__value):
+        return self.read()-__value
     def __str__(self):
         if self.name != '':
             return f'{self.name}={self.read()}'
@@ -247,7 +250,7 @@ class IWord(Channel):
 
 class QWord(Channel):
     def __init__(self,addr,name=''):
-        super( ).__init__(name,init_val=int(0))
+        super( ).__init__(name,init_val=int(0),rw = True)
         self.addr = addr
         self.forced = None
         self.dirty = True

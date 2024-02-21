@@ -115,15 +115,20 @@ class Manager():
                 if 'via' in conf:
                     ipv4=conf['via']
 
-        print(f'Connecting PLC via {ipv4}:9004')
-        __plc = Subscriber( ipv4,9004 )        
         scanTime = conf['scanTime'] if 'scanTime' in conf else 100
         slots = conf['slots'] if 'slots' in conf else []
         cli = CLI(port = 2455)         #simple telnet 
         posto = POSTO( port = 9004)    #simple share data over tcp 
-        plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
-        hw = __plc.state
-        plc.connection = __plc         #
+        if ipv4!='0.0.0.0':
+            print(f'Connecting PLC via {ipv4}:9004')
+            __plc = Subscriber( ipv4,9004 )        
+            hw = __plc.state
+            plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
+            plc.connection = __plc
+        else:
+            plc = PYPLC( sum(slots), period = scanTime, pre = [cli] ,post = [posto]  )
+            hw = plc.state
+            plc.connection = None
         
         if self.__fexists('src/io.csv'):
             vars = 0
@@ -155,12 +160,13 @@ class Manager():
                         print(e,info)
                         errs = errs+1
             print(f'Declared {vars} variable, have {errs} errors')
-            __plc.connect()
+            if ipv4!='0.0.0.0':
+                __plc.connect()
         return plc,hw
 
 def kx_init():
     global plc,hw
-    print('Warning: kx_init deprivated')
+    print('Warning: kx_init depricated')
     return plc,hw
 
 def kx_term():

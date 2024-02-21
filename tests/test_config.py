@@ -9,7 +9,7 @@ from pyplc.channel import QWord
 OUT = QWord.at('%QW0')
 
 def demo():
-    hw.OUT = (hw.OUT + 10) % 0xFFFF
+    hw.OUT = (OUT + 10) % 0xFFFF
 
 plc.config( ctx=globals() )
 plc.run( instances=[ demo ], ctx=globals() )
