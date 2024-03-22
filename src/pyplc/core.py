@@ -7,7 +7,8 @@ import hashlib,struct
 class PYPLC():
     HAS_TICKS_MS = hasattr(time,'ticks_ms') #в micropython есть в python нет
     TICKS_MAX = 0                           #сколько максиальное значение ms()
-    
+    GENERATOR_TYPE = type((lambda: (yield))())
+
     class __State():
         """
         прокси для удобного доступа к значениям переменных ввода вывода
@@ -80,7 +81,7 @@ class PYPLC():
         self.vars = {}
         self.state = self.__State(self)
         self.kwds = {}
-        self.simulator = True
+        self.simulator = False
         self.reader = None
         self.writer = None
         """
@@ -362,8 +363,17 @@ class PYPLC():
     def scan(self):
         with self:
             if not self.simulator:
-                for i in self.instances:
-                    i( )
+                i = 0
+                while i<len(self.instances):
+                    if type(self.results[i])==PYPLC.GENERATOR_TYPE:
+                        try:
+                            next(self.results[i])
+                        except StopIteration:
+                            self.results[i] = None
+                    else:
+                        self.results[i] = self.instances[i]( )
+                        if type(self.results[i])==PYPLC.GENERATOR_TYPE:i-=1
+                    i+=1
     
     def declare(self,channel: Channel, name: str = None):
         if not name:
@@ -398,7 +408,9 @@ class PYPLC():
         except Exception as e:
             print(f'PLC cant make unbind item {__name}: {e}')
     def run(self,instances=None,**kwds ):
-        if instances is not None: self.instances = instances
+        if instances is not None: 
+            self.instances = instances
+            self.results = [None]*len(instances)
         self.config( **kwds )
         try:
             while True:
