@@ -23,7 +23,7 @@ class Property():
 
     def write(self,value):
         if self.value!=value:
-            if type(self.value)!=type(value) and self.value is not None:
+            if type(self.value)!=type(value) and self.value is not None and value is not None:
                 self.value = type(self.value)(value)
             else:
                 self.value = value

@@ -289,9 +289,9 @@ class QWord(Channel):
 class ICounter8(Channel):
     def __init__(self,addr,name=''):
         super( ).__init__(name,init_val=int(0))
-        self.addr = addr
-        self.forced = None
-        self.cnt8 = 0
+        self.addr  = addr
+        self.forced= None
+        self.cnt8  = 0
     @staticmethod
     def at(addr: str)->'ICounter8':
         rx = re.compile(r'%I(B)([0-9]+)')
