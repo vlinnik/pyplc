@@ -194,8 +194,10 @@ class PYPLC():
                     self.declare( var, x )
         self.kwds = kwds
         self.safe = safe
-        self.persist = persist
-        if persist: #восстановление & подготовка следующей резервной копии
+        if persist is not None:
+            self.persist = persist
+        if self.persist: #восстановление & подготовка следующей резервной копии
+            persist = self.persist
             if hasattr(persist,'chip_id'):
                 self.has_eeprom = True
             info = [ ]
@@ -208,7 +210,6 @@ class PYPLC():
                     sect_off,sect_size,sect_n = struct.unpack_from('HHI',fat,off)
                     if last[2]<=sect_n and sect_off!=0xFFFF and sect_off>=256 and sect_size<8192/2 and sect_size!=0x0 and (sect_n % 32) * 8 == off:
                         last = (sect_off,sect_size,sect_n)
-                        print(f'Found section {last}...')
                     off+=8
                 if last[1]>0:
                     if self.restore( last[0] ):
@@ -405,4 +406,4 @@ class PYPLC():
             from sys import modules
             print('PYPLC: Task aborted!')
             self.cleanup( )
-            if 'kx.config' in modules: modules.pop('kx.config')
+            if 'pyplc.config' in modules: modules.pop('pyplc.config')

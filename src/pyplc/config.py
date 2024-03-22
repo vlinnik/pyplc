@@ -7,11 +7,11 @@ import os,json,re,gc,time
 
 __target_krax = True
 try:
-    import krax,network # доступно на micropython только
+    import kraxio # доступно на micropython только
     from machine import Pin,ADC
-    from kx.at25640b import AT25640B
+    from at25640b import AT25640B
 except:
-    from kx.coupler import *  # если не не micropython-e => то режим coupler
+    from coupler import *  # если не не micropython-e => то режим coupler
     __target_krax = False
 
 startAt = time.time()
@@ -147,9 +147,6 @@ class Manager():
 
     def __init__(self):
         self.conf = {'node_id': 1, 'layout': [], 'devs': [], 'AP' : True, 'STA' : True, 
-                    #  'eth' : self.ifconfig(network.LAN(0)), 
-                    #  'ap' : self.ifconfig(network.WLAN(1)), 
-                    #  'sta' : self.ifconfig(network.WLAN(0)),
                      'init' : { 'iface': 0, 'hostname' : 'krax'} }
         pass
 
@@ -164,14 +161,11 @@ class Manager():
     def __krax_init(self):
         # global eth,sta,ap
         conf = self.conf
-        # self.ifup( sta, conf['sta'] )
-        # self.ifup( ap, conf['ap'] )
-        # self.ifup( eth, conf['eth'] )
         print('Init KRAX with init=',conf['init'])
-        krax.init(conf['node_id'],**conf['init'])
+        kraxio.init(conf['node_id'],**conf['init'])
         if Manager.__fexists('krax.dat'):
             with open('krax.dat', 'rb') as d:
-                krax.restore(d.read())
+                kraxio.restore(d.read())
         
     def cleanup(self):
         global cli, posto, plc, hw
@@ -186,7 +180,7 @@ class Manager():
         except Exception as e:
             print('Exception in Manager.cleanup',e)
             pass
-        krax.deinit( )
+        kraxio.deinit( )
 
     def load(self,passive: bool=False):
         global cli, posto, plc, hw
@@ -209,15 +203,15 @@ class Manager():
                 print(f'CLI/POSTO in use ({e}).')
                 cli = None
                 posto = None
-        plc = PYPLC(sum(slots), period=scanTime, krax=krax, pre=cli, post=posto)
+        plc = PYPLC(sum(slots), period=scanTime, krax=kraxio, pre=cli, post=posto)
         hw = plc.state
         plc.connection = None 
         plc.cleanup = self.cleanup
 
-        if self.__fexists('io.csv') and not passive:
+        if self.__fexists('krax.csv') and not passive:
             vars = 0
             errs = 0
-            with open('io.csv', 'r') as csv:
+            with open('krax.csv', 'r') as csv:
                 csv.readline()  # skip column headers
                 id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
                 num = re.compile(r'[0-9]+')
@@ -249,6 +243,7 @@ class Manager():
             gc.collect()
             print(
                 f'Declared {vars} variable, have {errs} errors, {time.time()-startAt} secs')
+        plc.config(persist=AT25640B())
         self.__krax_init()
 
 

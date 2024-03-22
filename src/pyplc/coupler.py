@@ -3,9 +3,37 @@ from pyplc.utils.subscriber import Subscriber
 from pyplc.utils.cli import CLI
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8
-from .misc import exports
 from io import IOBase
 import os,re,json,struct
+
+def __typeof(var):
+    if isinstance(var,float):
+        return 'REAL'
+    elif isinstance(var,bool):
+        return 'BOOL'
+    elif isinstance(var,int):
+        return 'LONG'
+    elif isinstance(var,str):
+        return 'STRING'
+    return f'{type(var)}'
+
+
+def exports(ctx: dict,prefix:str=None):
+    print('Export all available items')
+    print('VAR_CONFIG')
+    prefix = '' if prefix is None else f'{prefix}.'
+    for i in ctx.keys():
+        obj = ctx[i]
+        try:
+            data = obj.__data__()
+            if i!='hw':
+                vars = [ f'\t{prefix}{i}.{x} AT {prefix}{i}.{x}: {__typeof(data[x])};' for x in data.keys() ]
+            else:
+                vars = [ f'\t{prefix}{x} AT {prefix}{i}.{x}: {__typeof(data[x])};' for x in data.keys() ]
+            print('\n'.join(vars))
+        except:
+            pass
+    print('END_VAR')
 
 class Board():
     def __init__(self):
@@ -105,7 +133,7 @@ class Manager():
           
     def load(self):
         global plc,hw
-        """Загрузка файла krax.json и io.csv
+        """Загрузка файла krax.json и krax.csv
         """        
         ipv4 = '0.0.0.0'
         conf = { }
@@ -130,10 +158,10 @@ class Manager():
             hw = plc.state
             plc.connection = None
         
-        if self.__fexists('src/io.csv'):
+        if self.__fexists('src/krax.csv'):
             vars = 0
             errs = 0
-            with open('src/io.csv','r') as csv:
+            with open('src/krax.csv','r') as csv:
                 csv.readline()  #skip column headers
                 id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
                 num = re.compile(r'[0-9]+')
