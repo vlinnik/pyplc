@@ -184,7 +184,7 @@ class PYPLC():
             return False
         return True
     
-    def config(self,simulator:bool=False,persist:IOBase = None,**kwds ):
+    def config(self,simulator:bool=None,persist:IOBase = None,**kwds ):
         if 'ctx' in kwds:
             ctx = kwds['ctx']
             for x in ctx:
@@ -193,7 +193,7 @@ class PYPLC():
                     var.name = x
                     self.declare( var, x )
         self.kwds = kwds
-        self.simulator = simulator
+        if simulator is not None: self.simulator = simulator
         if persist is not None:
             self.persist = persist
         if self.persist: #восстановление & подготовка следующей резервной копии
