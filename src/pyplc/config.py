@@ -11,7 +11,7 @@ try:
     from machine import Pin,ADC
     from at25640b import AT25640B
 except:
-    from coupler import *  # если не не micropython-e => то режим coupler
+    from .coupler import *  # если не не micropython-e => то режим coupler
     __target_krax = False
 
 startAt = time.time()
