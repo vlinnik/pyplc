@@ -119,8 +119,7 @@ class IBool(Channel):
         rx = re.compile(r'%IX([0-9]+)\.([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
-            print(f'Error: invalid IBool variable address {addr} ') 
-            return None
+            raise RuntimeError(f'Ошибка: проверьте формат адреса IBool {addr} ') 
         return IBool( int(mh.group(1)),int(mh.group(2)), addr )
 
     def read(self):
@@ -161,8 +160,7 @@ class QBool(Channel):
         rx = re.compile(r'%QX([0-9]+)\.([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
-            print(f'Error: invalid QBool variable address {addr} ') 
-            return None
+            raise RuntimeError(f'Ошибка: проверьте формат адреса QBool {addr} ') 
         return QBool( int(mh.group(1)),int(mh.group(2)), addr )
 
     def write(self,val):
@@ -223,8 +221,7 @@ class IWord(Channel):
         rx = re.compile(r'%I(W|B)([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
-            print(f'Error: invalid IWord variable address {addr} ') 
-            return None
+            raise RuntimeError(f'Ошибка: проверьте формат адреса IWord {addr} ') 
         return IWord( int(mh.group(2))*(2 if mh.group(1)=='W' else 1), addr )
 
     def read(self):
@@ -259,8 +256,7 @@ class QWord(Channel):
         rx = re.compile(r'%Q(W|B)([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
-            print(f'Error: invalid QWord variable address {addr} ') 
-            return None
+            raise RuntimeError(f'Ошибка: проверьте формат адреса QWord {addr} ') 
         return QWord( int(mh.group(2))*(2 if mh.group(1)=='W' else 1), addr )
 
     def read(self):
@@ -296,6 +292,13 @@ class ICounter8(Channel):
         self.addr = addr
         self.forced = None
         self.cnt8 = 0
+    @staticmethod
+    def at(addr: str)->'ICounter8':
+        rx = re.compile(r'%I(B)([0-9]+)')
+        mh=rx.match(addr)
+        if mh is None:
+            raise RuntimeError(f'Ошибка: проверьте формат адреса ICounter {addr} ') 
+        return ICounter8( int(mh.group(2)), addr )
         
     def reset(self):
         self.value = 0
