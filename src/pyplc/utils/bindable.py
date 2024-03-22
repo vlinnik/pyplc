@@ -23,11 +23,14 @@ class Property():
 
     def write(self,value):
         if self.value!=value:
-            self.value = value
+            if type(self.value)!=type(value) and self.value is not None:
+                self.value = type(self.value)(value)
+            else:
+                self.value = value
             if self._write:
-                self._write(value)
+                self._write(self.value)
             for b in self.__binds:
-                b(value)
+                b(self.value)
 
     def __call__(self, *args):
         if len(args)>0:
