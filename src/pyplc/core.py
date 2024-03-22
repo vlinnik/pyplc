@@ -80,7 +80,7 @@ class PYPLC():
         self.vars = {}
         self.state = self.__State(self)
         self.kwds = {}
-        self.safe = True
+        self.simulator = True
         self.reader = None
         self.writer = None
         """
@@ -184,7 +184,7 @@ class PYPLC():
             return False
         return True
     
-    def config(self,safe:bool=True,persist:IOBase = None,**kwds ):
+    def config(self,simulator:bool=False,persist:IOBase = None,**kwds ):
         if 'ctx' in kwds:
             ctx = kwds['ctx']
             for x in ctx:
@@ -193,7 +193,7 @@ class PYPLC():
                     var.name = x
                     self.declare( var, x )
         self.kwds = kwds
-        self.safe = safe
+        self.simulator = simulator
         if persist is not None:
             self.persist = persist
         if self.persist: #восстановление & подготовка следующей резервной копии
@@ -361,8 +361,9 @@ class PYPLC():
 
     def scan(self):
         with self:
-            for i in self.instances:
-                i( )
+            if not self.simulator:
+                for i in self.instances:
+                    i( )
     
     def declare(self,channel: Channel, name: str = None):
         if not name:
