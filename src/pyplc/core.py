@@ -2,7 +2,7 @@ from .channel import Channel
 from .pou import POU
 from io import IOBase
 import time,re,json,array
-import hashlib,struct
+import hashlib,struct,asyncio
 
 class PYPLC():
     HAS_TICKS_MS = hasattr(time,'ticks_ms') #в micropython есть в python нет
@@ -84,6 +84,7 @@ class PYPLC():
         self.simulator = False
         self.reader = None
         self.writer = None
+        self.eventCycle = None
         """
         Всего 32 секции по 8 байт. 256 байт в начале eeprom. Каждая секция 
         2 байта смещение в eeprom 
@@ -293,7 +294,7 @@ class PYPLC():
             self.flush(self.idleTime)
 
         now = self.ms( )
-        if self.__fts + self.period > now:
+        if self.__fts + self.period > now and self.eventCycle is None:
             self.sleep(self.__fts + self.period - now )
         
     def begin(self):
@@ -420,3 +421,25 @@ class PYPLC():
             print('PYPLC: Task aborted!')
             self.cleanup( )
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
+    
+    async def cycle(self):
+        await self.eventCycle.wait()
+        self.eventCycle.clear( )
+
+    async def exec(self,instances=[]):
+        coros = list(filter( lambda item: not callable(item), instances ))
+        non_coros = list(filter( lambda item: callable(item), instances ))
+        self.eventCycle = asyncio.Event( )
+        self.instances = non_coros
+        self.results = [None]*len(non_coros)
+
+        _ = [ asyncio.create_task( c ) for c in coros ]
+        have_ms = hasattr(asyncio,'sleep_ms')
+                
+        while True:
+            self.scan( )
+            self.eventCycle.set( )
+            now = self.ms( )
+            if self.__fts + self.period > now:
+                if have_ms: await asyncio.sleep_ms(self.__fts + self.period - now )
+                else: await asyncio.sleep( (self.__fts + self.period - now) /1000 )
