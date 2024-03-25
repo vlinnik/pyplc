@@ -25,9 +25,12 @@ class Board():
         self.__run = Pin(2, Pin.OUT)
         self.__swps = Pin(32, Pin.OUT)
         self.__usr = Pin(36,Pin.IN)
-        # self.__run = Pin(39,Pin.IN) - автозапуск проекта. 
+        self.__mode = Pin(39,Pin.IN) #- автозапуск проекта. 
         self.__storage = None
 
+    def get_mode(self) -> bool:
+        return self.__mode.value() == 0
+    
     def get_usr(self) -> bool:
         return self.__usr.value() == 0
 
@@ -93,6 +96,10 @@ class Board():
 
         self.__storage = AT25640B()
         return self.__storage
+
+    @property
+    def mode(self)->bool:
+        return self.get_mode( )
         
 class Manager():
     """Управление настройками KRAX.IO - загрузка настроек и подготовка глобальных переменных plc,hw,posto,cli

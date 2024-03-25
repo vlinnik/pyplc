@@ -42,7 +42,11 @@ class Board():
         self.__err = False
         self.__run = False
         self.__usr = False
+        self.__mode= True       
         self.__storage = None
+
+    def get_mode(self)->bool:
+        return self.__mode
         
     def get_usr(self)->bool:
         return self.__usr
@@ -116,6 +120,10 @@ class Board():
         except OSError:
             pass
         return self.__storage
+    
+    @property
+    def mode(self)->bool:
+        return self.get_mode( )
 
 class Manager():
     """Управление настройками KRAX.IO - загрузка настроек и подготовка глобальных переменных plc,hw,posto,cli
