@@ -1,5 +1,5 @@
 from pyplc.core import PYPLC
-from pyplc.channel import IBool,QBool,IWord,ICounter8
+from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.cli import CLI
 from pyplc.utils.posto import POSTO
 from io import IOBase
@@ -238,6 +238,8 @@ class Manager():
                                 ch = QBool(addr,ch_n-1,info[0])
                             elif info[1].upper( ) == 'AI':
                                 ch = IWord(addr+((ch_n-1)<<1),info[0])                               
+                            elif info[1].upper( ) == 'AO':
+                                ch = QWord(addr+((ch_n-1)<<1),info[0])                               
                             elif info[1].upper( ) == 'CNT8':
                                 ch = ICounter8(addr+ch_n,info[0])  
                             ch.comment = f'S{slot_n:02}C{ch_n:02}'                             
