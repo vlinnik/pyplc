@@ -95,7 +95,7 @@ class POU():
         if not found and len(self.__persistent__)>0:
             POU.__persistable__.append(self)
         for o in self.__children__:
-            ctx = vars(self)
+            ctx = self.__dict__
             for name in ctx:
                 if ctx[name]==o and o.id is None:
                     o.id = name
