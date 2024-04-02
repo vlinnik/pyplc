@@ -42,21 +42,26 @@ class POU():
             return getattr(obj,self._member)       
              
         def __set__(self,obj,value):
-            if self._persistent and getattr(obj,self._member)!=value:
-                POU.__dirty__ = True
+            if getattr(obj,self._member)!=value:
+                if self._persistent: POU.__dirty__ = True
+
+            if self._notify: setattr(obj,f'_touched_{self._name}',True)
+
             setattr(obj,self._member,value)
-            if self._notify:
-                obj.__touched__[self._name] = True
 
     class input(var):
         def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
             super().__init__(init_val, hidden=hidden, persistent=persistent,notify=False)
 
         def __set__(self,obj,value):
+            if callable(value):
+                obj.join(self._name,value)
+                return
+
             _value = super().__get__(obj)
             super().__set__(obj,value)
-            if _value!=value and self._name in obj.__touched__:                       #оповещение только при изменении
-                obj.__touched__[self._name] = True
+            if _value!=value:           #оповещение только при изменении
+                setattr(obj,f'_touched_{self._name}',True)
         
         def connect(self,obj,source):
             obj.join( self._name, source)     
@@ -65,42 +70,89 @@ class POU():
         def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
             super().__init__(init_val, hidden=hidden, persistent=persistent)
         
+        def __set__(self,obj,value):
+            if callable(value):
+                obj.bind(self._name,value)
+                return
+
+            _value = super().__get__(obj)
+            super().__set__(obj,value)
+            if _value!=value:           #оповещение только при изменении
+                setattr(obj,f'_touched_{self._name}',True)
+
         def connect(self,obj,target:callable):
             return obj.bind(self._name,target)
 
     def __init__(self,id:str = None) -> None:
-        if id is not None:
-            self.id = id
+        self.id = id
+        self.__persistent__=[]
 
-    def join(self, input: str, fn: callable):
-        self.__inputs__[input] = fn
+        for key in dir(self.__class__): 
+            p = getattr(self.__class__,key)
+            if isinstance( p,POU.var ):
+                if p._persistent: self.__persistent__.append(key)
+                p._name  = key
+                p._member= f'_{key}'
+                setattr(self,p._member,p._value)
+                setattr(self,f'_touched_{key}',False)
+                setattr(self,f'_bound_{key}',[])        
 
-    def bind(self,output,__sink):   #bind and atrribute to callback
-        if output in self.__sinks__:
-            self.__sinks__[output].append( __sink )
-        else:
-            self.__sinks__[output] = [ __sink ]
-        __sink( getattr(self,output) )
-        self.__touched__[output] = True
+                if id is not None and p._persistent:
+                    found = False
+                    for o in POU.__persistable__:
+                        if o.id == id:
+                            found = True
+                            break
+                    if not found:
+                        POU.__persistable__.append(self)
+
+    def join(self, input: str | input, fn: callable):
+        if isinstance(input,POU.input):
+            return input.connect(self,fn)
+        try:
+            setattr(self,input,fn())
+            setattr(self,f'_join_{input}',fn)
+        except Exception as e:
+            raise RuntimeError(f'Callable raises error {e} in POU.join {self}.{input}')
+
+    def bind(self,output: str | output,__sink):   #bind and atrribute to callback
+        if isinstance(output,POU.output):
+            return output.connect(self,__sink)
+        try:
+            bound = getattr(self,f'_bound_{output}')
+        except:
+            raise RuntimeError(f'Binding non-output {self}.{output}')
+
+        try:
+            __sink(getattr(self,output))        
+            bound.append( __sink )
+            setattr(self,f'_touched_{output}',True)
+        except Exception as e:
+            raise RuntimeError(f'Exception in POU.bind {e}, {self}.{output}')
         return id(__sink)
 
     def unbind(self,__name,__sink = None):
-        if __name in self.__sinks__:
-            self.__sinks__[__name] = list(filter( lambda x: ( id(x)!=__sink and x!=__sink and __sink is not None), self.__sinks__[__name] ))
+        try:
+            bound = getattr(self,f'_bound_{__name}')
+        except:
+            return
+        bound = list(filter( lambda x: ( id(x)!=__sink and x!=__sink and __sink is not None), bound ))
+        setattr(self,f'_bound_{__name}',bound)
 
     def __enter__(self):
-        for key in self.__inputs__: 
-            setattr(self,key,self.__inputs__[key]( ))
+        for key in dir(self.__class__): 
+            if isinstance( getattr(self.__class__,key),POU.var ):
+               if hasattr(self,f'_join_{key}'):
+                  setattr(self,f'_{key}',getattr(self,f'_join_{key}')( ))
 
     def __exit__(self, type, value, traceback):
-        for __name in self.__sinks__ :
-            if not hasattr(self,__name):
-                continue
-            __value = getattr(self,__name)
-            if __name in self.__touched__ and self.__touched__[__name]:
-                self.__touched__[__name] = False
-                for s in self.__sinks__[__name]:
-                    s(__value)
+        for key in dir(self.__class__): 
+            if isinstance( getattr(self.__class__,key),POU.var ):
+               if getattr(self,f'_touched_{key}'):
+                 val = getattr(self,f'_{key}')
+                 for b in getattr(self,f'_bound_{key}'):
+                    b(val)                    
+                 setattr(self,f'_touched_{key}',False)
 
     def overwrite(self,__input: str,__default = None):
         if __default is None:
@@ -112,9 +164,19 @@ class POU():
         return __default
 
     def export(self,__name: str,initial = None):
+        """Во время выполнения создает новый атрибут с функцией как POU.var
+
+        Args:
+            __name (str): имя атрибута
+            initial (_type_, optional): начальное значение
+        """
         attr = POU.var(initial)
+        attr._name = __name
+        attr._member = f'_{__name}'
+        setattr(self,attr._member,initial)
+        setattr(self,f'_touched_{__name}',False)
+        setattr(self,f'_bound_{__name}',[])        
         setattr(type(self),__name,attr)
-        attr.setup( self, __name)
 
     def __str__(self):
         if self.id is not None:
@@ -199,6 +261,8 @@ class POU():
 
     @staticmethod
     def init(fun):
+        print(f'Depricated decorator POU.init')
+        return fun
         def pou_init(self,*args,id:str = None, **kwargs):
             self.__inputs__= { }
             self.__sinks__ = { }
