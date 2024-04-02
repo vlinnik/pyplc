@@ -194,8 +194,9 @@ class PYPLC():
                 if isinstance(var,Channel):
                     var.name = x
                     self.declare( var, x )
-                elif isinstance(var,POU) and var.id is None:
-                    var.id = x
+                elif isinstance(var,POU):
+                    if var.id is None: var.id = x
+                    var.persistent( )
         self.kwds = kwds
         if simulator is not None: self.simulator = simulator
         if persist is not None:

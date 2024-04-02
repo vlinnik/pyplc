@@ -82,10 +82,31 @@ class POU():
 
         def connect(self,obj,target:callable):
             return obj.bind(self._name,target)
-
-    def __init__(self,id:str = None) -> None:
+    
+    def persistent(self,ctx:str = None)->bool:
+        found = False
+        id = self.id
+        if ctx is not None:
+            id = '.'.join([ctx,self.id])
+        for o in POU.__persistable__:
+            if o.id == id:
+                found = True
+                break
+        if not found and len(self.__persistent__)>0:
+            POU.__persistable__.append(self)
+        for o in self.__children__:
+            ctx = vars(self)
+            for name in ctx:
+                if ctx[name]==o and o.id is None:
+                    o.id = name
+            o.persistent(id)
+        return not found
+        
+    def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
         self.__persistent__=[]
+        self.__children__=[]
+        if parent is not None: parent.__children__.append(self)
 
         for key in dir(self.__class__): 
             p = getattr(self.__class__,key)
@@ -95,16 +116,7 @@ class POU():
                 p._member= f'_{key}'
                 setattr(self,p._member,p._value)
                 setattr(self,f'_touched_{key}',False)
-                setattr(self,f'_bound_{key}',[])        
-
-                if id is not None and p._persistent:
-                    found = False
-                    for o in POU.__persistable__:
-                        if o.id == id:
-                            found = True
-                            break
-                    if not found:
-                        POU.__persistable__.append(self)
+                setattr(self,f'_bound_{key}',[])     
 
     def join(self, input: str | input, fn: callable):
         if isinstance(input,POU.input):
