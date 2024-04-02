@@ -8,6 +8,10 @@ short = true
 desc = true
 use_git_versioner="short,desc,snapshot"
 
+
+[tool.setuptools.package-data]
+pyplc = ["**/*.py", "**/*.json", "**/*.csv" ]
+
 [project]
 dynamic = ["version"]
 name = "pyplc"

@@ -1,15 +1,26 @@
-from pyplc.utils.posto import Subscriber
-from pyplc.utils.cli import CLI
-import time
+from pyplc.utils.subscriber import Subscriber
+from pyplc.pou import POU
+from pyplc.config import plc
 
-host = '192.168.1.128'
-g = Subscriber( host,port=9003 )
+host = '127.0.0.1'
+remote = Subscriber( host,port=9004 )
+TIMER_T = remote.subscribe('timer.T','TIMER_T')
+TIMER_STEP=remote.subscribe('timer.STEP','TIMER_STEP')
 
-g.subscribe('S01C01')
+class Timer(POU):
+    STEP=POU.input(1)
+    T = POU.output(0)
+    def __init__(self,T:int = 0,id: str=None):
+        super().__init__(id)
+        self.T = T
+    def __call__(self):
+        with self:
+            self.T+=self.STEP
 
-cli = CLI( 2456 )
-while True:
-    cli( ctx=globals() )
-    g( )
-    time.sleep(0.2)
-    print(g.S01C01)
+timer = Timer(id='timer')
+def dump():
+    print(TIMER_T)
+
+plc.period = 1000
+plc.config(ctx=globals())
+plc.run(instances=[timer,remote,dump],ctx=globals())
