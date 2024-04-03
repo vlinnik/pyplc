@@ -1,5 +1,6 @@
 from .tcpserver import TCPServer
 from .buffer import BufferInOut,BufferOut
+import time
 
 """
 Простейший сервер командной строки на порте 2455.
@@ -11,6 +12,8 @@ from .buffer import BufferInOut,BufferOut
 """
 class CLI(TCPServer):
     G_PS = b'\n\r>>> '
+    def __str__(self):
+        return f'[{time.time_ns()}] CLI'
     def __init__(self,port=2455):
         self.history = []
         self.telnet = None
@@ -79,7 +82,7 @@ class CLI(TCPServer):
             else:
                 self.telnet.write(self.telnet.mid( start=-self.pos-echo, size=echo ))
         
-        if self.telnet.size()>=2 and self.telnet.tail(2)==b'\r\x00':
+        if self.telnet.size()>=2 and self.telnet.tail(2)==b'\r\n':
             try:
                 self.history.append (bytearray(self.telnet.tail( -2 )))
                 ret = eval( self.history[-1],self.ctx )

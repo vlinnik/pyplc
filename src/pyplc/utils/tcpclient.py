@@ -77,7 +77,6 @@ class TCPClient():
             
         try:
             if sock.read( ) == -1:
-                print(f'Unrecovable error! Closing...')
                 self.close()
                 return
             

@@ -123,6 +123,8 @@ Cервер "Почта" доступа к переменным на порте 
 import gc
 
 class POSTO(TCPServer):
+    def __str__(self):
+        return f'[{time.time_ns()}] POSTO'
     def __init__(self, port=9003):
         self.ctx = None
         self.subscriptions = {}

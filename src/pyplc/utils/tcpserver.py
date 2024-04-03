@@ -44,10 +44,10 @@ class TCPServer():
         self.svr = None
 
     def connected(self,sock:BufferInOut):
-        print(f'connected client')
+        print(f'{self}: Client connected...')
         
     def disconnected(self,sock:BufferInOut):
-        print(f'disconnected client')
+        print(f'{self}: Client disconnected...')
 
     def received(self,client:BufferInOut,data:memoryview):
         client.send( data ) #default implementation is echo server
@@ -84,7 +84,6 @@ class TCPServer():
         for sock in self.clients:
             try:
                 if sock.read( ) == -1:
-                    print(f'Unrecovable error! Closing...')
                     self.close(sock)
                     continue
                 if sock.rx.size()>0:
