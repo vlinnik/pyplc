@@ -201,7 +201,7 @@ class PYPLC():
         if simulator is not None: self.simulator = simulator
         if persist is not None:
             self.persist = persist
-        if self.persist: #восстановление & подготовка следующей резервной копии
+        if self.persist and len(POU.__persistable__)>0: #восстановление & подготовка следующей резервной копии
             persist = self.persist
             if hasattr(persist,'chip_id'):
                 self.has_eeprom = True
