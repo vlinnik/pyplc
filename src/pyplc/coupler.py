@@ -2,6 +2,7 @@ from pyplc.utils.posto import POSTO
 from pyplc.utils.subscriber import Subscriber
 from pyplc.utils.cli import CLI
 from pyplc.core import PYPLC
+from pyplc.utils.nvd import NVD
 from pyplc.channel import IBool,QBool,IWord,ICounter8
 from io import IOBase
 import os,re,json,struct
@@ -112,13 +113,7 @@ class Board():
             return self.__storage
         
         #normal file
-        self.__storage = open('persist.dat','a+b')
-        try:
-            self.__storage.seek(-8,2)
-            b_size, = struct.unpack('!q',self.__storage.read(8))
-            self.__storage.seek( -b_size-8, 2 )
-        except OSError:
-            pass
+        self.__storage = open('persist.dat','r+b')
         return self.__storage
     
     @property
@@ -159,7 +154,7 @@ class Manager():
             print(f'Connecting PLC via {ipv4}:9004')
             __plc = Subscriber( ipv4,9004 )        
             hw = __plc.state
-            plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc]  )
+            plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc,NVD(board.eeprom)]  )
             plc.connection = __plc
         else:
             plc = PYPLC( sum(slots), period = scanTime, pre = [cli] ,post = [posto]  )
@@ -195,7 +190,8 @@ class Manager():
                     except Exception as e:
                         print(e,info)
                         errs = errs+1
-            print(f'Declared {vars} variable, have {errs} errors')
+            print(f'\tОбъявлено {vars} переменных, {errs} ошибок')
+            plc.config(persist=board.eeprom)
             if ipv4!='0.0.0.0':
                 __plc.connect()
         return plc,hw
