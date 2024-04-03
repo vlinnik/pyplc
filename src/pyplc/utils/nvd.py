@@ -47,6 +47,7 @@ class NVD(POU):
     def mkinfo(file: str = 'persist.json'): 
         """Генерация файла информации об копии сохранения
         """
+        if len(POU.__persistable__)==0: return
         info = [ ]
         total = 8   #заголовок записи 8 байт
         for so in POU.__persistable__:

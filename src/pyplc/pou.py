@@ -13,44 +13,49 @@ class POU():
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
 
+    class inputchain():
+        def __init__(self, input:str, fn: callable,next:'POU.inputchain') -> None:
+            self.input = input
+            self.fn = fn
+            self.next = next
+        def __call__(self,parent: 'POU'):
+            setattr(parent,self.input,self.fn())
+            if self.next is not None: self.next( parent )
+    class outputchain():
+        def __init__(self, output:str, fn: callable,next:'POU.outputchain') -> None:
+            self.output = output
+            self.fn = fn
+            self.next = next
+        def __call__(self,parent: 'POU'):
+            self.fn(getattr(parent,self.output))
+            if self.next is not None: self.next( parent )
+        def remove(self,output: str,fn:callable)->'POU.outputchain':
+            if (self.fn == fn or id(self.fn)==fn) and self.output==output:
+                return self.next
+            if self.next is not None: self.next = self.next.remove(output,fn)
+            return self
+
     class var():
         @staticmethod
         def setup(attr: 'POU.var',__name:str, parent: 'POU', initial):
             attr._name = __name
             attr._member = f'_p_{__name}'
-            attr._join  = f'_join_{__name}'
             attr._touched=f'_touched_{__name}'
-            attr._bound  =f'_bound_{__name}'
             attr._value  = initial
             setattr(parent,attr._member,initial)
             setattr(parent,attr._touched,False)
-            setattr(parent,attr._bound,[])        
             setattr(type(parent),__name,attr)
+            if __name not in parent.__vars__: 
+                parent.__vars__.append(__name)
 
         def __init__(self, init_val, hidden:bool =False, persistent: bool = False,notify: bool = True):
             self._name = None
             self._member = None
-            self._join   = None
             self._touched= None
-            self._bound  = None
             self._value = init_val
             self._hidden = hidden
             self._persistent = persistent
             self._notify = notify
-
-        # def setup(self,obj,__name: str):
-        #     self._name = __name
-        #     self._member = '_'+__name
-        #     setattr(obj,self._member, self._value)
-        #     if hasattr(obj,'id') and obj.id is not None and self._persistent:
-        #         obj.__persistent__.append(__name)
-        #         found = False
-        #         for o in POU.__persistable__:
-        #             if o.id == obj.id:
-        #                 found = True
-        #                 break
-        #         if not found:
-        #             POU.__persistable__.append(obj)
 
         def __get__(self, obj, objtype=None):
             if obj is None:
@@ -124,6 +129,9 @@ class POU():
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
         self.full_id = id
+        self.__vars__ = []
+        self.__inputs__ = None
+        self.__outputs__= None
         self.__persistent__=[]
         self.__children__=[]
         if parent is not None: parent.__children__.append(self)
@@ -140,7 +148,7 @@ class POU():
         try:
             setattr(self,input,fn())
             p = getattr(self.__class__,input)
-            setattr(self,p._join,fn)
+            self.__inputs__ = POU.inputchain( p._member, fn, self.__inputs__)
         except Exception as e:
             raise RuntimeError(f'Error {e} in POU.join {self}.{input}')
 
@@ -149,14 +157,13 @@ class POU():
             return output.connect(self,__sink)
         try:
             p = getattr(self.__class__,output)
-            bound = getattr(self,p._bound)
         except:
             raise RuntimeError(f'Binding non-output {self}.{output}')
 
         try:
             __sink(getattr(self,output))        
-            bound.append( __sink )
             setattr(self,p._touched,True)
+            self.__outputs__ = POU.outputchain( p._member, __sink, self.__outputs__)
         except Exception as e:
             raise RuntimeError(f'Exception in POU.bind {e}, {self}.{output}')
         return id(__sink)
@@ -164,28 +171,15 @@ class POU():
     def unbind(self,__name,__sink = None):
         try:
             p = getattr(self.__class__,__name)
-            bound = getattr(self,p._bound)
         except:
             return
-        bound = list(filter( lambda x: ( id(x)!=__sink and x!=__sink and __sink is not None), bound ))
-        setattr(self,p._bound,bound)
+        if self.__outputs__ is not None: self.__outputs__ = self.__outputs__.remove(p._member,__sink)
 
     def __enter__(self):
-        for key in dir(self.__class__): 
-            v = getattr(self.__class__,key)
-            if isinstance( v,POU.var ):
-               if hasattr(self,v._join):
-                  setattr(self,v._member,getattr(self,v._join)( ))
+        if self.__inputs__ is not None: self.__inputs__( self )
 
     def __exit__(self, type, value, traceback):
-        for key in dir(self.__class__): 
-            p = getattr(self.__class__,key)
-            if isinstance( p,POU.var ):
-               if getattr(self,p._touched):
-                 val = getattr(self,p._member)
-                 for b in getattr(self,p._bound):
-                    b(val)                    
-                 setattr(self,p._touched,False)
+        if self.__outputs__ is not None: self.__outputs__(self)
 
     def overwrite(self,__input: str,__default = None):
         if __default is None:
@@ -219,7 +213,7 @@ class POU():
 
     def __data__(self):
         d = {}
-        for key in dir(type(self)):
+        for key in self.__vars__:
             try:
                 attr = getattr(type(self),key)
                 if isinstance(attr,POU.var) and not attr._hidden:
@@ -290,7 +284,7 @@ class POU():
     @staticmethod
     def init(fun):
         def pou_init(self,*args,id:str=None,**kwargs):
-            print(f'Depricated decorator POU.init applied to ({id})')
+            # print(f'Depricated decorator POU.init applied to ({id})')
             fun(self,*args,**kwargs)
 
         return pou_init

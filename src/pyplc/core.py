@@ -143,7 +143,9 @@ class PYPLC():
             self.ctx = ctx
         if simulator is not None: self.simulator = simulator
         if persist is not None: self.__persist = persist
-        if self.__persist is not None: NVD.restore(source = self.__persist)
+        if self.__persist is not None: 
+            NVD.restore(source = self.__persist)
+            NVD.mkinfo( )
     
     def idle(self):
         self.idleTime = (self.period - self.userTime)
