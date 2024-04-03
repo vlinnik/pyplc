@@ -10,6 +10,7 @@ try:
     import kraxio # доступно на micropython только
     from machine import Pin,ADC
     from at25640b import AT25640B
+    from pyplc.utils.nvd import NVD
 except:
     from .coupler import *  # если не не micropython-e => то режим coupler
     __target_krax = False
@@ -104,54 +105,6 @@ class Board():
 class Manager():
     """Управление настройками KRAX.IO - загрузка настроек и подготовка глобальных переменных plc,hw,posto,cli
     """
-    def ifconfig(self,dev):
-        try:
-            ipv4,mask,gw,_ = dev.ifconfig()
-            enabled = True
-        except:
-            ipv4,mask,gw = ('0.0.0.0','255.255.255.0','0.0.0.0')
-            enabled = False
-
-        conf = { 'ipv4': ipv4, 'mask': mask, 'gw' : gw , 'static':False , 'enabled': enabled}
-        try:
-            conf['essid'] = dev.config('essid')
-            conf['password'] = ''
-        except:
-            pass
-        return conf
-    
-    def ifup(self,dev,conf: dict):
-        enabled = conf['enabled'] if 'enabled' in conf else True
-        if not enabled:
-            dev.active(False)
-            return
-        ifname = conf['essid'] if 'essid' in conf else 'LAN'
-        print(f'Startup network interface {ifname}.',end='')
-        try:
-            if not dev.active():
-                dev.active(True)
-                while not dev.active():
-                    time.sleep(1)
-            static = conf['static'] if 'static' in conf else False
-            if static:
-                ipv4 = conf['ipv4']
-                mask = conf['mask']
-                gw = conf['gw']
-                dev.ifconfig( (ipv4,mask,gw,gw) )
-            if 'essid' in conf:
-                essid = conf['essid']
-                password = conf['pass']
-                try:
-                    dev.config(essid=essid,password=password)
-                    dev.config( authmode=(0 if len(password)<8 else 3) )
-                except:
-                    if len(essid)>0:
-                        dev.connect(essid,password)
-                
-            print('..OK')
-        except Exception as e:
-            print(f'..FAIL {e}')
-
     def __init__(self):
         self.conf = {'node_id': 1, 'layout': [], 'devs': [], 'AP' : True, 'STA' : True, 
                      'init' : { 'iface': 0, 'hostname' : 'krax'} }
@@ -166,9 +119,8 @@ class Manager():
             return False
 
     def __krax_init(self):
-        # global eth,sta,ap
         conf = self.conf
-        print('Init KRAX with init=',conf['init'])
+        print('\tЗапуск KRAX-IO с параметрами:',conf['init'])
         kraxio.init(conf['node_id'],**conf['init'])
         if Manager.__fexists('krax.dat'):
             with open('krax.dat', 'rb') as d:
@@ -178,14 +130,13 @@ class Manager():
         global cli, posto, plc, hw
         try:
             plc
-            print('Cleanup objects: cli/posto/plc')
+            print('\tОсвобождаем ресурсы: cli/posto/plc')
             if cli is not None: cli.term()
             if posto is not None: posto.term()
             del cli
             del posto
             del plc
         except Exception as e:
-            print('Exception in Manager.cleanup',e)
             pass
         kraxio.deinit( )
 
@@ -207,10 +158,10 @@ class Manager():
                 cli = CLI()  # simple telnet
                 posto = POSTO(port=9004)  # simple share data over tcp
             except Exception as e:
-                print(f'CLI/POSTO in use ({e}).')
+                print(f'\tCLI/POSTO порты заняты ({e}).')
                 cli = None
                 posto = None
-        plc = PYPLC(sum(slots), period=scanTime, krax=kraxio, pre=cli, post=posto)
+        plc = PYPLC(sum(slots), period=scanTime, krax=kraxio, pre=cli, post=[posto,NVD(board.eeprom)])
         hw = plc.state
         plc.connection = None 
         plc.cleanup = self.cleanup
@@ -250,9 +201,8 @@ class Manager():
                         sys.print_exception(e)
                         errs = errs+1
             gc.collect()
-            print(
-                f'Declared {vars} variable, have {errs} errors, {time.time()-startAt} secs')
-        plc.config(persist=AT25640B())
+            plc.config(persist=board.eeprom)
+            print(f'\tОбъявлено {vars} переменных, {errs} ошибок, запуск {time.time()-startAt} сек')
         self.__krax_init()
 
 

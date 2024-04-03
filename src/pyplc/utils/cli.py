@@ -20,8 +20,8 @@ class CLI(TCPServer):
     def connected(self,sock: BufferInOut):
         self.telnet = BufferOut( send = sock.client.send )
         sock.send(bytes([0xff, 0xfe, 0x26])) # iac dont authentication
-        sock.send(bytes([0xff, 0xfb, 0x03])) # iac will suppress go ahead
-        sock.send(bytes([0xff, 0xfb, 0x01])) # turn off local echo
+        # sock.send(bytes([0xff, 0xfb, 0x03])) # iac will suppress go ahead
+        # sock.send(bytes([0xff, 0xfb, 0x01])) # turn off local echo
         sock.send(b'>>> ')
         sock.tx.flush( )
         

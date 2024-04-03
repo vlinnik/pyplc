@@ -1,8 +1,9 @@
 from .channel import Channel
 from .pou import POU
 from io import IOBase
-import time,re,json,array
-import hashlib,struct,asyncio
+from pyplc.utils.nvd import NVD
+import time,re,array
+import asyncio
 
 class PYPLC():
     HAS_TICKS_MS = hasattr(time,'ticks_ms') #в micropython есть в python нет
@@ -57,10 +58,6 @@ class PYPLC():
             s.unbind( __notify )
 
     def __init__(self,io_size:int,krax=None,pre=None,post=None,period:int=100):
-        POU.__persistable__.clear( ) 
-        self.__dump__ = None    #текущий dump, который нужно сохранить
-        self.__backup_timeout__ = None #сохранение происходит с задержкой, чтобы увеличить срок службы EEPROM
-        self.persist = None
         if PYPLC.HAS_TICKS_MS:
             self.ms = time.ticks_ms 
             self.sleep = time.sleep_ms
@@ -68,7 +65,6 @@ class PYPLC():
         else:   
             self.ms = lambda: int(time.time_ns()/1000000)
             self.sleep = lambda x: time.sleep(x/1000)
-        self.has_eeprom = False
         self.scanTime = 0
         self.userTime = 0
         self.idleTime = 0
@@ -80,24 +76,15 @@ class PYPLC():
         self.period = period
         self.vars = {}
         self.state = self.__State(self)
-        self.kwds = {}
+        self.ctx = None
         self.simulator = False
         self.reader = None
         self.writer = None
         self.eventCycle = None
-        """
-        Всего 32 секции по 8 байт. 256 байт в начале eeprom. Каждая секция 
-        2 байта смещение в eeprom 
-        2 байта размер
-        4 байта порядковый номер. Порядковый номер % 32 === номер записи [0,31]
-        """
-        self.sect_n = 0 # номер секции, в которой будет сохранение persistent производиться. 
-        self.sect_off = 256 
-        # addr = 0
         if krax is not None:
             self.reader = krax.read_to
             self.writer = krax.write
-        
+        self.__persist = None
         self.data = array.array('B',[0x00]*io_size) #что писать
         self.mask = array.array('B',[0x00]*io_size) #бит из data писать только если бит=1
         self.dirty = memoryview(self.mask)          #оптимизация
@@ -143,52 +130,8 @@ class PYPLC():
     def write(self):
         self.sync(True)
         
-    def restore(self,off: int = None):
-        """Восстановить значение переменных из EEPROM
-
-        Args:
-            off (int, optional): Смещение в EEPROM по которому начинается снимок значений переменных. Defaults to None.
-
-        Raises:
-            f: 
-
-        Returns:
-            bool: True если удачно False иначе
-        """        
-        if not self.persist:
-            return False
-        
-        if off is not None:
-            self.persist.seek(off)
-        else:
-            self.sect_off = off
-            
-        try:
-            with open('persist.json','r') as f:
-                info = json.load(f)
-                
-            backup = POU.__persistable__    # объекты persistable
-            for i in info:  #info - список словарей, для каждого persistable объекта с указанием имени объекта, его свойств, sha1 хеша свойств и размера для сохранения
-                name = i['item']
-                size = i['size']
-                sha1 = i['sha1']
-                properties = i['properties']
-
-                so = list( filter( lambda x: x.full_id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
-                crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
-                if crc != sha1:
-                    raise f"sha1 digest properties list is invalid: {so.id}"
-                
-                data = self.persist.read(size)
-                so.from_bytearray( data, properties )
-        except Exception as e:
-            print(f'Cannot restore backup({e}). Section at {self.sect_off}')
-            return False
-        return True
-    
-    def config(self,simulator:bool=None,persist:IOBase = None,**kwds ):
-        if 'ctx' in kwds:
-            ctx = kwds['ctx']
+    def config(self,simulator:bool=None,ctx = None,persist = None, **kwds ):
+        if ctx is not None:
             for x in ctx:
                 var = ctx[x]
                 if isinstance(var,Channel):
@@ -197,106 +140,13 @@ class PYPLC():
                 elif isinstance(var,POU):
                     if var.id is None: var.id = x
                     var.persistent( )
-        self.kwds = kwds
+            self.ctx = ctx
         if simulator is not None: self.simulator = simulator
-        if persist is not None:
-            self.persist = persist
-        if self.persist and len(POU.__persistable__)>0: #восстановление & подготовка следующей резервной копии
-            persist = self.persist
-            if hasattr(persist,'chip_id'):
-                self.has_eeprom = True
-            info = [ ]
-            #eeprom в начале первые 256 байт - это информация о сохраненных переменных в формате смещение/размер/номер порядковый
-            persist.seek( 0 )
-            fat = persist.read( 256 )
-            last = ( 256,0,0 )
-            if len(fat)==256:
-                off = 0
-                while off<256:
-                    sect_off,sect_size,sect_n = struct.unpack_from('HHI',fat,off)
-                    if last[2]<=sect_n and sect_off!=0xFFFF and sect_off>=256 and sect_size<8192/2 and sect_size!=0x0 and (sect_n % 32) * 8 == off:
-                        last = (sect_off,sect_size,sect_n)
-                    off+=8
-                if last[1]>0:
-                    if self.restore( last[0] ):
-                        self.sect_n = last[2]+1
-                        self.sect_off = last[0]+last[1]
-                        self.persist.seek( self.sect_off )
-                    else:
-                        self.sect_n = last[2]
-                        self.sect_off = last[0]
-                        self.persist.seek( last[0] )
-            else:
-                self.sect_n = 0
-                self.sect_off = 256
-                persist.seek(self.sect_off)
-                                            
-            POU.__dirty__=False
-            info.clear()
-            total = 8   #заголовок записи 8 байт
-            for so in POU.__persistable__:
-                properties = so.__persistent__
-                sha1 = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(so.__persistent__).encode( ) ).digest( ))
-                size = len( so.to_bytearray( ) )
-                info.append( { 'item': so.full_id , 'properties': properties, 'sha1':sha1 , 'size': size  } )
-                total+=size
-
-            with open('persist.json','w+') as f:
-                json.dump(info,f)
-
-            print(f'Persistent memory restored size/num: {last[1]}/{last[2]}, now {total}/{self.sect_n} ')
-                    
-    def backup(self):  
-        if self.__dump__ is not None or self.persist is None:
-            return
-        buf = bytearray()
-        index = []
-        for so in POU.__persistable__:
-            if so.full_id in index:
-                raise Exception(f'POU id is not unique ({so.id}, {index})!')
-            index.append(so.full_id)
-            buf.extend( so.to_bytearray( ) )            
-        buf.extend(struct.pack('!q',len(buf)))  #последнее записанное = размер backup
-        self.__dump__ = buf
-        POU.__dirty__=False
-        print('Backup started...')
-    
-    def flush(self,timeout_ms:int = 10 ):       #сохранение persistable переменных теневое
-        if self.__dump__ is None or self.persist is None:
-            return
-        done = self.persist.tell() - self.sect_off   #где находимся, сколько уже сохранили
-        size = len(self.__dump__)
-        written = 0 #сколько записали за этот вызов
-        
-        now = time.time_ns( )
-        start_ts = now
-        end_ts = start_ts + timeout_ms*1000000
-            
-        while done<size and start_ts<=now and now<end_ts:
-            npage=min(32,size-done)
-            self.persist.write( self.__dump__[done:done+npage])
-            done+=npage
-            written+=npage
-            now = time.time_ns()
-            
-        if done>=size:
-            self.__dump__ = None                #все сохранили
-            self.persist.flush( )
-            if self.has_eeprom:
-                self.persist.seek( (self.sect_n % 32)*8 )
-                self.persist.write( struct.pack( "HHI", self.sect_off,done,self.sect_n ) )
-                self.sect_off += done
-                self.sect_n += 1
-                if self.sect_off + done>=8192:
-                    self.sect_off = 256
-                print(f'Persistent memory stat off/size/num: {self.sect_off}/{done}/{self.sect_n}')
-                self.persist.seek( self.sect_off )          
-        return written
+        if persist is not None: self.__persist = persist
+        if self.__persist is not None: NVD.restore(source = self.__persist)
     
     def idle(self):
         self.idleTime = (self.period - self.userTime)
-        if self.idleTime>0:
-            self.flush(self.idleTime)
 
         now = self.ms( )
         if self.__fts + self.period > now and self.eventCycle is None:
@@ -307,20 +157,11 @@ class PYPLC():
         if isinstance(self.pre,list):
             for pre in self.pre:
                 if callable(pre):
-                    pre(**self.kwds)
+                    pre( ctx=self.ctx )
         elif callable(self.pre):
-            self.pre( **self.kwds )
+            self.pre( ctx=self.ctx )
         if self.krax is not None :
             self.krax.master(1) #dummy krax exchange - only process messages 
-
-        if POU.__dirty__ and self.__backup_timeout__ is None and self.persist:
-            self.__backup_timeout__ = 5000     #5 сек
-            print('Backup scheduled after 5 sec')
-        elif self.__backup_timeout__ is not None:
-            self.__backup_timeout__-=self.scanTime
-            if self.__backup_timeout__<=0:
-                self.__backup_timeout__ = None
-                self.backup( )
 
         self.sync( False )
 
@@ -334,9 +175,9 @@ class PYPLC():
         if isinstance(self.post,list):
             for post in self.post:
                 if callable(post):
-                    post(**self.kwds)
+                    post(ctx=self.ctx)
         elif callable(self.post):
-            self.post( **self.kwds )
+            self.post( ctx=self.ctx )
         if self.krax is not None :
             self.krax.master(2) #krax exchange 
             
@@ -354,7 +195,7 @@ class PYPLC():
     def __exit__(self, type, value, traceback):
         self.end()
 
-    def __call__(self,**kwds):
+    def __call__(self,ctx=None):
         """python vs micropython: в micropython globals() общий как будто всюду, или как минимум из вызывающего контекста
         Пример в python (в микропитоне можно без этих ухищрений)
         with plc(ctx=globals()):
@@ -362,7 +203,8 @@ class PYPLC():
         Returns:
             PYPLC: себя
         """
-        self.kwds = kwds
+        if ctx is not None:
+            self.ctx = ctx
 
         return self
 
@@ -395,24 +237,6 @@ class PYPLC():
             channel.bind(remote.write)  #изменения канала ввода/вывода производит запись в Subscription
         #setattr(self.state,name,channel())
         return channel
-    def bind(self,__name:str,__notify: callable):
-        id = re.compile(r'S([0-9]+)C([0-9]+)')
-        try:
-            m = id.match(__name)
-            ch = self.slots[int(m.group(1))].channel(int(m.group(2)))
-            ch.bind( __notify )
-            if ch.rw:
-                return ch   #для записи 
-        except Exception as e:
-            print(f'PLC cant make bind item {__name}: {e}')
-    def unbind(self,__name:str,__notify: callable):
-        id = re.compile(r'S([0-9]+)C([0-9]+)')
-        try:
-            m = id.match(__name)
-            ch = self.slots[int(m.group(1))].channel(int(m.group(2)))
-            ch.unbind( __notify )
-        except Exception as e:
-            print(f'PLC cant make unbind item {__name}: {e}')
     def run(self,instances=None,**kwds ):
         if instances is not None: 
             self.instances = instances

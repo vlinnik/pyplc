@@ -1,4 +1,4 @@
-import struct
+import struct,time
 """
 Элемент программы с входами и выходами, которые можно присоединить к callable
 Пример:
@@ -90,7 +90,7 @@ class POU():
             id = '.'.join([ctx,self.id])
         self.full_id = id
         for o in POU.__persistable__:
-            if o.id == id:
+            if o.full_id == id or o==self:
                 found = True
                 break
         if not found and len(self.__persistent__)>0:
@@ -102,6 +102,8 @@ class POU():
                     o.id = name
             o.persistent(id)
         return not found
+    def log(self,*args,**kwds):
+        print(f'[{time.time_ns()}] #{self.full_id}:', *args, **kwds)
         
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
