@@ -174,7 +174,7 @@ class PYPLC():
                 sha1 = i['sha1']
                 properties = i['properties']
 
-                so = list( filter( lambda x: x.id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
+                so = list( filter( lambda x: x.full_id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
                 crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
                 if crc != sha1:
                     raise f"sha1 digest properties list is invalid: {so.id}"
@@ -206,6 +206,7 @@ class PYPLC():
             if hasattr(persist,'chip_id'):
                 self.has_eeprom = True
             info = [ ]
+            #eeprom в начале первые 256 байт - это информация о сохраненных переменных в формате смещение/размер/номер порядковый
             persist.seek( 0 )
             fat = persist.read( 256 )
             last = ( 256,0,0 )
@@ -225,8 +226,6 @@ class PYPLC():
                         self.sect_n = last[2]
                         self.sect_off = last[0]
                         self.persist.seek( last[0] )
-                print(f'restoring from section in persistent memory off/size/num: {last}')
-                print(f'now index at {(self.sect_n % 32)*8} section at {self.sect_off}')
             else:
                 self.sect_n = 0
                 self.sect_off = 256
@@ -234,14 +233,18 @@ class PYPLC():
                                             
             POU.__dirty__=False
             info.clear()
+            total = 8   #заголовок записи 8 байт
             for so in POU.__persistable__:
                 properties = so.__persistent__
                 sha1 = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(so.__persistent__).encode( ) ).digest( ))
                 size = len( so.to_bytearray( ) )
-                info.append( { 'item': so.id , 'properties': properties, 'sha1':sha1 , 'size': size  } )
+                info.append( { 'item': so.full_id , 'properties': properties, 'sha1':sha1 , 'size': size  } )
+                total+=size
 
             with open('persist.json','w+') as f:
                 json.dump(info,f)
+
+            print(f'Persistent memory restored size/num: {last[1]}/{last[2]}, now {total}/{self.sect_n} ')
                     
     def backup(self):  
         if self.__dump__ is not None or self.persist is None:
@@ -249,9 +252,9 @@ class PYPLC():
         buf = bytearray()
         index = []
         for so in POU.__persistable__:
-            if so.id in index:
+            if so.full_id in index:
                 raise Exception(f'POU id is not unique ({so.id}, {index})!')
-            index.append(so.id)
+            index.append(so.full_id)
             buf.extend( so.to_bytearray( ) )            
         buf.extend(struct.pack('!q',len(buf)))  #последнее записанное = размер backup
         self.__dump__ = buf
@@ -280,14 +283,13 @@ class PYPLC():
             self.__dump__ = None                #все сохранили
             self.persist.flush( )
             if self.has_eeprom:
-                print(f'writing index at {(self.sect_n % 32)*8} section at {self.sect_off}')
                 self.persist.seek( (self.sect_n % 32)*8 )
                 self.persist.write( struct.pack( "HHI", self.sect_off,done,self.sect_n ) )
                 self.sect_off += done
                 self.sect_n += 1
                 if self.sect_off + done>=8192:
                     self.sect_off = 256
-                print(f'next index at {(self.sect_n % 32)*8} section at {self.sect_off}')
+                print(f'Persistent memory stat off/size/num: {self.sect_off}/{done}/{self.sect_n}')
                 self.persist.seek( self.sect_off )          
         return written
     

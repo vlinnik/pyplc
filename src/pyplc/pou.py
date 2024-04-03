@@ -88,6 +88,7 @@ class POU():
         id = self.id
         if ctx is not None:
             id = '.'.join([ctx,self.id])
+        self.full_id = id
         for o in POU.__persistable__:
             if o.id == id:
                 found = True
@@ -104,6 +105,7 @@ class POU():
         
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
+        self.full_id = id
         self.__persistent__=[]
         self.__children__=[]
         if parent is not None: parent.__children__.append(self)
