@@ -5,10 +5,10 @@ class RTRIG(POU):
     clk = POU.input(False)
     q = POU.output(False)
     @POU.init
-    def __init__(self,clk=None,value=None,q=False,out=None) -> None:
+    def __init__(self,clk:bool=False,q:bool=False) -> None:
         super().__init__( )
-        self.__clk = clk
-        self.clk = clk
+        self.clk = clk  #clk может быть callable
+        self.__clk = self.clk # результат отличается от того что выше
         self.q = q
 
     def __call__(self, clk=None) :
@@ -23,10 +23,10 @@ class FTRIG(POU):
     clk = POU.input(False)
     q = POU.output(False)
     @POU.init
-    def __init__(self,clk=False,q=False) -> None:
+    def __init__(self,clk:bool=False,q:bool=False) -> None:
         super().__init__( )
-        self.__clk = clk
         self.clk = clk
+        self.__clk = self.clk
         self.q = q
 
     def __call__(self,clk = None):
@@ -41,10 +41,10 @@ class TRIG(POU):
     clk = POU.input(False)
     q = POU.output(False)
     @POU.init
-    def __init__(self,clk=False,q=False) -> None:
+    def __init__(self,clk:bool=False,q:bool=False) -> None:
         super().__init__( )
-        self.__clk = clk
         self.clk = clk
+        self.__clk = self.clk
         self.q = q
 
     def __call__(self,clk = None):
@@ -66,8 +66,8 @@ class TRANS(POU):
     @POU.init
     def __init__(self,clk=False,q=False,value=None,mode = RAISING_EDGE | FALLING_EDGE) -> None:
         super().__init__()
-        self.__clk = clk
         self.clk = clk
+        self.__clk = self.clk
         self.q = q
         self.value = value
         self.out = value

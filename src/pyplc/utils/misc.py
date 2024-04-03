@@ -83,12 +83,12 @@ class TOF(SFC):
     q   = POU.output(False)
     et  = POU.output( 0 )
     @POU.init
-    def __init__(self, clk: bool = False, pt: int = 1000):
+    def __init__(self, clk: bool = False, q: bool=False, et: int = 0, pt: int = 1000):
         super().__init__( )
         self.clk = clk
         self.pt = pt
-        self.q = False
-        self.et = 0
+        self.q = q
+        self.et = et
 
     @sfcaction
     def main(self):
@@ -118,12 +118,12 @@ class BLINK(SFC):
     t_off= POU.input(1000)
     q = POU.output(False)
     @POU.init
-    def __init__(self, enable=False, t_on: int = 1000, t_off: int = 1000):
+    def __init__(self, enable=False, q=False, t_on: int = 1000, t_off: int = 1000):
         super().__init__( )
         self.enable = enable
         self.t_on = t_on
         self.t_off = t_off
-        self.q = False
+        self.q = q
 
     @sfcaction
     def main(self):
