@@ -18,7 +18,7 @@ class SR(POU):
         super().__init__( )
         self.set = set
         self.reset = reset 
-        self.__reset = reset
+        self.__reset = self.reset
         self.q = q
 
     def unset(self):
@@ -52,7 +52,7 @@ class RS(POU):
         super().__init__( )
         self.set = set
         self.reset = reset 
-        self.__set   = set
+        self.__set   = self.set
         self.q = q
 
     def unset(self):

@@ -155,6 +155,7 @@ class PYPLC():
             self.sleep(self.__fts + self.period - now )
         
     def begin(self):
+        POU.NOW = time.time_ns( )
         self.__fts = self.ms( )
         if isinstance(self.pre,list):
             for pre in self.pre:
@@ -213,17 +214,14 @@ class PYPLC():
     def scan(self):
         with self:
             if not self.simulator:
-                i = 0
-                while i<len(self.instances):
-                    if type(self.results[i])==PYPLC.GENERATOR_TYPE:
+                for i in self.instances:
+                    if type(i[1])==PYPLC.GENERATOR_TYPE:
                         try:
-                            next(self.results[i])
+                            next(i[1])
                         except StopIteration:
-                            self.results[i] = None
+                            i[1] = None
                     else:
-                        self.results[i] = self.instances[i]( )
-                        if type(self.results[i])==PYPLC.GENERATOR_TYPE:i-=1
-                    i+=1
+                        i[1] = i[0]( )
     
     def declare(self,channel: Channel, name: str = None):
         if not name:
@@ -241,8 +239,7 @@ class PYPLC():
         return channel
     def run(self,instances=None,**kwds ):
         if instances is not None: 
-            self.instances = instances
-            self.results = [None]*len(instances)
+            self.instances = [ [i,None] for i in instances]
         self.config( **kwds )
         try:
             while True:
@@ -261,8 +258,7 @@ class PYPLC():
         coros = list(filter( lambda item: not callable(item), instances ))
         non_coros = list(filter( lambda item: callable(item), instances ))
         self.eventCycle = asyncio.Event( )
-        self.instances = non_coros
-        self.results = [None]*len(non_coros)
+        self.instances = [ [i,None] for i in non_coros]
 
         _ = [ asyncio.create_task( c ) for c in coros ]
         have_ms = hasattr(asyncio,'sleep_ms')

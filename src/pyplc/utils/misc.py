@@ -75,39 +75,44 @@ class TON(SFC):
             self.call() 
         return self.q
 
-
-# @sfc(inputs=['clk', 'pt'], outputs=['q', 'et'])
 class TOF(SFC):
     clk = POU.input(False)
     pt  = POU.input(1000)
     q   = POU.output(False)
     et  = POU.output( 0 )
-    @POU.init
-    def __init__(self, clk: bool = False, q: bool=False, et: int = 0, pt: int = 1000):
-        super().__init__( )
+    def __init__(self, clk: bool = False, q: bool=False, et: int = 0, pt: int = 1000,id=None,parent=None):
+        super().__init__( id,parent )
         self.clk = clk
         self.pt = pt
         self.q = q
         self.et = et
+        self.__ns = self.pt * 1000000
+        self.bind( 'pt', self.on_update_pt)
+    
+    def on_update_pt(self,ms: int ):
+        self.__ns = ms*1000000
 
-    @sfcaction
     def main(self):
         while True:
             self.et = 0
             for x in self.till(lambda: self.clk):
                 self.q = self.clk
                 yield x
-            begin = self.T
-            for x in self.until(lambda: self.clk):
-                self.et = self.T - begin
-                self.q = self.et <= self.pt and self.q
-                yield x
+            begin = POU.NOW
+            for _ in self.until(lambda: self.clk):
+                self.et = POU.NOW - begin
+                self.q = self.et <= self.__ns and self.q
+                yield
 
     def __call__(self,clk: bool = None, pt: int = None):
         with self:
             self.overwrite('clk',clk)
             self.overwrite('pt', pt)
-            self.call()
+            if self.sfc_main is  None: self.sfc_main = self.main( )
+            try:
+                next(self.sfc_main)
+            except StopIteration:
+                self.sfc_main = None
         return self.q
 
 

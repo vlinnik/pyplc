@@ -10,8 +10,8 @@ class SFC(POU):
     TIME_NOW = None   #время 
     STEP = type((lambda: (yield))())
     
-    def __init__(self) -> None:
-        super().__init__( )
+    def __init__(self,id:str = None, parent:POU = None) -> None:
+        super().__init__( id=id,parent=parent )
 
         if SFC.HAS_TICKS_MS is None:
             SFC.HAS_TICKS_MS = hasattr(time, 'ticks_ms')

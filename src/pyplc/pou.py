@@ -10,48 +10,49 @@ x = Trig( )
 """
 
 class POU():
+    NOW = time.time_ns( )   #момент начала цикла
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
 
-    class inputchain():
-        def __init__(self, input:str, fn: callable,next:'POU.inputchain') -> None:
-            self.input = input
-            self.fn = fn
-            self.next = next
-        def __call__(self,parent: 'POU'):
-            setattr(parent,self.input,self.fn())
-            if self.next is not None: self.next( parent )
-    class outputchain():
-        def __init__(self, output:str, fn: callable,next:'POU.outputchain') -> None:
-            self.output = output
-            self.fn = fn
-            self.next = next
-        def __call__(self,parent: 'POU'):
-            self.fn(getattr(parent,self.output))
-            if self.next is not None: self.next( parent )
-        def remove(self,output: str,fn:callable)->'POU.outputchain':
-            if (self.fn == fn or id(self.fn)==fn) and self.output==output:
-                return self.next
-            if self.next is not None: self.next = self.next.remove(output,fn)
-            return self
+    # class inputchain():
+    #     def __init__(self, input:str, fn: callable,next:'POU.inputchain') -> None:
+    #         self.input = input
+    #         self.fn = fn
+    #         self.next = next
+    #     def __call__(self,parent: 'POU'):
+    #         setattr(parent,self.input,self.fn())
+    #         if self.next is not None: self.next( parent )
+    # class outputchain():
+    #     def __init__(self, output:str, fn: callable,next:'POU.outputchain') -> None:
+    #         self.output = output
+    #         self.fn = fn
+    #         self.next = next
+    #     def __call__(self,parent: 'POU'):
+    #         self.fn(getattr(parent,self.output))
+    #         if self.next is not None: self.next( parent )
+    #     def remove(self,output: str,fn:callable)->'POU.outputchain':
+    #         if (self.fn == fn or id(self.fn)==fn) and self.output==output:
+    #             return self.next
+    #         if self.next is not None: self.next = self.next.remove(output,fn)
+    #         return self
 
     class var():
         @staticmethod
         def setup(attr: 'POU.var',__name:str, parent: 'POU', initial):
             attr._name = __name
-            attr._member = f'_p_{__name}'
-            attr._touched=f'_touched_{__name}'
             attr._value  = initial
-            setattr(parent,attr._member,initial)
-            setattr(parent,attr._touched,False)
             setattr(type(parent),__name,attr)
-            if __name not in parent.__vars__: 
+            if __name not in parent.__vars__:
+                attr._index = len(parent.__vars__)
                 parent.__vars__.append(__name)
+                parent.__values__.append(initial)
+                parent.__inputs__.append(None)
+                parent.__outputs__.append([])
+                parent.__touched__.append(False)
 
         def __init__(self, init_val, hidden:bool =False, persistent: bool = False,notify: bool = True):
+            self._index = None
             self._name = None
-            self._member = None
-            self._touched= None
             self._value = init_val
             self._hidden = hidden
             self._persistent = persistent
@@ -60,15 +61,14 @@ class POU():
         def __get__(self, obj, objtype=None):
             if obj is None:
                 return self
-            return getattr(obj,self._member)       
+            return obj.__values__[self._index]
              
         def __set__(self,obj,value):
-            if getattr(obj,self._member)!=value:
+            if obj.__values__[self._index]!=value:
                 if self._persistent: POU.__dirty__ = True
+                if self._notify: obj.__touched__[self._index]=True
 
-            if self._notify: setattr(obj,self._touched,True)
-
-            setattr(obj,self._member,value)
+            obj.__values__[self._index] = value
 
     class input(var):
         def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
@@ -79,27 +79,21 @@ class POU():
                 obj.join(self._name,value)
                 return
 
-            _value = super().__get__(obj)
             super().__set__(obj,value)
-            if _value!=value:           #оповещение только при изменении
-                setattr(obj,self._touched,True)
         
         def connect(self,obj,source):
             obj.join( self._name, source)     
                         
     class output(var):
         def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
-            super().__init__(init_val, hidden=hidden, persistent=persistent)
+            super().__init__(init_val, hidden=hidden, persistent=persistent,notify=True)
         
         def __set__(self,obj,value):
             if callable(value):
                 obj.bind(self._name,value)
                 return
 
-            _value = super().__get__(obj)
             super().__set__(obj,value)
-            if _value!=value:           #оповещение только при изменении
-                setattr(obj,self._touched,True)
 
         def connect(self,obj,target:callable):
             return obj.bind(self._name,target)
@@ -129,9 +123,11 @@ class POU():
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
         self.full_id = id
-        self.__vars__ = []
-        self.__inputs__ = None
-        self.__outputs__= None
+        self.__vars__   = []
+        self.__values__ = []
+        self.__inputs__ = []
+        self.__outputs__= []
+        self.__touched__= []
         self.__persistent__=[]
         self.__children__=[]
         if parent is not None: parent.__children__.append(self)
@@ -142,13 +138,14 @@ class POU():
                 if p._persistent: self.__persistent__.append(key)
                 POU.var.setup(p,key,self,p._value)
 
+
     def join(self, input: str | input, fn: callable):
         if isinstance(input,POU.input):
             return input.connect(self,fn)
         try:
-            setattr(self,input,fn())
+            setattr(self,input,fn())         # начальное значение + проверка работоспособности fn
             p = getattr(self.__class__,input)
-            self.__inputs__ = POU.inputchain( p._member, fn, self.__inputs__)
+            self.__inputs__[p._index] = fn
         except Exception as e:
             raise RuntimeError(f'Error {e} in POU.join {self}.{input}')
 
@@ -162,29 +159,42 @@ class POU():
 
         try:
             __sink(getattr(self,output))        
-            setattr(self,p._touched,True)
-            self.__outputs__ = POU.outputchain( p._member, __sink, self.__outputs__)
+            self.__outputs__[p._index].append( __sink )
         except Exception as e:
             raise RuntimeError(f'Exception in POU.bind {e}, {self}.{output}')
         return id(__sink)
 
     def unbind(self,__name,__sink = None):
-        try:
-            p = getattr(self.__class__,__name)
-        except:
-            return
-        if self.__outputs__ is not None: self.__outputs__ = self.__outputs__.remove(p._member,__sink)
+        if isinstance(__name,POU.var):
+            p = __name
+        else:
+            try:
+                p = getattr(self.__class__,__name)
+            except:
+                return
+        self.__outputs__[p._index] = list(filter( lambda i : __sink!=None and i!=__sink and id(i)!=__sink ,self.__outputs__[p._index] ))
 
     def __enter__(self):
-        if self.__inputs__ is not None: self.__inputs__( self )
+        i = 0
+        for f in self.__inputs__:
+            if f is not None: self.__values__[ i ] = f( )
+            i+=1
 
     def __exit__(self, type, value, traceback):
-        if self.__outputs__ is not None: self.__outputs__(self)
+        i = 0
+        for o in self.__outputs__:
+            if self.__touched__[i]:
+                self.__touched__[i]=False
+                value = self.__values__[i]
+                for f in o:
+                    f(value)
+            i+=1
+
+
 
     def overwrite(self,__input: str,__default = None):
         if __default is None:
-            if hasattr(self,__input):
-                return getattr(self,__input)
+            return getattr(self,__input)
         else:
             setattr(self,__input,__default)
                 

@@ -15,8 +15,8 @@ class MOVE(POU):
             
     def __call__(self,en=None,i=None):  #если при вызове en и i не указать, то POU.Instance.__call__ обновит self.en/self.i. Иначе en/i получат значения по умолчанию без обновления свойств
         with self:
-            self.overwrite('en',en)
-            self.overwrite('i',i)
+            en= self.overwrite('en',en)
+            i = self.overwrite('i',i)
             if self.en:
                 self.q=i
             try:
@@ -24,10 +24,14 @@ class MOVE(POU):
             except:
                 pass
 
-x = MOVE( )
+x = MOVE(  )
 y = MOVE(en=lambda: True,q = print )
 x.join(MOVE.en,lambda: False)
 x.bind(MOVE.q,print)
+#x.unbind(MOVE.q,print)
 
 x( i = 14   )
+x( i = 15 )
+x( en = True )
+
 y( i = 3.14 )
