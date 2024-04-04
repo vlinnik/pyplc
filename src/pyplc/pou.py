@@ -10,31 +10,10 @@ x = Trig( )
 """
 
 class POU():
-    NOW = time.time_ns( )   #момент начала цикла
+    EPOCH=time.time_ns( )
+    NOW  =time.time_ns( )   #момент начала цикла
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
-
-    # class inputchain():
-    #     def __init__(self, input:str, fn: callable,next:'POU.inputchain') -> None:
-    #         self.input = input
-    #         self.fn = fn
-    #         self.next = next
-    #     def __call__(self,parent: 'POU'):
-    #         setattr(parent,self.input,self.fn())
-    #         if self.next is not None: self.next( parent )
-    # class outputchain():
-    #     def __init__(self, output:str, fn: callable,next:'POU.outputchain') -> None:
-    #         self.output = output
-    #         self.fn = fn
-    #         self.next = next
-    #     def __call__(self,parent: 'POU'):
-    #         self.fn(getattr(parent,self.output))
-    #         if self.next is not None: self.next( parent )
-    #     def remove(self,output: str,fn:callable)->'POU.outputchain':
-    #         if (self.fn == fn or id(self.fn)==fn) and self.output==output:
-    #             return self.next
-    #         if self.next is not None: self.next = self.next.remove(output,fn)
-    #         return self
 
     class var():
         @staticmethod
@@ -118,7 +97,7 @@ class POU():
             o.persistent(id)
         return not found
     def log(self,*args,**kwds):
-        print(f'[{time.time_ns()}] #{self.full_id}:', *args, **kwds)
+        print(f'[{(POU.NOW-POU.EPOCH)}] #{self.full_id}:', *args, **kwds)
         
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id

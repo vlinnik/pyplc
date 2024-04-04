@@ -148,15 +148,16 @@ class PYPLC():
             NVD.mkinfo( )
     
     def idle(self):
-        self.idleTime = (self.period - self.userTime)
-
-        now = self.ms( )
-        if self.__fts + self.period > now and self.eventCycle is None:
-            self.sleep(self.__fts + self.period - now )
-        
-    def begin(self):
+        self.idleTime = self.period - self.userTime
+        if self.idleTime>0:
+            if self.eventCycle is None: self.sleep(self.idleTime)
+            self.scanTime = self.period
+        else:
+            self.scanTime = self.period-self.idleTime
+            self.overRun = -self.idleTime
+            
+    def __enter__(self):
         POU.NOW = time.time_ns( )
-        self.__fts = self.ms( )
         if isinstance(self.pre,list):
             for pre in self.pre:
                 if callable(pre):
@@ -165,14 +166,9 @@ class PYPLC():
             self.pre( ctx=self.ctx )
         if self.krax is not None :
             self.krax.master(1) #dummy krax exchange - only process messages 
-
         self.sync( False )
 
-        self.__ts = self.ms()
-    def end(self):
-        now = self.ms( )
-        if now>self.__ts:
-            self.userTime = (now - self.__ts)
+    def __exit__(self, type, value, traceback):
         self.sync(True)
 
         if isinstance(self.post,list):
@@ -184,19 +180,8 @@ class PYPLC():
         if self.krax is not None :
             self.krax.master(2) #krax exchange 
             
+        self.userTime = int((time.time_ns( ) - POU.NOW)/1000000)
         self.idle( )
-        
-        now = self.ms( )
-        if self.__fts<now:
-            self.scanTime = (now - self.__fts)
-        if self.scanTime>self.period+self.overRun:
-            self.overRun = self.scanTime - self.period
-    
-    def __enter__(self):
-        self.begin( )
-
-    def __exit__(self, type, value, traceback):
-        self.end()
 
     def __call__(self,ctx=None):
         """python vs micropython: в micropython globals() общий как будто всюду, или как минимум из вызывающего контекста
@@ -235,7 +220,6 @@ class PYPLC():
             else:
                 remote.bind( channel.force )
             channel.bind(remote.write)  #изменения канала ввода/вывода производит запись в Subscription
-        #setattr(self.state,name,channel())
         return channel
     def run(self,instances=None,**kwds ):
         if instances is not None: 

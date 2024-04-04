@@ -1,4 +1,4 @@
-from kx.config import *
+from pyplc.config import plc,hw
 from pyplc.channel import QWord
 # если в io.csv нет, то можно ниже объявить переменные IO
 # from pyplc.channel import QBool,IBool
@@ -11,5 +11,4 @@ OUT = QWord.at('%QW0')
 def demo():
     hw.OUT = (OUT + 10) % 0xFFFF
 
-plc.config( ctx=globals() )
 plc.run( instances=[ demo ], ctx=globals() )

@@ -1,54 +1,47 @@
+from pyplc.pou import POU
 from pyplc.sfc import *
+from pyplc.core import PYPLC
 import time
 
 class Logic(SFC):
-    def __init__(self,clk = False) -> None:
-        super().__init__()
+    def __init__(self, clk:bool = False, id: str = None, parent: POU = None) -> None:
+        super().__init__(id, parent)
         self.clk = clk
         
-# @sfc(inputs=['clk','pt'],outputs=['q'])
 class TON(Logic):
     clk = POU.input( False )
     pt = POU.input( 1000 )
-    @POU.init
-    def __init__(self,clk:bool=False,pt:int=1000,q:bool=False):
-        super().__init__(clk=clk)
+
+    def __init__(self, clk: bool = False, pt: int = 1000, q: bool = False, id: str = None, parent: POU = None) -> None:
+        super().__init__(clk, id, parent)
         self.pt = pt
         self.q = q
     
-    @sfcaction
     def timeout500ms(self):
-        for x in self.pause(500,step='timeout'):
-            self.log(f'timeout {self.T}')
-            yield x
+        self.log(f'timeout {self.T}')
+        yield from self.pause(500,step='timeout 500 ms')
     
-    @sfcaction
     def dump(self,period: int):
         while True:
-            for x in self.pause(period):
-                yield x
-            self.log(f'dump: {self.sfc}')
+            self.log(f'dump: {self}')
+            yield from self.pause(period)
 
-    @sfcaction
     def main(self) :
-        for x in self.until(self.false,min=1,max=2,step='heatup'):
-            self.log('heatup')
-            yield True
-        for x in self.until(lambda : self.clk):
-            self.log('wait for clk')
-            yield True
-        for x in self.till(lambda: self.clk ,max=self.pt):
-            self.log('delay')
-            yield True
+        self.log('heatup')
+        yield from self.until(self.false,min=1000,max=2000,step='heatup')
+
+        self.log('wait for clk')
+        yield from self.until(lambda : self.clk)
+
+        self.log('delay')
+        yield from self.till(lambda: self.clk ,max=self.pt)
             
-        for x in self.action(self.timeout500ms).wait:
-            yield x
+        yield from self.action(self.timeout500ms)
 
         if self.clk:
             self.q = True
-            for x in self.till(lambda: self.clk):
-                self.log('wait for clk set low')
-                yield True
+            self.log('wait for clk set low')
+            yield from self.till(lambda: self.clk)
             self.q = False
             
     def __call__(self, clk: bool = None, pt: int = None):
@@ -60,19 +53,8 @@ class TON(Logic):
             
         return self.q
 
-x = TON(clk=lambda: True, pt=3000 )
+x = TON(clk=lambda: True, pt=3000, q=print )
+dump = x.exec(x.dump( 1000 ))
 
-dump = x.exec(x.dump( 100 ))
-
-cycle = 0 
-start_ts = time.time_ns()
-while not x.q:
-    x(  )
-    cycle+=1
-    if cycle==20:
-        dump.close( )
-    time.sleep(0.1)
-end_ts = time.time_ns()
-print(f'{(end_ts-start_ts)/cycle/1000000} ms/call')
-
-print(f'ok: {x()}')
+plc = PYPLC(0)
+plc.run(instances=[x],ctx=globals())
