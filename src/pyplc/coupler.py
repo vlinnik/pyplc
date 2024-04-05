@@ -113,7 +113,14 @@ class Board():
             return self.__storage
         
         #normal file
-        self.__storage = open('persist.dat','r+b')
+        try:
+            self.__storage = open('persist.dat','r+b')
+        except FileNotFoundError:
+            with open('persist.dat','w+b') as f:
+                f.write(bytearray(256))
+            self.__storage = open('persist.dat','r+b')
+            self.__storage.seek(0)
+
         return self.__storage
     
     @property
@@ -133,7 +140,21 @@ class Manager():
             return True
         except OSError:
             return False
-          
+
+    def cleanup(self):
+        global cli, posto, plc, hw
+        try:
+            plc
+            print('\tОсвобождаем ресурсы: cli/posto/plc')
+            if cli is not None: cli.term()
+            if posto is not None: posto.term()
+            del cli
+            del posto
+            del plc
+            board.eeprom.close()
+        except Exception as e:
+            pass
+
     def load(self):
         global plc,hw
         """Загрузка файла krax.json и krax.csv
@@ -157,7 +178,7 @@ class Manager():
             plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc,NVD(board.eeprom)]  )
             plc.connection = __plc
         else:
-            plc = PYPLC( sum(slots), period = scanTime, pre = [cli] ,post = [posto]  )
+            plc = PYPLC( sum(slots), period = scanTime, pre = [cli] ,post = [posto,NVD(board.eeprom)]  )
             hw = plc.state
             plc.connection = None
         
@@ -192,6 +213,7 @@ class Manager():
                         errs = errs+1
             print(f'\tОбъявлено {vars} переменных, {errs} ошибок')
             plc.config(persist=board.eeprom)
+            plc.cleanup = self.cleanup
             if ipv4!='0.0.0.0':
                 __plc.connect()
         return plc,hw
