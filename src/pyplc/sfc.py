@@ -26,15 +26,16 @@ class SFC(POU):
     def true():
         return True
                         
-    @property
-    def T(self):
-        return POU.NOW - self.born
+    # @property
+    # def T(self):
+    #     self.log('SFC.T нужно убрать')
+    #     return POU.NOW - self.born
     
     @staticmethod
     def isgenerator(x):
         return isinstance(x, SFC.STEP)
     
-    def pause(self, T: int, step: str = None, ):
+    def pause(self, T: int, step: str = None, n=[]):
         """Пауза в программе на T мсек.
 
         Пример использования: 
@@ -46,34 +47,38 @@ class SFC(POU):
         """
         if step is not None:
             self.sfc_step = step
-        T = POU.NOW + T*1000000 #convert ms->ns
+        T = POU.NOW + int(T*1000000) #convert ms->ns
         while POU.NOW<T and not self.sfc_continue:
+            for _ in n: _(True)
             yield
+        for _ in n: _(False)
         self.sfc_continue = False
 
-    def till(self, cond, min=None, max=None, step=None, enter=None, exit=None):
+    def till(self, cond:callable, min:int=None, max:int=None, step:str=None, enter:callable=None, exit:callable=None, n=[]):
         """Выполнять пока выполняется условие
         """
 
         if step is not None: self.sfc_step = f'{step}'
         
         if min is not None:
-            min = POU.NOW + min*1000000
+            min = POU.NOW + int(min*1000000)
         if max is not None:
-            max = POU.NOW + max*1000000
+            max = POU.NOW + int(max*1000000)
 
         if callable(enter):
             enter()
 
         while not self.sfc_reset and ((min is not None and self.time() < min) or cond()) and (max is None or self.time()<max):
+            for _ in n: _(True)
             yield
+        for _ in n: _(False)
         if callable(exit):
             exit()
 
-    def until(self, cond, min=None, max=None, step=None, enter=None, exit=None):
+    def until(self, cond:callable, min:int=None, max:int=None, step:str=None, enter:callable=None, exit:callable=None, n=[]):
         """Выполнять пока не выполнится условие
         """
-        yield from self.till(lambda: not cond(), min=min, max=max, step=step, enter=enter, exit=exit)
+        yield from self.till(lambda: not cond(), min=min, max=max, step=step, enter=enter, exit=exit, n = n)
 
     def main(self):
         raise RuntimeError("SFC.main должен быть реализован")

@@ -12,6 +12,7 @@ x = Trig( )
 class POU():
     EPOCH=time.time_ns( )
     NOW  =time.time_ns( )   #момент начала цикла
+    NOW_MS=int(NOW/1000000) #в мсек
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
 

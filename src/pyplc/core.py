@@ -158,6 +158,7 @@ class PYPLC():
             
     def __enter__(self):
         POU.NOW = time.time_ns( )
+        POU.NOW_MS = int(POU.NOW/1000000)
         if isinstance(self.pre,list):
             for pre in self.pre:
                 if callable(pre):

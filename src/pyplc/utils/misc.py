@@ -62,11 +62,11 @@ class TON(SFC):
         for x in self.until(lambda: self.clk):
             self.q = False
             yield x
-        begin = self.T
-        for x in self.till(lambda: self.clk):
-            self.et = self.T - begin
+        begin = POU.NOW_MS
+        for _ in self.till(lambda: self.clk):
+            self.et = POU.NOW_MS - begin
             self.q = self.et >= self.pt
-            yield x
+            yield 
 
     def __call__(self,clk: bool = None, pt: int = None):
         with self:
@@ -85,12 +85,7 @@ class TOF(SFC):
         self.clk = clk
         self.pt = pt
         self.q = q
-        self.et = et
-        self.__ns = self.pt * 1000000
-        self.bind( 'pt', self.on_update_pt)
-    
-    def on_update_pt(self,ms: int ):
-        self.__ns = ms*1000000
+        self.et = et    
 
     def main(self):
         while True:
@@ -98,10 +93,10 @@ class TOF(SFC):
             for x in self.till(lambda: self.clk):
                 self.q = self.clk
                 yield x
-            begin = POU.NOW
+            begin = POU.NOW_MS
             for _ in self.until(lambda: self.clk):
-                self.et = POU.NOW - begin
-                self.q = self.et <= self.__ns and self.q
+                self.et = POU.NOW_MS - begin
+                self.q = self.et <= self.pt and self.q
                 yield
 
     def __call__(self,clk: bool = None, pt: int = None):
