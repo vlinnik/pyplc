@@ -10,8 +10,8 @@ class Stopwatch(SFC):
     pt      = POU.input(1000)
     reset   = POU.input(False)
     q       = POU.output(False)
-    def __init__(self, clk:bool=False,q:bool = False, pt:int=1000, reset:bool=False):
-        super().__init__()
+    def __init__(self, clk:bool=False,q:bool = False, pt:int=1000, reset:bool=False,id:str =None,parent: POU =None):
+        super().__init__( id,parent )
         self.reset = reset
         self.clk = clk
         self.pt = pt
@@ -49,7 +49,7 @@ class TON(SFC):
     q   = POU.output(False)
     et  = POU.output( 0 )
     def __init__(self, clk: bool = False, q: bool=False, et:int=0, pt: int = 1000,id:str =None,parent: POU =None):
-        super().__init__( )
+        super().__init__( id,parent )
         self.clk = clk
         self.pt = pt
         self.q = q
@@ -115,7 +115,7 @@ class BLINK(SFC):
     t_off= POU.input(1000)
     q = POU.output(False)
     def __init__(self, enable:bool=False, q:bool=False, t_on: int = 1000, t_off: int = 1000,id:str =None,parent: POU =None):
-        super().__init__( )
+        super().__init__( id,parent )
         self.enable = enable
         self.t_on = t_on
         self.t_off = t_off
@@ -146,7 +146,7 @@ class TP(SFC):
     t_off=POU.input(0)
     q = POU.output(False)
     def __init__(self, clk=False, t_on: int = 1000, t_off: int = 0, q:bool = False,id:str =None,parent: POU =None):
-        super().__init__()
+        super().__init__( id,parent )
         self.clk = clk
         self.t_on = t_on
         self.t_off = t_off

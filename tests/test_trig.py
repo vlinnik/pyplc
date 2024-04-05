@@ -1,4 +1,5 @@
-from pyplc.utils.trig import RTRIG,FTRIG,TRIG,TRANS
+from pyplc.utils.trig import RTRIG,FTRIG,TRIG
+from pyplc.core import PYPLC
 import time
 
 test = 0
@@ -15,13 +16,20 @@ def get_clk():
 
 x = FTRIG( clk = get_clk, q=False )
 result_check = result_ftrig
-print(x)
 
-begin_ts = time.time_ns()
-while test<len(result_check):
-    if x()!=result_check[test]:
-        print(f'FAIL {test}: {x}')
-        break
-    test+=1
-end_ts = time.time_ns()
-print(f'{(end_ts-begin_ts)/1000000} ms')
+def test_trig():
+    global result_check,test
+    begin_ts = time.time_ns()
+    while test<len(result_check):
+        if x()!=result_check[test]:
+            print(f'FAIL {test}: {x}')
+            break
+        test+=1
+        yield
+    end_ts = time.time_ns()
+    print(f'{(end_ts-begin_ts)/1000000} ms')
+    raise KeyboardInterrupt
+
+plc = PYPLC(0,period=0)
+plc.run(instances=[test_trig],ctx=globals())
+print(x)

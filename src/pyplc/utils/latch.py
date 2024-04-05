@@ -6,8 +6,7 @@ class SR(POU):
     set     = POU.input( False )
     reset   = POU.input( False )
     q       = POU.output( False)
-    @POU.init
-    def __init__(self,set=False,reset=False,q=False) -> None:
+    def __init__(self,set=False,reset=False,q=False,id:str =None,parent: POU =None) -> None:
         """Конструктор
 
         Args:
@@ -15,11 +14,11 @@ class SR(POU):
             reset (bool, optional): Сбросить флаг. Defaults to False.
             q (bool, optional): Текущее состояние. Defaults to False.
         """
-        super().__init__( )
+        super().__init__( id,parent)
         self.set = set
         self.reset = reset 
-        self.__reset = self.reset
         self.q = q
+        self.__reset = self.reset
 
     def unset(self):
         self.q=False
@@ -40,8 +39,7 @@ class RS(POU):
     set     = POU.input(False)
     reset   = POU.input(False)
     q       = POU.output(False)
-    @POU.init
-    def __init__(self,reset=False,set=False,q=False) -> None:
+    def __init__(self,reset=False,set=False,q=False,id:str = None,parent: POU = None) -> None:
         """Конструктор
 
         Args:
@@ -49,7 +47,7 @@ class RS(POU):
             set (bool, optional): Установить флаг. Defaults to False.
             q (bool, optional): Текущее состояние. Defaults to False.
         """
-        super().__init__( )
+        super().__init__( id,parent)
         self.set = set
         self.reset = reset 
         self.__set   = self.set

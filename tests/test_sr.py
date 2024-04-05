@@ -1,6 +1,8 @@
 from pyplc.utils.latch import SR,RS
+from pyplc.core import PYPLC
 import time
 
+plc = PYPLC(0)
 test = 0
 test_set=  [False,True,False,False,False,True,False]*100
 test_reset=[False,False,False,True,False,True,True]*100
@@ -23,13 +25,20 @@ def get_reset():
 
 x = RS( set = get_set,reset=get_reset, q=False )
 result_check = result_rs
-print(x)
 
-begin_ts = time.time_ns()
-while test<len(result_check):
-    if x()!=result_check[test]:
-        print(f'FAIL {test}: {x}')
-        break
-    test+=1
-end_ts = time.time_ns()
-print(f'{(end_ts-begin_ts)/1000000} ms')
+def test_sr():
+    global test,result_check
+    begin_ts = time.time_ns()
+    while test<len(result_check):
+        if x()!=result_check[test]:
+            print(f'FAIL {test}: {x}')
+            break
+        test+=1
+        yield
+    end_ts = time.time_ns()
+    print(f'\n{(end_ts-begin_ts)/1000000} ms')
+    raise KeyboardInterrupt
+
+plc.period=0
+plc.run(instances=[test_sr],ctx=globals())
+print(x)
