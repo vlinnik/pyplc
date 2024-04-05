@@ -34,6 +34,15 @@ class SFC(POU):
     @staticmethod
     def isgenerator(x):
         return isinstance(x, SFC.STEP)
+
+    @staticmethod
+    def limited_t( ms:int = 0, n=[]):
+        begin = POU.NOW_MS
+        till  = begin + ms
+        while POU.NOW_MS<till: 
+            for _ in n: _(True)
+            yield
+        for _ in n: _(False)
     
     def pause(self, T: int, step: str = None, n=[]):
         """Пауза в программе на T мсек.

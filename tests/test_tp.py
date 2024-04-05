@@ -1,21 +1,25 @@
 import time
 from pyplc.utils.misc import TP
+from pyplc.core import PYPLC
+from pyplc.sfc import SFC
 
-tp = TP(t_on=5000,t_off = 3000)
+plc = PYPLC(0)
+tp = TP(t_on=1000,t_off = 100)
 
-while True:
-    print('set CLK=TRUE')
-    try:
-        while True:
-            print(tp(clk=True))
-            time.sleep(0.250)
-    except KeyboardInterrupt:
-        pass
+def test_tp():
+    print('\n>IIIIIIIIII__________\n=',end='')
+    tp(clk=True)
+    tp(clk=False)
+    for _ in SFC.limited_t( ms=2000 ):
+        print('I' if tp(clk=True) else '_',end='' )
+        yield
+    print('\n>IIIIIIIIII___IIIIIII\n=',end='')
+    tp(clk=False)
+    tp(clk=True)
+    for _ in SFC.limited_t( ms = 2000 ):
+        print('I' if tp(clk=not tp.clk) else '_',end='' )
+        yield
+    print('\n')
+    raise KeyboardInterrupt
 
-    print('set CLK=FALSE')
-    try:
-        while True:
-            print(tp(clk=False))
-            time.sleep(0.250)
-    except KeyboardInterrupt:
-        pass
+plc.run(instances=[test_tp])
