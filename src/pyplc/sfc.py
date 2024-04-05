@@ -143,7 +143,6 @@ class SFC(POU):
             try:
                 next(self.jobs[job_n])
             except StopIteration:
-                self.log(f'job {self.jobs[job_n]} complete')
                 self.jobs[job_n] = None
                 jobs_changed = True
         if jobs_changed:
@@ -157,7 +156,8 @@ class SFC(POU):
             if self.sfc_main: 
                 self.sfc_main.close()
                 self.sfc_main = None
-            
+            return
+        
         with self:
             self.call( )
 

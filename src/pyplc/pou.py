@@ -98,7 +98,7 @@ class POU():
             o.persistent(id)
         return not found
     def log(self,*args,**kwds):
-        print(f'[{(POU.NOW-POU.EPOCH)}] #{self.full_id}:', *args, **kwds)
+        print(f'[{(POU.NOW-POU.EPOCH)}] #{self.full_id:12.12s}:', *args, **kwds)
         
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
