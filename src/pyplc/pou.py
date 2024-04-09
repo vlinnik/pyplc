@@ -30,13 +30,14 @@ class POU():
                 parent.__outputs__.append([])
                 parent.__touched__.append(False)
 
-        def __init__(self, init_val, hidden:bool =False, persistent: bool = False,notify: bool = True):
+        def __init__(self, init_val, hidden:bool =False, persistent: bool = False,notify: bool = True,dynamic: bool = False):
             self._index = None
             self._name = None
             self._value = init_val
             self._hidden = hidden
             self._persistent = persistent
             self._notify = notify
+            self._dynamic= dynamic
 
         def __get__(self, obj, objtype=None):
             if obj is None:
@@ -114,7 +115,7 @@ class POU():
 
         for key in dir(self.__class__): 
             p = getattr(self.__class__,key)
-            if isinstance( p,POU.var ):
+            if isinstance( p,POU.var ) and not p._dynamic:
                 if p._persistent: self.__persistent__.append(key)
                 POU.var.setup(p,key,self,p._value)
 
@@ -187,7 +188,7 @@ class POU():
             __name (str): имя атрибута
             initial (_type_, optional): начальное значение
         """
-        attr = POU.var(initial)
+        attr = POU.var(initial,dynamic=True)
         POU.var.setup(attr,__name,self,initial=initial)
 
     def __str__(self):
