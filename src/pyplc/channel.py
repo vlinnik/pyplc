@@ -204,12 +204,13 @@ class QBool(Channel):
             self.dirty = False
             dirty[self.addr] |= self.mask
         else:           #нет изменений через write
-            o_val = self.read()
-            self.value = (data[ self.addr ] & self.mask)!=0
-            if self.value!=o_val:
-                self.changed( )
-            self.dirty = False
-            dirty[self.addr] &= ~self.mask 
+            c_val = (data[ self.addr ] & self.mask)!=0
+            if self.value!=c_val:
+                if self.value:
+                    data[self.addr] |= self.mask
+                else:
+                    data[self.addr] &= ~self.mask
+            dirty[self.addr] |= self.mask 
 
 class IWord(Channel):
     def __init__(self,addr,name=''):

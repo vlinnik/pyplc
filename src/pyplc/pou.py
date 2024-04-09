@@ -11,8 +11,8 @@ x = Trig( )
 
 class POU():
     EPOCH=time.time_ns( )
-    NOW  =time.time_ns( )   #момент начала цикла
-    NOW_MS=int(NOW/1000000) #в мсек
+    NOW  = 0                #момент начала цикла
+    NOW_MS=0                #в мсек
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
 
@@ -98,7 +98,7 @@ class POU():
             o.persistent(id)
         return not found
     def log(self,*args,**kwds):
-        print(f'[{(POU.NOW-POU.EPOCH)}] #{self.full_id:12.12s}:', *args, **kwds)
+        print(f'[{POU.NOW_MS}] #{self.full_id:12.12s}:', *args, **kwds)
         
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id

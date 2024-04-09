@@ -157,7 +157,7 @@ class PYPLC():
             self.overRun = -self.idleTime
             
     def __enter__(self):
-        POU.NOW = time.time_ns( )
+        POU.NOW = time.time_ns( ) - POU.EPOCH
         POU.NOW_MS = int(POU.NOW/1000000)
         if isinstance(self.pre,list):
             for pre in self.pre:
@@ -181,7 +181,7 @@ class PYPLC():
         if self.krax is not None :
             self.krax.master(2) #krax exchange 
             
-        self.userTime = int((time.time_ns( ) - POU.NOW)/1000000)
+        self.userTime = int((time.time_ns( )-POU.EPOCH-POU.NOW)/1000000)
         self.idle( )
 
     def __call__(self,ctx=None):
