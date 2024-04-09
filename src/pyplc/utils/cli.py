@@ -39,14 +39,28 @@ class CLI(TCPServer):
         
     def connected(self,sock: BufferInOut):
         self.telnet = BufferOut( send = sock.client.send )
-        sock.send(bytes([255, 252, 38])) # iac wont authentication
         sock.send(bytes([255, 254, 38])) # iac dont authentication
         sock.send(bytes([255, 253, 34])) # iac do linemode 
         sock.tx.flush( )
     
     def esc(self):
         echo = 0 
-        if self.opt==bytes([0x1b,0x41]): #up
+        print(self.opt)
+        if self.opt==bytes([0x1b,0x5b]):   #escape sequence
+            self.eat+=1
+        elif self.opt==bytes([0x1b,0x5b,0x44]): #left 
+            if self.pos<self.telnet.size(): 
+                self.pos+=1
+                self.telnet.write(self.opt)
+            self.opt = b''
+            self.mod = 0
+        elif self.opt==bytes([0x1b,0x5b,0x43]): #right
+            if self.pos>0: 
+                self.pos-=1
+                self.telnet.write(self.opt)   
+            self.opt = b''
+            self.mod = 0
+        elif self.opt==bytes([0x1b,0x5b,0x41]): #up
             if len(self.history)>0: 
                 last = self.history.pop( )
                 if self.telnet.size()>0:
@@ -57,7 +71,7 @@ class CLI(TCPServer):
                 echo = self.telnet.size( )
             self.opt = b''
             self.mod = 0
-        elif self.opt==bytes([0x1b,0x42]): #down
+        elif self.opt==bytes([0x1b,0x5b,0x42]): #down
             if len(self.history)>0: 
                 last = self.history.pop( 0 )
                 if self.telnet.size()>0:
@@ -68,16 +82,7 @@ class CLI(TCPServer):
                 echo = self.telnet.size( )
             self.opt = b''
             self.mod = 0
-        elif self.opt==bytes([0x1b,0x43]): #right
-            if self.pos>0: 
-                self.pos-=1
-                self.telnet.write(bytearray([0x1b,0x5b,0x43]))                    
-            self.opt = b''
-            self.mod = 0
-        elif self.opt==bytes([0x1b,0x44]): #left
-            if self.pos<self.telnet.size(): 
-                self.pos+=1
-                self.telnet.write(bytearray([0x1b,0x5b,0x44]))
+        else:
             self.opt = b''
             self.mod = 0
         return echo
@@ -116,10 +121,16 @@ class CLI(TCPServer):
             else:
                 if b==0xd: self.pos = 0
                 if b==0x7F: 
-                    if self.telnet.size()>0: #self.pos<self.telnet.size(): 
-                        self.telnet.write(bytearray([0x08,32,0x08]))  #backspace space backspace
-                        # self.pos+=1
-                        self.telnet.pop()
+                    if self.telnet.size()>0 and self.pos<self.telnet.size(): #self.pos<self.telnet.size(): 
+                        l = bytearray(self.telnet.head())
+                        if self.pos>0:
+                            l = l[:-self.pos-1]+l[-self.pos:]
+                            self.telnet.write( bytes([0x08])+l[-self.pos:] + bytes([0x20,0x1b,0x5b,self.pos+0x31,0x44]) )
+                        else:
+                            l = l[:-1]
+                            self.telnet.write(bytes([0x08,0x20,0x08]))
+                        self.telnet.purge()
+                        self.telnet.put(l)
                     continue    #backspace
                 echo+=1
                 self.telnet.putc(b,off=self.pos)
