@@ -45,7 +45,6 @@ class CLI(TCPServer):
     
     def esc(self):
         echo = 0 
-        print(self.opt)
         if self.opt==bytes([0x1b,0x5b]):   #escape sequence
             self.eat+=1
         elif self.opt==bytes([0x1b,0x5b,0x44]): #left 
@@ -125,7 +124,7 @@ class CLI(TCPServer):
                         l = bytearray(self.telnet.head())
                         if self.pos>0:
                             l = l[:-self.pos-1]+l[-self.pos:]
-                            self.telnet.write( bytes([0x08])+l[-self.pos:] + bytes([0x20,0x1b,0x5b,self.pos+0x31,0x44]) )
+                            self.telnet.write( bytes([0x08,0x1b,0x37])+l[-self.pos:] + bytes([0x20,0x1b,0x38]) ) #backspace+save cursor pos+
                         else:
                             l = l[:-1]
                             self.telnet.write(bytes([0x08,0x20,0x08]))
@@ -133,14 +132,21 @@ class CLI(TCPServer):
                         self.telnet.put(l)
                     continue    #backspace
                 echo+=1
-                self.telnet.putc(b,off=self.pos)
-                if self.pos>0: self.pos-=1
+                if self.pos>0:
+                    tail = bytes( self.telnet.tail(self.pos) )
+                    self.telnet.put( bytes([b])+tail ,self.pos )
+                    self.telnet.putc( tail[-1] )
+                else:
+                    self.telnet.putc(b)
+                # if self.pos>0: self.pos-=1
         
         if echo>0 and self.echo:
             if self.pos==0:
                 self.telnet.write(self.telnet.tail( echo ))
             else:
-                self.telnet.write(self.telnet.mid( start=-self.pos-echo, size=echo ))
+                self.pos+=1
+                tail = bytes(self.telnet.tail( self.pos ))
+                self.telnet.write(bytes([b,0x1b,0x37])+tail+bytes([0x1b,0x38]))
         
         if self.telnet.size()>=2 and self.telnet.tail(2)==b'\r\n':
             try:
