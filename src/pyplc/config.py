@@ -122,9 +122,6 @@ class Manager():
         conf = self.conf
         print('\tЗапуск KRAX-IO с параметрами:',conf['init'])
         kraxio.init(conf['node_id'],**conf['init'])
-        if Manager.__fexists('krax.dat'):
-            with open('krax.dat', 'rb') as d:
-                kraxio.restore(d.read())
         
     def cleanup(self):
         global cli, posto, plc, hw
