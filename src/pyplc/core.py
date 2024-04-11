@@ -227,6 +227,9 @@ class PYPLC():
             self.instances = [ [i,None] for i in instances]
         self.config( **kwds )
         try:
+            for _ in range(0,10):
+                with self:  #первое сканирование
+                    pass
             while True:
                 self.scan( )
         except KeyboardInterrupt as kbi:
