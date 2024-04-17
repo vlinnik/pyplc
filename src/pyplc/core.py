@@ -6,6 +6,19 @@ import time,re,array
 import asyncio
 
 class PYPLC():
+    """Реализация управления циклом работы программы.
+
+    Вызывается обычно из pyplc.config. pre/post настраиваются так, чтобы к программе можно было подключиться с 
+    помощью telnet (диагностика, отладка) и с помощью pyplc.utils.subscriber для реализации интерфейса оператора
+    на ПК.
+
+    Args:
+        io_size (int): Размер доступной памяти ввода-вывода. Должно быть <200 байт
+        krax (модуль, optional): Объект, который производит синхронизацию памяти ввода-вывода. 
+        pre (list[], optional): Список функций, которые надо вызвать перед пользовательскими программами. Defaults to None.
+        post (_type_, optional): Список функций, которые надо вызвать после пользовательских программ. Defaults to None.
+        period (int, optional): Период работы . Defaults to 100 (мсек).
+    """
     HAS_TICKS_MS = hasattr(time,'ticks_ms') #в micropython есть в python нет
     TICKS_MAX = 0                           #сколько максиальное значение ms()
     GENERATOR_TYPE = type((lambda: (yield))())
@@ -100,6 +113,11 @@ class PYPLC():
         pass
 
     def sync(self,output=True):
+        """Произвести синхронизацию памяти ввода-вывода и каналов pyplc.channel.*
+
+        Args:
+            output (bool, optional): Выходы и Входы синхронизируются отдельно. Defaults to True.
+        """
         if output and self.writer:
             for var in self.vars.values():
                 if var.rw:
@@ -131,6 +149,13 @@ class PYPLC():
         self.sync(True)
         
     def config(self,simulator:bool=None,ctx = None,persist = None, **kwds ):
+        """Изменение параметров. Вызывается из run.
+
+        Args:
+            simulator (bool, optional): Режим симулятора. Если включено, то пользовательские программы не вызываются, только опрос и интерфейс обмена. Defaults to None.
+            ctx (dict, optional): если указывать, то должно быть так: plc.config(ctx=globals()) . Defaults to None.
+            persist (IOBase, optional): Куда производить сохранение persistent переменных. Defaults to None.
+        """
         if ctx is not None:
             for x in ctx:
                 var = ctx[x]
@@ -185,12 +210,17 @@ class PYPLC():
         self.idle( )
 
     def __call__(self,ctx=None):
-        """python vs micropython: в micropython globals() общий как будто всюду, или как минимум из вызывающего контекста
-        Пример в python (в микропитоне можно без этих ухищрений)
-        with plc(ctx=globals()):
-            ....
-        Returns:
-            PYPLC: себя
+        """
+        Аналогично вызову config(ctx=ctx), только возвращает self.
+
+        Экземпляр PYPLC может быть использован как функция. И также использован с with, например:
+        ::
+            with plc:
+                pass
+        или 
+        ::
+            with plc(ctx=globals()):
+                pass
         """
         if ctx is not None:
             self.ctx = ctx
@@ -198,6 +228,8 @@ class PYPLC():
         return self
 
     def scan(self):
+        """однократное выполнение цикла работы: синхронизация памяти и каналов ввода - функции pre - пользовательская логика - функции post - пауза
+        """
         with self:
             if not self.simulator:
                 for i in self.instances:
@@ -210,6 +242,15 @@ class PYPLC():
                         i[1] = i[0]( )
     
     def declare(self,channel: Channel, name: str = None):
+        """Добавить канал ввода/вывода
+
+        Args:
+            channel (Channel): канал
+            name (str, optional): имя канала. Defaults to None.
+
+        Returns:
+            Channel: возвращает значение параметра channel
+        """
         if not name:
             name = channel.name
         self.vars[name] = channel
@@ -223,6 +264,13 @@ class PYPLC():
             channel.bind(remote.write)  #изменения канала ввода/вывода производит запись в Subscription
         return channel
     def run(self,instances=None,**kwds ):
+        """Запуск работы пользовательских программ.
+
+        Именованные параметры будут переданы в config.
+
+        Args:
+            instances (callable|generator, optional): Пользовательские программы.
+        """
         if instances is not None: 
             self.instances = [ [i,None] for i in instances]
         self.config( **kwds )

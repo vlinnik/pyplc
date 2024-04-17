@@ -20,6 +20,12 @@ def __typeof(var):
 
 
 def exports(ctx: dict,prefix:str=None):
+    """_summary_
+
+    Args:
+        ctx (dict): _description_
+        prefix (str, optional): _description_. Defaults to None.
+    """
     print('Export all available items')
     print('VAR_CONFIG')
     prefix = '' if prefix is None else f'{prefix}.'
@@ -37,6 +43,8 @@ def exports(ctx: dict,prefix:str=None):
     print('END_VAR')
 
 class Board():
+    """_summary_
+    """
     def __init__(self):
         self.__wps = False
         self.__comm = False

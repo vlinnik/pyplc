@@ -1,6 +1,8 @@
 from pyplc.pou import POU
 
 class Cell():
+    """Базовый класс для элементов LD-подобной программы
+    """
     def __init__(self):
         self._id   = 1
         self._last = None
@@ -69,6 +71,8 @@ class Cell():
         return self.next(CTD(max))
 
 class NO(Cell):
+    """Блок, выполнение следующего на RAIL если выражение cond() истинно
+    """
     def __init__(self,cond: callable = None):
         super().__init__()
         self._cond = cond

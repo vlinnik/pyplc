@@ -1,6 +1,13 @@
 import struct,re
 
 class Channel(object):        
+    """Основа для всех измерительных каналов
+
+    Args:
+        name (str, optional): Имя измерительного канала. По умолчанию ''.
+        init_val (bool|int, optional): Начальное значение. По умолчанию None.
+        rw (bool, optional): Тип измерительного канала (можно изменять или только читать). По умолчанию только читать.
+    """
     def __init__(self, name='', init_val=None, rw=False):
         self.rw = rw
         self.name = name
@@ -32,17 +39,37 @@ class Channel(object):
         return f'{self.value}'
 
     def force(self, value):
+        """Обеспечивает маханизм записи имитационных значений
+
+        Измерительные каналы с режимом только чтение при разработке удобно имитировать как будто измерено новое значение,
+        например сигнал MOTOR_ISON можно изменить программно если выдан сигнал MOTOR_ON. 
+
+        Args:
+            value (Any): имитируемое значение
+        """
         changed = (self() != value)
         self.forced = value
         if changed:
             self.changed()
 
     def read(self):
+        """Получить значение измерительного/управляющего канала
+
+        Returns:
+            bool|int: текущее значение
+        """
         if self.forced is not None:
             return self.forced
         return self.value
 
     def write(self, value):
+        """Изменить текущее состояние канала
+
+        Если новое значение отличается от старого, то произойдет оповещение всех функций, переданных :py:meth:`Channel.bind`
+
+        Args:
+            value (bool|int): новое значение
+        """
         if self.value != value:
             self.value = value
             for c in self.callbacks:
@@ -50,12 +77,12 @@ class Channel(object):
 
     def bind(self, callback):
         """Соединить канал IO c функцией оповещения. 
-        Если значение переменной изменится, то будет вызвана функция оповещения.
+        Если значение канала изменится, то будет вызвана функция callback.
         При этом возвращается функция, с помощью которой можно производить запись
-        в IO, если это доступно.
+        в IO, если это доступно. Отменить вызов callback можно :py:meth:`unbind`
 
         Args:
-            callback (function): _description_
+            callback (function): что вызвать при изменении канала
 
         Returns:
             callable: функция для доступа к изменению переменной 
@@ -71,6 +98,11 @@ class Channel(object):
             pass
 
     def unbind(self, callback):
+        """Убрать оповещение указанного callback
+
+        Args:
+            callback (function): Может быть функцией, а также результатом id(<функция>), где <функция> ранее использовалась в bind
+        """
         if callback is None:
             self.callbacks.clear()
             return
@@ -84,14 +116,31 @@ class Channel(object):
             self.callbacks.remove(marked)
 
     def changed(self):
+        """Прроизвести вызов всех функций, использованных с bind
+        """
         value = self()
         for c in self.callbacks:
             c(value)
             
     def sync(self,data: memoryview, dirty: memoryview):
+        """
+        Механизм синхронизации значения с памятью ввода-вывода
+
+        Args:
+            data (memoryview): память ввода-вывода
+            dirty (memoryview): битовый флаг надо менять или нет память ввода-вывода
+        """
         pass
 
     def __call__(self, value=None):
+        """Доступ к значению для чтения/записи
+
+        Args:
+            value (_type_, optional): если не указано, то вернем :py:meth:`read`, иначе производится :py:meth:`write`
+
+        Returns:
+            _type_: _description_
+        """
         if value is None:
             return self.read()
         self.write(value)
@@ -106,16 +155,36 @@ class Channel(object):
         return r
 
 class IBool(Channel):
-    def __init__(self,addr,num,name=''):
+    """Дискретный вход (логический True/False)
+
+    Args:
+        addr (int): номер байта (смещение) в памяти ввода-вывода
+        num (int): номер бита 
+        name (str, optional): имя канала ввода-вывода.
+    """
+    def __init__(self,addr:int,num:int,name=''):
         super( ).__init__(name,init_val=False)
         self.addr = addr
         self.num = num
         self.mask = 1<<num
         self.forced = None
+
     def __bool__(self)->bool:
         return self.read()==True
+    
     @staticmethod
     def at(addr: str)->'IBool':
+        """Создать канал и закрепить его за указанным адресом
+
+        Args:
+            addr (str): Адрес, должен начинаться с %IX, затем смещение, "." и номер бита, например %IX0.1
+
+        Raises:
+            RuntimeError: Формат адреса не соответсвует требованиям
+
+        Returns:
+            IBool: Новый канал 
+        """
         rx = re.compile(r'%IX([0-9]+)\.([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
@@ -123,15 +192,31 @@ class IBool(Channel):
         return IBool( int(mh.group(1)),int(mh.group(2)), addr )
 
     def read(self):
+        """Получить значение канала дискретного входа
+
+        Returns:
+            bool: текущее значение
+        """
+
         if self.forced:
             return self.forced
         return super().read( )
 
     def write(self,val):
+        """Вызов этого метода приведет к исключению RuntimeError
+
+        Raises:
+            Exception: IBool не поддерживает write (только для чтения)
+        """
         if self.read()!=val:
-            raise Exception('IXBool is read only',self)
+            raise RuntimeError('IXBool is read only',self)
 
     def __invert__(self):
+        """Получить инверсированный канал
+
+        Returns:
+            callable: функция, которая возвращает противоположное значение канала
+        """
         return lambda: not self.read()
 
     def __str__(self):
@@ -147,6 +232,13 @@ class IBool(Channel):
             self.changed( )
 
 class QBool(Channel):
+    """Дискретный выход (логический True/False)
+
+    Args:
+        addr (int): адрес байта
+        num (int): номер бита
+        name (str, optional): имя канала.
+    """
     def __init__(self, addr, num: int, name=''):
         super().__init__(name,init_val=False,rw=True)
         self.addr = addr
@@ -157,6 +249,17 @@ class QBool(Channel):
         return self.read()==True
     @staticmethod
     def at(addr: str)->'QBool':
+        """Создать канал и закрепить его за указанным адресом
+
+        Args:
+            addr (str): Адрес, должен начинаться с %QX, затем смещение, "." и номер бита, например %QX0.1
+
+        Raises:
+            RuntimeError: Формат адреса не соответсвует требованиям
+
+        Returns:
+            QBool: Новый канал 
+        """
         rx = re.compile(r'%QX([0-9]+)\.([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
@@ -213,12 +316,29 @@ class QBool(Channel):
             dirty[self.addr] |= self.mask 
 
 class IWord(Channel):
+    """Аналоговый вход 16 бит
+
+    Args:
+        addr (int): адрес первого байта
+        name (str, optional): имя канала
+    """
     def __init__(self,addr,name=''):
         super( ).__init__(name,init_val=int(0))
         self.addr = addr
         self.forced = None
     @staticmethod
     def at(addr: str)->'IWord':
+        """Создать канал и закрепить его за указанным адресом
+
+        Args:
+            addr (str): Адрес, должен начинаться с %IW или %IB, затем смещение (в 16-битных словах или байтах соответственно)
+
+        Raises:
+            RuntimeError: Формат адреса не соответсвует требованиям
+
+        Returns:
+            IWord: Новый канал 
+        """
         rx = re.compile(r'%I(W|B)([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
@@ -226,11 +346,21 @@ class IWord(Channel):
         return IWord( int(mh.group(2))*(2 if mh.group(1)=='W' else 1), addr )
 
     def read(self):
+        """Получить значение измерительного/управляющего канала
+
+        Returns:
+            int: текущее значение, 0-65535
+        """
         if self.forced:
             return self.forced
         return super().read( )
 
     def write(self,val):
+        """Вызов этого метода приведет к исключению RuntimeError
+
+        Raises:
+            Exception: IWord не поддерживает write (только для чтения)
+        """
         if val!=self.read():
             raise Exception('IWord is read only',self)
 
@@ -247,6 +377,12 @@ class IWord(Channel):
             self.changed()
 
 class QWord(Channel):
+    """Аналоговый выход 16 бит
+
+    Args:
+    addr (int): адрес первого байта
+    name (str, optional): имя канала
+    """
     def __init__(self,addr,name=''):
         super( ).__init__(name,init_val=int(0),rw = True)
         self.addr = addr
@@ -254,6 +390,17 @@ class QWord(Channel):
         self.dirty = True
     @staticmethod
     def at(addr: str)->'QWord':
+        """Создать канал и закрепить его за указанным адресом
+
+        Args:
+            addr (str): Адрес, должен начинаться с %QW или %QB, затем смещение (в 16-битных словах или байтах соответственно)
+
+        Raises:
+            RuntimeError: Формат адреса не соответсвует требованиям
+
+        Returns:
+            QWord: Новый канал 
+        """
         rx = re.compile(r'%Q(W|B)([0-9]+)')
         mh=rx.match(addr)
         if mh is None:
@@ -261,6 +408,12 @@ class QWord(Channel):
         return QWord( int(mh.group(2))*(2 if mh.group(1)=='W' else 1), addr )
 
     def read(self):
+        """Получить значение измерительного/управляющего канала
+
+        Returns:
+            int: текущее значение, 0-65535
+        """
+
         if self.forced:
             return self.forced
         return super().read( )
@@ -288,6 +441,17 @@ class QWord(Channel):
                 self.changed()
 
 class ICounter8(Channel):
+    """Вход-счетчик импульсов 8-битный
+
+    В памяти ввода-вывода занимает 1 байт. Значение может принимать как обычный int. Переполнение байта 
+    учитывается программно когда байт из памяти ввода-вывода изменяется в меньшую сторону. Например:
+    значение 253 - 254 - 255 (переполнение) - 5, значение канала будет 300. 
+
+    Args:
+        addr (int): адрес байта
+        name (str, optional): имя канала
+    """
+
     def __init__(self,addr,name=''):
         super( ).__init__(name,init_val=int(0))
         self.addr  = addr
@@ -302,22 +466,34 @@ class ICounter8(Channel):
         return ICounter8( int(mh.group(2)), addr )
         
     def reset(self):
+        """сбросить накопленное значение счетчика
+        """
         self.value = 0
 
     def read(self):
+        """Текущее значение.
+
+        Returns:
+            int: с учетом переполнений
+        """
         if self.forced:
             return self.forced
         return super().read( )
 
     def write(self,val):
+        """Вызов этого метода приведет к исключению RuntimeError
+
+        Raises:
+            Exception: ICounter8 не поддерживает write (только для чтения)
+        """
         if val!=self.read():
             raise Exception('ICounter8 is read only',self)
 
     def __str__(self):
         if self.name!='':
-            return f'ICounter({self.name} AT %IB{self.addr}={self():02x}) #{self.comment}'
+            return f'ICounter8({self.name} AT %IB{self.addr}={self():02x}) #{self.comment}'
         else:
-            return f'ICounter(%IB{self.addr}={self():02x}) #{self.comment}'                
+            return f'ICounter8(%IB{self.addr}={self():02x}) #{self.comment}'                
     
     def sync(self,data: memoryview,dirty: memoryview):
         o_val = self.cnt8

@@ -1,3 +1,24 @@
+"""Инициализация библиотеки и каналов I/O
+
+Использование
+=============
+
+.. highlight:: python
+.. code-block:: python
+    
+    from pyplc.config import board,plc,hw
+
+board - Экземпляр Board() для доступа к светодиодам и переключателям, также к EEPROM
+plc   - Экземпляр PYPLC() для организации опроса I/O и циклической работы
+hw    - Экземпляр PYPLC.State для доступа к значениям переменных I/O 
+
+Если выполняется не на контроллере, то вместо модуля config будет использован coupler,
+и будет использован режим имитации (simulator). Это позволяет не менять программу, которая 
+может выполняться на компьютере в среде python. 
+
+При загрузке этого модуля используются файлы krax.json (информация о настройках опроса модулей)
+и krax.csv (настройка переменных ввода-вывода).
+"""
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.cli import CLI
@@ -18,6 +39,8 @@ except:
 startAt = time.time()
         
 class Board():
+    """Экземпляр процессорного блока контроллера.
+    """
     def __init__(self):
         self.__adc = ADC(Pin(35))        # create an ADC object acting on a pin
         self.__wps = Pin(34, Pin.IN)
@@ -32,7 +55,7 @@ class Board():
     def get_mode(self) -> bool:
         return self.__mode.value() == 0
     
-    def get_usr(self) -> bool:
+    def get_usr(self) -> bool: #: Соcтояние переключателя USR
         return self.__usr.value() == 0
 
     def get_wps(self) -> bool:
@@ -51,7 +74,7 @@ class Board():
         self.__run.value(value)
 
     @property
-    def usr(self) -> bool:
+    def usr(self) -> bool: 
         return self.get_usr()
 
     @property
