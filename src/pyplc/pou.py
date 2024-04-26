@@ -29,6 +29,7 @@ class POU():
                 parent.__inputs__.append(None)
                 parent.__outputs__.append([])
                 parent.__touched__.append(False)
+                parent.__access__.append( attr.__access__(parent) )
 
         def __init__(self, init_val, hidden:bool =False, persistent: bool = False,notify: bool = True,dynamic: bool = False):
             self._index = None
@@ -51,7 +52,7 @@ class POU():
 
             obj.__values__[self._index] = value
 
-        def __call__(self, obj:'POU' ) :
+        def __access__(self,obj):
             """Получить функцию чтения/записи в свойство для obj. 
             Если ее вызвать без параметров она возвращает значение свойства, иначе изменяет
             TODO: подумать над временем жизни этой функции
@@ -65,6 +66,9 @@ class POU():
                 else:
                     return self.__set__(obj,value)
             return access
+
+        def __call__(self, obj:'POU' ) :
+            return obj.__access__[self._index]
 
     class input(var):
         def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
@@ -126,6 +130,7 @@ class POU():
         self.__touched__= []
         self.__persistent__=[]
         self.__children__=[]
+        self.__access__=[]
         if parent is not None: parent.__children__.append(self)
 
         for key in dir(self.__class__): 
