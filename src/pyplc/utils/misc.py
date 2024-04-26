@@ -153,17 +153,11 @@ class TP(SFC):
         self.q = q
 
     def main(self):
-        while not self.clk:
-            self.q = False
-            yield False
-        if self.t_on>0:
-            for _ in self.pause(self.t_on):
-                self.q = True
-                yield 
-        if self.t_off>0:
-            for _ in self.till(lambda: self.clk,min = self.t_off):
-                self.q = False
-                yield _
+        yield from self.until(lambda: self.clk)
+        self.q = True
+        yield from self.pause(self.t_on)
+        self.q = False
+        yield from self.till(lambda: self.clk,min = self.t_off)
 
     def __call__(self, clk: bool = None):
         with self:

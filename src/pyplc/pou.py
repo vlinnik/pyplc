@@ -51,6 +51,21 @@ class POU():
 
             obj.__values__[self._index] = value
 
+        def __call__(self, obj:'POU' ) :
+            """Получить функцию чтения/записи в свойство для obj. 
+            Если ее вызвать без параметров она возвращает значение свойства, иначе изменяет
+            TODO: подумать над временем жизни этой функции
+
+            Args:
+                obj (POU): владелец свойства
+            """
+            def access( value = None ):
+                if value is None: 
+                    return self.__get__(obj)
+                else:
+                    return self.__set__(obj,value)
+            return access
+
     class input(var):
         def __init__(self, init_val, hidden: bool = False, persistent: bool = False):
             super().__init__(init_val, hidden=hidden, persistent=persistent,notify=False)
