@@ -1,6 +1,16 @@
+"""
+Триггеры
+--------
+
+Функциональные блоки для контроля за изменением фронта входа. Триггеры на один вызов устанавливают выход q 
+при переходе из одного состояния в другое входа clk.
+"""
 from pyplc.pou import POU
 
 class RTRIG(POU):
+    """
+    Детектирование перехода clk из False в True.
+    """
     clk = POU.input(False)
     q = POU.output(False)
     def __init__(self,clk:bool=False,q:bool=False,id:str = None,parent:POU = None) -> None:
@@ -17,6 +27,9 @@ class RTRIG(POU):
         return self.q
 
 class FTRIG(POU):
+    """
+    Детектирование перехода clk из True в False.
+    """
     clk = POU.input(False)
     q = POU.output(False)
     def __init__(self,clk:bool=False,q:bool=False,id:str=None,parent:POU=None) -> None:
@@ -33,6 +46,9 @@ class FTRIG(POU):
         return self.q         
 
 class TRIG(POU):
+    """
+    Детектирование перехода clk из одного состояния в другое.
+    """
     clk = POU.input(False)
     q = POU.output(False)
     def __init__(self,clk:bool=False,q:bool=False,id:str=None,parent:POU=None) -> None:

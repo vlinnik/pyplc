@@ -10,13 +10,15 @@ x = Trig( )
 """
 
 class POU():
-    EPOCH=time.time_ns( )
-    NOW  = 0                #момент начала цикла
-    NOW_MS=0                #в мсек
+    EPOCH=time.time_ns( )   
+    NOW  = 0                #: момент начала цикла работы логики в нано-сек
+    NOW_MS=0                #: момент начала цикла работы логики в мсек
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
 
     class var():
+        """Локальная переменная POU. Доступна для подключения извне по протоколу TCP
+        """
         @staticmethod
         def setup(attr: 'POU.var',__name:str, parent: 'POU', initial):
             attr._name = __name
@@ -32,6 +34,15 @@ class POU():
                 parent.__access__.append( attr.__access__(parent) )
 
         def __init__(self, init_val, hidden:bool =False, persistent: bool = False,notify: bool = True,dynamic: bool = False):
+            """Конструктор переменной POU.
+
+            Args:
+                init_val (bool|float|str): начальное значение.
+                hidden (bool, optional): переменная не нужна для доступа по TCP. Defaults to False.
+                persistent (bool, optional): значение должно сохраняться после перезагрузки. Defaults to False.
+                notify (bool, optional): при записи любого значения произвести регистрацию этого события. Defaults to True.
+                dynamic (bool, optional): см. динамические переменные POU. Defaults to False.
+            """
             self._index = None
             self._name = None
             self._value = init_val

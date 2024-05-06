@@ -1,15 +1,37 @@
+"""
+
+Сервер командной строки, порт 2455
+----------------------------------
+
+Пример использования:
+::
+        from pyplc.utils.cli import CLI
+        telnet = CLI()
+        while True:
+            telnet()
+           
+Каждый цикл работы программы читает данные от клиента и выполняет их через eval().
+Специально создавать экземпляр данной программы не нужно, это происходит в :py:mod:`pyplc.config`.
+
+Пример подключения (предполагаем контроллер имеет IP 192.168.1.120)
+
+.. code-block:: console
+
+    $ telnet 192.168.1.120 2455
+    Trying 192.168.1.120...
+    Connected to 192.168.1.120.
+    Escape character is '^]'.
+    >>> 
+
+
+"""
+
 from .tcpserver import TCPServer
 from .buffer import BufferInOut,BufferOut
 from pyplc.pou import POU
 import time
 
 """
-Простейший сервер командной строки на порте 2455.
-Пример использования:
-    telnet = CLI()
-    while True:
-        telnet()
-Каждый цикл работы программы читает данные от клиента и выполняет их через eval()
 IAC  255    0xff
 DONT 254    0xfe
 DO   253    0xfd
@@ -24,6 +46,10 @@ SE 240      0xf0
 SUPPRESS_LOCAL_ECHO 45  0x2d
 """
 class CLI(TCPServer):
+    """
+    Поддержка telnet протокола на порту 2455. Полученные данные обрабатываются при вызове данной программы.
+    """
+
     G_PS = b'\n\r>>> '
     def __str__(self):
         return f'[{POU.NOW_MS}] CLI'

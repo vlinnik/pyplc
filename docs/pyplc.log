@@ -1,0 +1,16 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdftex 2024.4.17)  26 APR 2024 15:30
+entering extended mode
+ restricted \write18 enabled.
+ %&-line parsing enabled.
+**_build/latex/pyplc.tex
+(./_build/latex/pyplc.tex
+! Undefined control sequence.
+l.3 \documentclass
+                  [letterpaper,10pt,russian]{sphinxmanual}
+? 
+! Emergency stop.
+l.3 \documentclass
+                  [letterpaper,10pt,russian]{sphinxmanual}
+End of file on the terminal!
+
+!  ==> Fatal error occurred, no output PDF file produced!

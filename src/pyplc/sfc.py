@@ -64,7 +64,20 @@ class SFC(POU):
         self.sfc_continue = False
 
     def till(self, cond:callable, min:int=None, max:int=None, step:str=None, enter:callable=None, exit:callable=None, n=[]):
-        """Выполнять пока выполняется условие
+        """
+        Выполнять пока выполняется условие
+
+        Пример использования:
+            yield from self.till( lambda: self.clk, min = 1000, step = 'ждем пока clk не станет False' )
+
+        Args:
+            cond (callable): Логическое выражение, которое проверяется 
+            min (int, optional): Минимальное время работы в мсек. Defaults to None.
+            max (int, optional): Максимальное время работы в мсек. Defaults to None.
+            step (str, optional): Пользовательский комментарий. Defaults to None.
+            enter (callable, optional): Что выполнить в начале. Defaults to None.
+            exit (callable, optional): Что выполнить в конце. Defaults to None.
+            n (list, optional): функции, которые пока выполнение происходит вызываются с True в качестве параметра, за затем c False. Defaults to [].
         """
 
         if step is not None: self.sfc_step = f'{step}'
@@ -85,29 +98,19 @@ class SFC(POU):
             exit()
 
     def until(self, cond:callable, min:int=None, max:int=None, step:str=None, enter:callable=None, exit:callable=None, n=[]):
-        """Выполнять пока не выполнится условие
+        """Выполнять пока не выполнится условие, противоположность :py:meth:`~pyplc.sfc.SFC.till`
         """
         yield from self.till(lambda: not cond(), min=min, max=max, step=step, enter=enter, exit=exit, n = n)
 
     def main(self):
+        """
+        Пользовательская логика.
+        Необходимо написать свою реализацию этого метода, используя в нем ключевое слово `yield` там где должен быть следующий шаг.
+        """
         raise RuntimeError("SFC.main должен быть реализован")
 
     def action(self, t: callable):
-        """Создать новое действие. Выполняется паралельно.
-        
-        action - генератор, который при каждом вызове выполняет часть кода до вызова yield. 
-        class my_sfc(SFC):
-            ...
-            def my_action(self):
-                yield True
-        Теперь для объекта x:my_sfc можно выполнить x.action(x.my_action)
-        yield from self.action(self.my_action):
-
-        Args:
-            t (type): имя метода, который декорирован @sfcaction
-
-        Returns:
-            _type_: _description_
+        """Устарело, не применять. 
         """        
         job = t( )
         if self.isgenerator(job):
@@ -115,11 +118,14 @@ class SFC(POU):
         return None
         
     def exec(self,act ):
-        """Создать action и добавить его в фоновое выполнение (однократное выполнение)
+        """Создать действие и добавить его в фоновое выполнение (однократное выполнение).
 
         Args:
             act (callable | generator )
-        """        
+
+        Returns:
+            generator: созданный генератор
+        """
         if self.isgenerator(act):
             job = act
         else:

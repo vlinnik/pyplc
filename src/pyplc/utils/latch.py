@@ -1,13 +1,22 @@
+"""
+Триггеры с фиксацией
+--------------------
+
+Функциональные блоки триггеров-защелок RS/SR. При наличии или фронте входа clk выход q устанавливается и сбрасывается
+уже другим сигналом (reset). Триггеры имеют разный приоритет входов set и reset. 
+"""
+
 from pyplc.pou import POU
 
 class SR(POU):
-    """Флаг
+    """Триггер с приоритетным входом set
     """
-    set     = POU.input( False )
-    reset   = POU.input( False )
-    q       = POU.output( False)
+    set     = POU.input( False ) #: вход активация триггера
+    reset   = POU.input( False ) #: вход сброса q
+    q       = POU.output( False) #: выход, состояние триггера
     def __init__(self,set=False,reset=False,q=False,id:str =None,parent: POU =None) -> None:
-        """Конструктор
+        """SET-RESET Флаг. Если вход set==True на выходе q будет True. При положительном
+        фронте входа reset q будет сброшен (если set не установ)
 
         Args:
             set (bool, optional): Установить флаг. Defaults to False.
@@ -21,6 +30,8 @@ class SR(POU):
         self.__reset = self.reset
 
     def unset(self):
+        """Произвести сброс выхода q
+        """
         self.q=False
 
     def __call__(self,set=None,reset=None):
@@ -36,9 +47,11 @@ class SR(POU):
         return self.q
     
 class RS(POU):
-    set     = POU.input(False)
-    reset   = POU.input(False)
-    q       = POU.output(False)
+    """Триггер с приоритетным входом reset
+    """
+    set     = POU.input(False) #: вход активация триггера. q устанавливается по переходу из False в True
+    reset   = POU.input(False) #: вход сброса q. Пока ==True q = False
+    q       = POU.output(False)#: выход блока
     def __init__(self,reset=False,set=False,q=False,id:str = None,parent: POU = None) -> None:
         """Конструктор
 
@@ -54,6 +67,8 @@ class RS(POU):
         self.q = q
 
     def unset(self):
+        """Произвести сброс выхода q
+        """
         self.q = False
 
     def __call__(self,reset=None,set=None):

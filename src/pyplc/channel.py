@@ -1,3 +1,9 @@
+"""
+Базовый класс для измерительных и управляющих каналов :py:class:`~pyplc.channel.Channel`. В нем реализован механизм
+подписи на изменения значения (:py:meth:`~pyplc.channel.Channel.bind`), запись/чтение текущего значения и метод для синхронизации 
+с памятью ввода-вывода (:py:meth:`~pyplc.channel.Channel.sync`). 
+"""
+
 import struct,re
 
 class Channel(object):        
@@ -133,13 +139,13 @@ class Channel(object):
         pass
 
     def __call__(self, value=None):
-        """Доступ к значению для чтения/записи
+        """Доступ к значению для чтения/записи.
 
         Args:
-            value (_type_, optional): если не указано, то вернем :py:meth:`read`, иначе производится :py:meth:`write`
+            value (Any, optional): если value!=None, то производится :py:meth:`~pyplc.channel.Channel.write`
 
         Returns:
-            _type_: _description_
+            bool|int: Если value==None возвращает результат вызова :py:meth:`~pyplc.channel.Channel.read()` 
         """
         if value is None:
             return self.read()
