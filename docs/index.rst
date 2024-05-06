@@ -7,9 +7,10 @@
    :maxdepth: 2
    :caption: Состав:
 
-   pyplc.usage
+   pyplc.about
    pyplc.channel
    pyplc.api
+   pyplc.examples
 
 .. autosummary::
    :toctree: generated
