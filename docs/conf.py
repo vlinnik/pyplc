@@ -10,6 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+from __version__ import version_short
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../src/'))
@@ -17,17 +18,17 @@ sys.path.insert(0, os.path.abspath('../src/'))
 # -- Project information -----------------------------------------------------
 
 project = 'pyplc'
-copyright = '2024, Linnik V.V.'
-author = 'Linnik V.V.'
+copyright = '2024, Эталон КОМ'
+author = 'Эталон КОМ'
 
 # The full version, including alpha/beta/rc tags
-release = 'v0.1'
+release = f'{version_short}'
 
 
 # -- General configuration ---------------------------------------------------
 autodoc_typehints_format = 'short'
 python_use_unqualified_type_names = True
-latex_elements = {  'extraclassoptions': 'openany,oneside' }
+latex_elements = {  'extraclassoptions': 'openany,oneside','preamble': r'\usepackage{pmboxdraw}'  }
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
