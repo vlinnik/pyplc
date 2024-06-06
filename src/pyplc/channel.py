@@ -14,6 +14,7 @@ class Channel(object):
         init_val (bool|int, optional): Начальное значение. По умолчанию None.
         rw (bool, optional): Тип измерительного канала (можно изменять или только читать). По умолчанию только читать.
     """
+    runtime = False #< во время работы PYPLC.run установлено в True, что меняет поведение __get__. из за чего plc.MIXER_ON_1 будет значением канала, а иначе экземпляром Channel
     def __init__(self, name='', init_val=None, rw=False):
         self.rw = rw
         self.name = name
@@ -159,6 +160,14 @@ class Channel(object):
             if isinstance(s, Channel):
                 r[i] = s
         return r
+
+    def __get__(self, obj, _=None):
+        if obj is None or not Channel.runtime:
+            return self        
+        return self.read( )
+        
+    def __set__(self,_,value):
+        self.write(value)
 
 class IBool(Channel):
     """Дискретный вход (логический True/False)

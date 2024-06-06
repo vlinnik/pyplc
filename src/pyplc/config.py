@@ -185,7 +185,8 @@ class Manager():
                 cli = None
                 posto = None
         plc = PYPLC(sum(slots), period=scanTime, krax=kraxio, pre=cli, post=[posto,NVD(board.eeprom)])
-        hw = plc.state
+        hw = plc
+        # hw = plc.state
         plc.connection = None 
         plc.cleanup = self.cleanup
 

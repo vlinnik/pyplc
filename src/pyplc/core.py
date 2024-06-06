@@ -23,52 +23,52 @@ class PYPLC():
     TICKS_MAX = 0                           #сколько максиальное значение ms()
     GENERATOR_TYPE = type((lambda: (yield))())
 
-    class __State():
-        """
-        прокси для удобного доступа к значениям переменных ввода вывода
-        например если есть канал ввода/вывода MIXER_ON_1, то для записи необходимо MIXER_ON_1(True). 
-        альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
-        """
-        def __init__(self,parent ):
-            self.__parent = parent 
+    # class __State():
+    #     """
+    #     прокси для удобного доступа к значениям переменных ввода вывода
+    #     например если есть канал ввода/вывода MIXER_ON_1, то для записи необходимо MIXER_ON_1(True). 
+    #     альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
+    #     """
+    #     def __init__(self,parent ):
+    #         self.__parent = parent 
         
-        def __item(self,name:str)->Channel:
-            if name in self.__parent.vars:
-                return self.__parent.vars[name]
-            return None
+    #     def __item(self,name:str)->Channel:
+    #         if name in self.__parent.vars:
+    #             return self.__parent.vars[name]
+    #         return None
 
-        def __getattr__(self, __name: str):
-            if not __name.endswith('__parent') and __name in self.__parent.vars:
-                obj = self.__item(__name)
-                return obj()
-            # try:
-            return getattr(super(),__name)
-            #     return super().__getattribute__(__name)
-            # except Exception as e:
-            #     print(f'Exception in PYPLC.State.__getattr__ {e}')
+    #     def __getattr__(self, __name: str):
+    #         if not __name.endswith('__parent') and __name in self.__parent.vars:
+    #             obj = self.__item(__name)
+    #             return obj()
+    #         # try:
+    #         return getattr(super(),__name)
+    #         #     return super().__getattribute__(__name)
+    #         # except Exception as e:
+    #         #     print(f'Exception in PYPLC.State.__getattr__ {e}')
 
-        def __setattr__(self, __name: str, __value):
-            if not __name.endswith('__parent') and __name in self.__parent.vars:
-                obj = self.__item(__name)
-                obj(__value)
-                return
+    #     def __setattr__(self, __name: str, __value):
+    #         if not __name.endswith('__parent') and __name in self.__parent.vars:
+    #             obj = self.__item(__name)
+    #             obj(__value)
+    #             return
 
-            super().__setattr__(__name,__value)
+    #         super().__setattr__(__name,__value)
 
-        def __data__(self):
-            return { var: self.__item(var)() for var in self.__parent.vars }
+    #     def __data__(self):
+    #         return { var: self.__item(var)() for var in self.__parent.vars }
 
-        def bind(self,__name:str,__notify: callable):   
-            if __name not in self.__parent.vars:
-                return
-            s = self.__item(__name)
-            s.bind( __notify )
+    #     def bind(self,__name:str,__notify: callable):   
+    #         if __name not in self.__parent.vars:
+    #             return
+    #         s = self.__item(__name)
+    #         s.bind( __notify )
 
-        def unbind(self,__name:str,__notify: callable):
-            if __name not in self.__parent.vars:
-                return
-            s = self.__item(__name)
-            s.unbind( __notify )
+    #     def unbind(self,__name:str,__notify: callable):
+    #         if __name not in self.__parent.vars:
+    #             return
+    #         s = self.__item(__name)
+    #         s.unbind( __notify )
 
     def __init__(self,io_size:int,krax=None,pre=None,post=None,period:int=100):
         if PYPLC.HAS_TICKS_MS:
@@ -88,7 +88,7 @@ class PYPLC():
         self.krax = krax
         self.period = period
         self.vars = {}
-        self.state = self.__State(self)
+        # self.state = self.__State(self)
         self.ctx = None
         self.simulator = False
         self.reader = None
@@ -254,7 +254,8 @@ class PYPLC():
         if not name:
             name = channel.name
         self.vars[name] = channel
-        setattr(self,name,channel)
+        # setattr(self,name,channel)
+        setattr(PYPLC,name,channel)
         if self.connection is not None: #в режиме Coupler здесь Subscriber подключенный к физическому PLC
             remote = self.connection.subscribe(f'hw.{name}')
             if channel.rw:
@@ -274,6 +275,7 @@ class PYPLC():
         if instances is not None: 
             self.instances = [ [i,None] for i in instances]
         self.config( **kwds )
+        Channel.runtime = True
         try:
             for _ in range(0,10):
                 with self:  #первое сканирование
@@ -285,6 +287,7 @@ class PYPLC():
             print('PYPLC: Task aborted!')
             self.cleanup( )
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
+        Channel.runtime = False
     
     async def cycle(self):
         await self.eventCycle.wait()
@@ -306,3 +309,15 @@ class PYPLC():
             if self.__fts + self.period > now:
                 if have_ms: await asyncio.sleep_ms(self.__fts + self.period - now )
                 else: await asyncio.sleep( (self.__fts + self.period - now) /1000 )
+
+    def bind(self,__name:str,__notify: callable):   
+        if __name not in self.vars:
+            return
+        s = self.vars[__name]
+        s.bind( __notify )
+
+    def unbind(self,__name:str,__notify: callable):
+        if __name not in self.vars:
+            return
+        s = self.vars[__name]
+        s.unbind( __notify )

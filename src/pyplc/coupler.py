@@ -182,12 +182,12 @@ class Manager():
         if ipv4!='0.0.0.0':
             print(f'Connecting PLC via {ipv4}:9004')
             __plc = Subscriber( ipv4,9004 )        
-            hw = __plc.state
+            #hw = __plc.state
             plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc,NVD(board.eeprom)]  )
             plc.connection = __plc
         else:
             plc = PYPLC( sum(slots), period = scanTime, pre = [cli] ,post = [posto,NVD(board.eeprom)]  )
-            hw = plc.state
+            # hw = plc.state
             plc.connection = None
         
         if self.__fexists('src/krax.csv'):
@@ -224,7 +224,7 @@ class Manager():
             plc.cleanup = self.cleanup
             if ipv4!='0.0.0.0':
                 __plc.connect()
-        return plc,hw
+        return plc,None
 
 def kx_init():
     global plc,hw
@@ -238,4 +238,4 @@ if __name__!='__main__':
     board = Board( )
     manager = Manager( )
     manager.load( )
-    __all__ = ['board','plc','hw','kx_init','kx_term','exports']
+    __all__ = ['board','plc','kx_init','kx_term','exports']
