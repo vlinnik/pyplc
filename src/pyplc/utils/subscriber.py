@@ -98,6 +98,7 @@ class Subscriber(TCPClient):
         self.online = False
         for i in self.subscriptions:
             s = self.subscriptions[i]
+            s.remote(None)
             s.remote_id = None
             s.filed = False
             if s.local_id not in self.unsubscribed:

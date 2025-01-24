@@ -10,3 +10,5 @@ _version.py
 build
 tests/lesson#*.py
 docs/_build
+krax.csv
+krax.json

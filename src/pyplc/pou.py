@@ -143,12 +143,25 @@ class POU():
         self.__children__=[]
         self.__access__=[]
         if parent is not None: parent.__children__.append(self)
+        
+        hierarchy = []
+        ordered = []
+        root = self.__class__
+        while issubclass(root.__bases__[0],POU):
+            hierarchy.append(root)
+            root = root.__bases__[0]
+        hierarchy.reverse( )
+        
+        if len(hierarchy)>2:
+            pass
 
-        for key in dir(self.__class__): 
-            p = getattr(self.__class__,key)
-            if isinstance( p,POU.var ) and not p._dynamic:
-                if p._persistent: self.__persistent__.append(key)
-                POU.var.setup(p,key,self,p._value)
+        for root in hierarchy:
+            for key in dir(root):
+                p = getattr(root,key)
+                if isinstance( p,POU.var ) and not p._dynamic and key not in ordered:
+                    ordered.append(key)
+                    if p._persistent: self.__persistent__.append(key)
+                    POU.var.setup(p,key,self,p._value)
 
 
     def join(self, input: str | input, fn: callable):

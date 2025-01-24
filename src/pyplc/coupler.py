@@ -33,10 +33,10 @@ def exports(ctx: dict,prefix:str=None):
         obj = ctx[i]
         try:
             data = obj.__data__()
-            if i!='hw':
+            if not isinstance(obj,PYPLC):
                 vars = [ f'\t{prefix}{i}.{x} AT {prefix}{i}.{x}: {__typeof(data[x])};' for x in data.keys() ]
             else:
-                vars = [ f'\t{prefix}{x} AT {prefix}{i}.{x}: {__typeof(data[x])};' for x in data.keys() ]
+                vars = [ f'\t{prefix}{x} AT {prefix}{i}.{x}: {__typeof(data[x]( ))};' for x in data.keys() ]
             print('\n'.join(vars))
         except:
             pass

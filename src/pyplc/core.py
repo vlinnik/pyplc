@@ -55,8 +55,8 @@ class PYPLC():
 
     #         super().__setattr__(__name,__value)
 
-    #     def __data__(self):
-    #         return { var: self.__item(var)() for var in self.__parent.vars }
+    def __data__(self):
+        return self.vars
 
     #     def bind(self,__name:str,__notify: callable):   
     #         if __name not in self.__parent.vars:

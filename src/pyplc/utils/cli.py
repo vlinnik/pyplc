@@ -4,12 +4,14 @@
 ----------------------------------
 
 Пример использования:
+
 ::
-        from pyplc.utils.cli import CLI
-        telnet = CLI()
-        while True:
-            telnet()
-           
+    from pyplc.utils.cli import CLI
+    telnet = CLI()
+    while True:
+        telnet()
+
+
 Каждый цикл работы программы читает данные от клиента и выполняет их через eval().
 Специально создавать экземпляр данной программы не нужно, это происходит в :py:mod:`pyplc.config`.
 
