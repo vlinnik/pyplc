@@ -41,8 +41,11 @@ class Subscription(Property):
         Args:
             value (Any): новое значение
         """
-        self.write(value)     # произведем
-        self.modified = False # не надо отправлять на удаленную сторону
+        if not self.modified:
+            self.write(value)     # произведем
+            self.modified = False # не надо отправлять на удаленную сторону
+        else:
+            pass    #отклоняем, тк. есть локальные изменения
         self.rx +=1
 
 class Subscriber(TCPClient):
