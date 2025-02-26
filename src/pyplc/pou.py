@@ -312,7 +312,7 @@ class POU():
                 value,=struct.unpack_from('!d',buf,off)
                 off+=8
             else:
-                raise TypeError('Unknown type code')
+                raise TypeError(f'Unknown type code {t},{self.id}.{i}')
             if hasattr(self,i):
                 setattr(self,i,value)
 
