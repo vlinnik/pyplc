@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+# See debhelper(7) (uncomment to enable).
+# Output every command that modifies files on the build system.
+#export DH_VERBOSE = 1
+
+export PYBUILD_NAME=pyplc
+
+%:
+	dh $@ --buildsystem=pybuild
+
+#override_dh_auto_configure:
+#	dh_auto_configure
+#	cp debian/control.in debian/control
+#	intltool-merge -d -u po debian/control.in debian/control
+
+#override_dh_auto_build:
+#	(cd po && $(MAKE))

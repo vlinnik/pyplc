@@ -16,7 +16,7 @@ def file_template(src: str,dst: str,env = {}):
         content = data.joinpath(src).read_text()
         var = re.compile(r'\${([^}]+)}')
         for m in re.findall(var,content):
-            what = '\${' + f'{m}' + '}'
+            what = r'\${' + f'{m}' + '}'
             content = re.sub(what,env[m] if m in env else f'<{m} not set>',content)
         output.write(content)
 

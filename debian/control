@@ -1,0 +1,28 @@
+Source: pyplc
+Section: devel
+Priority: optional
+Maintainer: vlinnik <vlinnik@mail.ru>
+Rules-Requires-Root: no
+Build-Depends: 
+ debhelper-compat (= 13),
+ dh-sequence-python3,
+ python3-setuptools,
+ dh-python,
+ python3-all
+Standards-Version: 4.6.2
+Homepage: http://etalonkom.ru/krax-plc
+Vcs-Git: https://github.com/vlinnik/pyplc.git
+
+Package: python3-pyplc
+Architecture: all
+Multi-Arch: foreign
+Depends:
+ ${python3:Depends},
+ ${misc:Depends},
+Suggests:
+Description: Library for developing and debugging control logic on KRAX PLC-932 (python3)
+ The pyplc module is designed for developing and debugging control 
+ logic in Python 3, simplifying code writing in a style similar to
+ classic programming languages such as SFC/STL/LD, but in Python. 
+ It is aimed at subsequent execution on systems with MicroPython 
+ (KRAX PLC-932).
