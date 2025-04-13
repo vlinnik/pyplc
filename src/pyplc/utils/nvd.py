@@ -74,6 +74,7 @@ class NVD(POU):
             return False
         
         NVD.__seek_end(source)
+        name = '<entry>'
 
         try:
             with open(index,'r') as f:
@@ -93,7 +94,7 @@ class NVD(POU):
                 
                 data = source.read(size)
                 so.from_bytearray( data, properties )
-        except FileNotFoundError:
+        except OSError:
             print(f'E: backup index file not found(persist.json)')
         except Exception as e:
             print(f'E: cannot restore {name}:{e}')
