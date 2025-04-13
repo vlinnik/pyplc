@@ -26,10 +26,10 @@ class POU():
             setattr(type(parent),__name,attr)
             if __name not in parent.__vars__:
                 attr._index = len(parent.__vars__)
-                parent.__vars__.append(__name)
+                parent.__vars__+=(__name,)
                 parent.__values__.append(initial)
-                parent.__inputs__.append(None)
-                parent.__outputs__.append([])
+                parent.__inputs__+=(None,)
+                parent.__outputs__+=([],)
                 parent.__touched__.append(False)
                 parent.__access__.append( attr.__access__(parent) )
 
@@ -134,10 +134,10 @@ class POU():
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
         self.full_id = id
-        self.__vars__   = []
+        self.__vars__   = ()
         self.__values__ = []
-        self.__inputs__ = []
-        self.__outputs__= []
+        self.__inputs__ = ()
+        self.__outputs__= ()
         self.__touched__= []
         self.__persistent__=[]
         self.__children__=[]
@@ -170,7 +170,7 @@ class POU():
         try:
             setattr(self,input,fn())         # начальное значение + проверка работоспособности fn
             p = getattr(self.__class__,input)
-            self.__inputs__[p._index] = fn
+            self.__inputs__ = self.__inputs__[:p._index]+(fn,)+self.__inputs__[p._index+1:]
         except Exception as e:
             raise RuntimeError(f'Error {e} in POU.join {self}.{input}')
 
@@ -197,7 +197,7 @@ class POU():
                 p = getattr(self.__class__,__name)
             except:
                 return
-        self.__outputs__[p._index] = list(filter( lambda i : __sink!=None and i!=__sink and id(i)!=__sink ,self.__outputs__[p._index] ))
+        self.__outputs__ =self.__outputs__[:p._index]+ (list(filter( lambda i : __sink!=None and i!=__sink and id(i)!=__sink ,self.__outputs__[p._index] )),)+self.__outputs__[p._index+1:]
 
     def __enter__(self):
         i = 0
