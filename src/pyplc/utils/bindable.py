@@ -38,6 +38,14 @@ class Property():
             return args[0]
         return self.read()
 
+    def __get__(self, obj, _=None):
+        if obj is None:
+            return self        
+        return self.read( )
+        
+    def __set__(self,_,value):
+        self.write(value)
+
 class Expressions(dict):
     class Expression(Property):
         def __init__(self, ctx, source: str) -> None:

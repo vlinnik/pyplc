@@ -46,7 +46,7 @@ class Subscription(Property):
             self.modified = False # не надо отправлять на удаленную сторону
         else:
             pass    #отклоняем, тк. есть локальные изменения
-        self.rx +=1
+        self.rx +=1            
 
 class Subscriber(TCPClient):
     class __State():
@@ -111,15 +111,18 @@ class Subscriber(TCPClient):
         s = Subscription(item)
         self.subscriptions[s.local_id] = s
         if local_id is None:    #локальное имя не должно содержать .
+            hidden = True
             path = item.split('.')
             if len(path) > 1:
                 local_id = '.'.join(path[1:])
             else:
                 local_id = item
             local_id.replace('.', '_')
+        else:
+            hidden = False
         self.items[local_id] = s.local_id
         self.unsubscribed.append(s.local_id)
-        setattr(self, local_id, s)
+        if not hidden: setattr(self.__class__, local_id, s)
         return s
 
     def received(self, data: memoryview):
