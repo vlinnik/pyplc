@@ -23,52 +23,8 @@ class PYPLC():
     TICKS_MAX = 0                           #сколько максиальное значение ms()
     GENERATOR_TYPE = type((lambda: (yield))())
 
-    # class __State():
-    #     """
-    #     прокси для удобного доступа к значениям переменных ввода вывода
-    #     например если есть канал ввода/вывода MIXER_ON_1, то для записи необходимо MIXER_ON_1(True). 
-    #     альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
-    #     """
-    #     def __init__(self,parent ):
-    #         self.__parent = parent 
-        
-    #     def __item(self,name:str)->Channel:
-    #         if name in self.__parent.vars:
-    #             return self.__parent.vars[name]
-    #         return None
-
-    #     def __getattr__(self, __name: str):
-    #         if not __name.endswith('__parent') and __name in self.__parent.vars:
-    #             obj = self.__item(__name)
-    #             return obj()
-    #         # try:
-    #         return getattr(super(),__name)
-    #         #     return super().__getattribute__(__name)
-    #         # except Exception as e:
-    #         #     print(f'Exception in PYPLC.State.__getattr__ {e}')
-
-    #     def __setattr__(self, __name: str, __value):
-    #         if not __name.endswith('__parent') and __name in self.__parent.vars:
-    #             obj = self.__item(__name)
-    #             obj(__value)
-    #             return
-
-    #         super().__setattr__(__name,__value)
-
     def __data__(self):
         return self.vars
-
-    #     def bind(self,__name:str,__notify: callable):   
-    #         if __name not in self.__parent.vars:
-    #             return
-    #         s = self.__item(__name)
-    #         s.bind( __notify )
-
-    #     def unbind(self,__name:str,__notify: callable):
-    #         if __name not in self.__parent.vars:
-    #             return
-    #         s = self.__item(__name)
-    #         s.unbind( __notify )
 
     def __init__(self,io_size:int,krax=None,pre=None,post=None,period:int=100):
         if PYPLC.HAS_TICKS_MS:
@@ -103,9 +59,7 @@ class PYPLC():
         self.dirty = memoryview(self.mask)          #оптимизация
         self.mv_data = memoryview(self.data)        #оптимизация
         self.instances = []                         #пользовательские программы которые надо выполнять каждое сканирование
-        
-        print(f'Initialized PYPLC with scan time={self.period} msec!')
-    
+            
     def __str__(self):
         return f'scan/user/idle/overrun {self.scanTime}/{self.userTime}/{self.idleTime}/{self.overRun}'
     
