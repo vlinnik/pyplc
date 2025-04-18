@@ -99,6 +99,8 @@ class TOF(SFC):
     def main(self):
         """Если clk==True, то q=True. При clk==False через pt мсек q = False. 
         """
+        self.q = self.clk
+        yield from self.until(lambda: self.clk)
         while True:
             self.et = 0
             for _ in self.till(lambda: self.clk):
