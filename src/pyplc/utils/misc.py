@@ -101,7 +101,7 @@ class TOF(SFC):
         """
         self.q = self.clk
         yield from self.until(lambda: self.clk)
-        while True:
+        while not self.sfc_reset:
             self.et = 0
             for _ in self.till(lambda: self.clk):
                 self.q = self.clk
