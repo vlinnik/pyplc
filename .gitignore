@@ -5,8 +5,6 @@ depricated
 dist
 src/pyplc.egg-info
 upydev_.config
-src/pyplc/version.py
-_version.py
 build
 tests/lesson#*.py
 docs/_build
