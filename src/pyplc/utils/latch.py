@@ -1,3 +1,4 @@
+from typing import *
 """
 Триггеры с фиксацией
 --------------------
@@ -36,8 +37,8 @@ class SR(POU):
 
     def __call__(self,set=None,reset=None):
         with self:
-            set = self.overwrite('set',set)
-            reset = self.overwrite('reset',reset)
+            set = self.set #self.overwrite('set',set)
+            reset = self.reset #self.overwrite('reset',reset)
             if set:
                 self.q=True
             if reset and not self.__reset:
@@ -45,14 +46,11 @@ class SR(POU):
             self.__reset = self.reset
 
         return self.q
-    
-class RS(POU):
-    """Триггер с приоритетным входом reset
+
+class RS():
+    """Триггер с приоритетным входом reset. установка q происходит по фронту входа set
     """
-    set     = POU.input(False) #: вход активация триггера. q устанавливается по переходу из False в True
-    reset   = POU.input(False) #: вход сброса q. Пока ==True q = False
-    q       = POU.output(False)#: выход блока
-    def __init__(self,reset=False,set=False,q=False,id:str = None,parent: POU = None) -> None:
+    def __init__(self,reset:bool | Callable[[],bool]=None,set:bool | Callable[[],bool]=None,q:bool|Callable[[bool],None] = False,**kwargs) -> None:
         """Конструктор
 
         Args:
@@ -60,29 +58,45 @@ class RS(POU):
             set (bool, optional): Установить флаг. Defaults to False.
             q (bool, optional): Текущее состояние. Defaults to False.
         """
-        super().__init__( id,parent)
-        self.set = set
-        self.reset = reset 
+        self._set = set
+        self._reset = reset 
+        self._q = q
         self.__set   = self.set
-        self.q = q
-
+        self.__q = False
+    @property
+    def set(self)->bool:
+        if callable(self._set):
+            return self._set( )
+        return self._set
+    @property 
+    def reset(self)->bool:
+        if callable(self._reset):
+            return self._reset()
+        return self._reset
+    @property 
+    def q(self)->bool:
+        return self.__q
+    @q.setter
+    def q(self,q:bool):
+        if self.__q==q: return
+        self.__q = q
+        if callable(self._q):
+            self._q(q)
+            
     def unset(self):
         """Произвести сброс выхода q
         """
         self.q = False
 
-    def __call__(self,reset=None,set=None):
-        with self:
-            reset = self.overwrite('reset',reset)
-            set = self.overwrite('set',set)
-            if reset:
-                self.q=False
-            if set and set!=self.__set:
-                self.q=True
-
-            if self.q is None:
-                self.q = False
-
-            self.__set = set
+    def __call__(self,reset:bool=None,set:bool=None):
+        reset = self.reset
+        set = self.set 
+        if reset:
+            self.q=False
+        if set and set!=self.__set:
+            self.q=True
+        if self.q is None:
+            self.q = False
+        self.__set = set
             
         return self.q

@@ -21,28 +21,51 @@ class RTRIG(POU):
 
     def __call__(self, clk=None) :
         with self:
-            clk = self.overwrite('clk',clk)
+            clk = self.clk #self.overwrite('clk',clk)
             self.q = (not self.__clk and clk)
             self.__clk = clk
         return self.q
 
-class FTRIG(POU):
-    """
-    Детектирование перехода clk из True в False.
-    """
-    clk = POU.input(False)
-    q = POU.output(False)
-    def __init__(self,clk:bool=False,q:bool=False,id:str=None,parent:POU=None) -> None:
-        super().__init__( id,parent )
-        self.clk = clk
-        self.__clk = self.clk
-        self.q = q
+# class FTRIG(POU):
+#     """
+#     Детектирование перехода clk из True в False.
+#     """
+#     clk = POU.input(False)
+#     q = POU.output(False)
+#     def __init__(self,clk:bool=False,q:bool=False,id:str=None,parent:POU=None) -> None:
+#         super().__init__( id,parent )
+#         self.clk = clk
+#         self.__clk = self.clk
+#         self.q = q
 
-    def __call__(self,clk = None):
-        with self:
-            clk = self.overwrite('clk',clk)
-            self.q = (self.__clk and not clk)
-            self.__clk = clk
+#     def __call__(self,clk = None):
+#         with self:
+#             clk = self.clk #self.overwrite('clk',clk)
+#             self.q = (self.__clk and not clk)
+#             self.__clk = clk
+#         return self.q         
+class FTRIG():
+    def __init__(self,clk: callable , q: callable = None,**kwargs):
+        self._clk = clk
+        self._q  = q
+        self.__clk = clk( )
+        self.__q   = False
+    @property
+    def clk(self)->bool:
+        return self._clk( )
+    @property
+    def q(self)->bool:
+        return self.__q
+    @q.setter
+    def q(self,q:bool):
+        if self.__q!=q:
+            self.__q = q
+            if self._q: self._q(q)
+    
+    def __call__(self,clk: bool = None):
+        clk = clk if clk is not None else self.clk
+        self.q = (self.__clk and not clk)
+        self.__clk = clk
         return self.q         
 
 class TRIG(POU):
@@ -59,7 +82,7 @@ class TRIG(POU):
 
     def __call__(self,clk = None):
         with self:
-            clk = self.overwrite('clk',clk)
+            clk = self.clk #self.overwrite('clk',clk)
             self.q = (self.__clk and not clk) or (not self.__clk and clk)
             self.__clk = clk
         return self.q        
@@ -83,8 +106,8 @@ class TRANS(POU):
 
     def __call__(self,clk = None,value = None):
         with self:
-            clk = self.overwrite('clk',clk)
-            value = self.overwrite('value',value)
+            clk = self.clk #self.overwrite('clk',clk)
+            value = self.value #self.overwrite('value',value)
             self.q = (self.__clk and not clk) or (not self.__clk and clk)
             self.__clk = clk
             if self.q and value is not None:

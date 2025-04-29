@@ -6,6 +6,7 @@
 """
 
 from pyplc.sfc import SFC,POU
+from typing import *
 
 class Stopwatch(SFC):
     """Таймер с настраевыемым моментом сработки. Подобие часов используемых при игре в шахматы
@@ -77,44 +78,59 @@ class TON(SFC):
 
     def __call__(self,clk: bool = None, pt: int = None):
         with self:
-            self.overwrite('pt', pt)
-            self.overwrite('clk', clk)
+            #self.overwrite('pt', pt)
+            #self.overwrite('clk', clk)
             self.call() 
         return self.q
 
-class TOF(SFC):
+class TOF():
     """Задержка при отключении
     """
-    clk = POU.input(False)  #: вход, который с задержкой pt снимается с выхода q
-    pt  = POU.input(1000)   #: задержка в мсек
-    q   = POU.output(False) #: выход блока
-    et  = POU.output( 0 )   #: сколько времени прошло с момента установки clk
-    def __init__(self, clk: bool = False, q: bool=False, et: int = 0, pt: int = 1000,id:str =None,parent: POU =None):
-        super().__init__( id,parent )
-        self.clk = clk
+    # clk = POU.input(False)  #: вход, который с задержкой pt снимается с выхода q
+    # pt  = POU.input(1000)   #: задержка в мсек
+    # q   = POU.output(False) #: выход блока
+    # et  = POU.output( 0 )   #: сколько времени прошло с момента установки clk
+    def __init__(self, clk: bool | Callable[[],bool] = False, q: bool | Callable[[bool],None]=False, pt: int = 1000,**kwargs):
+        self._clk = clk
+        self._q = q
         self.pt = pt
-        self.q = q
-        self.et = et    
+        self.et = 0
+        self._logic = self.main( )
+        self.__q = None
+    
+    @property
+    def clk(self)->bool:
+        if callable(self._clk):
+            return self._clk( )
+    @property
+    def q(self)->bool:
+        return self.__q
+    @q.setter
+    def q(self,q:bool):
+        if self.__q==q: return
+        self.__q = q
+        if callable(self._q):
+            self._q(q)
 
     def main(self):
         """Если clk==True, то q=True. При clk==False через pt мсек q = False. 
         """
         while True:
             self.et = 0
-            for _ in self.till(lambda: self.clk):
+            while self.clk:
                 self.q = self.clk
                 yield
             begin = POU.NOW_MS
-            for _ in self.until(lambda: self.clk):
+            while not self.clk:
                 self.et = POU.NOW_MS - begin
                 self.q = self.et <= self.pt and self.q
                 yield
 
     def __call__(self,clk: bool = None, pt: int = None):
-        with self:
-            self.overwrite('clk',clk)
-            self.overwrite('pt', pt)
-            self.call( )
+        # with self:
+            #self.overwrite('clk',clk)
+            #self.overwrite('pt', pt)
+        next(self._logic)
         return self.q
 
 
@@ -145,7 +161,7 @@ class BLINK(SFC):
 
     def __call__(self, enable: bool = None):
         with self:
-            self.overwrite('enable', enable)
+            #self.overwrite('enable', enable)
             self.call( )
         return self.q
 
@@ -172,6 +188,6 @@ class TP(SFC):
 
     def __call__(self, clk: bool = None):
         with self:
-            self.overwrite('clk', clk)
+            #self.overwrite('clk', clk)
             self.call( )
         return self.q
