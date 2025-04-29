@@ -1,6 +1,8 @@
 import os
 import sys
 from pyplc.core import PYPLC
+from collections import namedtuple
+
 class IO():
     def __init__(self):
         pass
@@ -52,6 +54,11 @@ def exports(ctx: dict,prefix:str=None):
 import argparse
 args = argparse.ArgumentParser(sys.argv)
 args.add_argument('--exports',action='store_true',default=False)
+args.add_argument('--conf', action='store', type=str, default='.', help='IO files name, default (krax.json/krax.csv)')
+args.add_argument('--port', action='store', type=int, default=9004, help='Interface port, default 9004')
+args.add_argument('--cli', action='store', type=int, default=2455, help='Interface port, default 2455')
+args.add_argument('--nocli', action='store_true', default=False, help='Dont start CLI interface (2455 port)')
+
 ns = args.parse_args()
 
 before = None
@@ -59,8 +66,20 @@ before = None
 if ns.exports:
     before = exports
 
+PLATFORM_CONF = namedtuple('PLATFORM_CONF',( 'conf_dir','port','nocli','cli' ) )    
+platform_conf   = PLATFORM_CONF( conf_dir= ns.conf,port=ns.port,nocli=ns.nocli,cli=ns.cli )
 after = None
 
+workdir = os.path.abspath(os.curdir)
 os.chdir('src')
 io = IO( )
-__all__ = ['io','before','after']
+
+try:
+    storage = open(f'{ns.conf}/persist.dat','r+b')
+except FileNotFoundError:
+    with open(f'{ns.conf}/persist.dat','w+b') as f:
+        f.write(bytearray(256))
+    storage = open(f'{ns.conf}/persist.dat','r+b')
+    storage.seek(0)
+
+__all__ = ['io','before','after','storage','platform_conf']

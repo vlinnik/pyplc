@@ -5,10 +5,14 @@ from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.cli import CLI
 from pyplc.utils.posto import POSTO
+from pyplc.utils.nvd import NVD
 import re,gc,time
 
 sys.modules['_platform'] = __import__(f'pyplc.platform_{sys.platform}',None,None,['platform_linux'])
-from _platform import io,before,after
+try:
+    from _platform import io,before,after,storage,platform_conf
+except:
+    from platform_linux import io,before,after,storage,platform_conf
 
 def __fexists(filename):
     try:
@@ -17,25 +21,41 @@ def __fexists(filename):
     except OSError:
         return False
 
+cli = None
+posto = None
+plc = None
+
 def __cleanup():
     global cli, posto, plc
     try:
-        plc
-        print('\tОсвобождаем ресурсы: cli/posto/plc')
-        if cli is not None: cli.term()
-        if posto is not None: posto.term()
-        del cli
-        del posto
-        del plc
+        if plc is not None:
+            del plc
+            plc = None
+        if cli is not None: 
+            cli.term()
+            del cli
+            cli = None
+        if posto is not None: 
+            posto.term()
+            del posto
+            post = None
         io.deinit( )
+        if '_platform' in sys.modules: 
+            del(sys.modules['_platform'])
+        if 'pyplc.platform' in sys.modules: 
+            del(sys.modules['pyplc.platform'])        
     except Exception as e:
+        print('cleanup:',e)
         pass
+    gc.collect()
 
 def __load():
     global cli, posto, plc
     conf = {'node_id': 1, 'layout': [], 'devs': [], 'init' : { 'iface': 0, 'hostname' : 'krax'} }
-    if __fexists('krax.json'):
-        with open('krax.json', 'rb') as f:
+    krax_json = f'{platform_conf.conf_dir}/krax.json'
+    krax_csv = f'{platform_conf.conf_dir}/krax.csv'
+    if __fexists(krax_json):
+        with open(krax_json, 'rb') as f:
             conf = json.load(f)
 
     scanTime = conf['scanTime'] if 'scanTime' in conf else 100
@@ -46,22 +66,22 @@ def __load():
     posto = None
 
     try:
-        cli = CLI()  # simple telnet
-        posto = POSTO(port=9004)  # simple share data over tcp
+        if not platform_conf.nocli: cli = CLI(port=platform_conf.cli)  # simple telnet
+        posto = POSTO(port=platform_conf.port)   # simple share data over tcp
     except Exception as e:
         print(f'\tCLI/POSTO порты заняты ({e}).')
         cli = None
         posto = None
         
     io.init( conf['node_id'],**conf['init'] )
-    plc = PYPLC(sum(slots), period=scanTime, krax = io, pre=[before,cli], post=[posto,after])
+    plc = PYPLC(sum(slots), period=scanTime, krax = io, pre=[before,cli], post=[posto,after,NVD(storage)])
     plc.cleanup = __cleanup
     plc.connection = None
 
-    if __fexists('krax.csv'):
+    if __fexists(krax_csv):
         vars = 0
         errs = 0
-        with open('krax.csv', 'r') as csv:
+        with open(krax_csv, 'r') as csv:
             csv.readline()  # skip column headers
             id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
             num = re.compile(r'[0-9]+')
@@ -93,6 +113,7 @@ def __load():
                     sys.print_exception(e)
                     errs = errs+1
         gc.collect()
+        plc.config(persist=storage)
 
 if __name__ != '__main__':
     plc = None
