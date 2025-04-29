@@ -192,7 +192,7 @@ class PYPLC():
                             next(i[1])
                         except StopIteration:
                             i[1] = None
-                    else:
+                    elif i[0]:
                         i[1] = i[0]( )
     
     def declare(self,channel: Channel, name: str = None):
@@ -227,7 +227,7 @@ class PYPLC():
             instances (callable|generator, optional): Пользовательские программы.
         """
         if instances is not None: 
-            self.instances = [ [i,None] for i in instances]
+            self.instances = tuple( [i,None] for i in instances )
         self.config( **kwds )
         Channel.runtime = True
         try:

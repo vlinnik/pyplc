@@ -13,6 +13,7 @@ class POU():
     EPOCH=time.time_ns( )   
     NOW  = 0                #: момент начала цикла работы логики в нано-сек
     NOW_MS=0                #: момент начала цикла работы логики в мсек
+    USE_COUNT=0
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
 
@@ -129,7 +130,10 @@ class POU():
             o.persistent(id)
         return not found
     def log(self,*args,**kwds):
-        print(f'[{POU.NOW_MS}] #{self.full_id:12.12s}:', *args, **kwds)
+        if self.full_id:
+            print(f'[{POU.NOW_MS}] #{self.full_id:12.12s}:', *args, **kwds)
+        else:
+            print(f'[{POU.NOW_MS}] #            :', *args, **kwds)            
         
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
@@ -143,6 +147,7 @@ class POU():
         self.__children__=[]
         self.__access__=[]
         if parent is not None: parent.__children__.append(self)
+        self.__class__.USE_COUNT += 1
         
         hierarchy = []
         ordered = []
