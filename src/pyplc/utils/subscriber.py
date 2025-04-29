@@ -49,50 +49,14 @@ class Subscription(Property):
         self.rx +=1            
 
 class Subscriber(TCPClient):
-    class __State():
-        """
-        прокси для удобного доступа к значениям переменных ввода вывода
-        например если есть канал ввода/вывода MIXER_ON_1, то для записи необходимо MIXER_ON_1(True). 
-        альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
-        """
-
-        def __init__(self, parent):
-            self.__parent = parent
-
-        def __item(self, name: str) -> Subscription:
-            id = self.__parent.items[name]
-            return self.__parent.subscriptions[id]
-
-        def __getattr__(self, __name: str):
-            if not __name.endswith('__parent') and __name in self.__parent.items:
-                obj = self.__item(__name)
-                if obj.remote_id is not None:
-                    return obj()
-                return None
-            return super().__getattribute__(__name)
-
-        def __setattr__(self, __name: str, __value):
-            if not __name.endswith('__parent') and __name in self.__parent.items:
-                obj = self.__item(__name)
-                if obj.remote_id is not None:
-                    obj.write(__value)
-                return
-
-            return super().__setattr__(__name, __value)
-
-        def __data__(self):
-            return {var: self.__item(var)() for var in self.__parent.items}
-
-    def __init__(self, host, port=9004):
+    def __init__(self, host, port=9004,i_size:int=512,o_size:int=1024):
         self.items = {}
         self.unsubscribed = []
         self.subscriptions = {}
         self.keepalive = time.time_ns()
-        self.state = self.__State(self)
         self.online = False
         self.stat = [None]*3
-
-        super().__init__(host, port)
+        super().__init__( host,port, i_size=i_size,o_size=o_size )
 
     def connected(self):
         pass
@@ -190,7 +154,7 @@ class Subscriber(TCPClient):
             filed = []
             end = 8
             for i in self.unsubscribed:
-                if end > self.b_size/2:
+                if end > self.o_size/2:
                     break
                 s = self.subscriptions[i]
                 if s.filed:
@@ -216,7 +180,7 @@ class Subscriber(TCPClient):
                 for s in modified:
                     value = s()
                     remote_id = s.remote_id
-                    if value is None or end > self.b_size-32 or remote_id is None:
+                    if value is None or end > self.o_size-32 or remote_id is None:
                         continue
                     elif type(value) is bool:
                         struct.pack_into('!HBHb', payload, end,

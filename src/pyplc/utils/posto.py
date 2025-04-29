@@ -130,7 +130,7 @@ class POSTO(TCPServer):
         self.subscriptions = {}
         self.belongs = {}  # map subscription to fileno of socket
         self.keepalive = time.time_ns()
-        super().__init__(port,i_size = 1024, o_size = 4096)
+        super().__init__(port,i_size = 2048, o_size = 4096)
 
     def find(self, item: str):
         for id in self.subscriptions:

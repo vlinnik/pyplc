@@ -1,4 +1,5 @@
 import socket,sys
+import errno,select
 from .buffer import BufferInOut
 
 """
@@ -10,6 +11,7 @@ TCP клиент с работой циклами. Синхронно кажды
         client()             #логика работы сервера. 
 """
 class TCPClient():
+    TRY_LIMIT = 1000
     @staticmethod
     def attention(e: Exception,hint: str=''):
         if hasattr(sys,'print_exception'): 
@@ -18,7 +20,7 @@ class TCPClient():
         else:
             print(f'Attention: {e}({hint})')
     
-    def __init__(self,host: str, port:int ,b_size:int=256):
+    def __init__(self,host: str, port:int ,i_size:int=256,o_size:int=256):
         """Инициализация и запуск клиента по указанному порту
 
         Args:
@@ -27,10 +29,12 @@ class TCPClient():
         """
         self.host = host
         self.port = port
-        self.b_size = b_size
+        self.i_size = i_size
+        self.o_size = o_size
         self.buf = bytearray()
         self.sock = None
-        # self.connect()
+        self._sock = None # на время установки соединения 
+        self._tries = TCPClient.TRY_LIMIT
 
     def connected(self):
         print(f'Connected to {self.host}:{self.port}')
@@ -50,15 +54,35 @@ class TCPClient():
             self.sock.tx.put(data)
 
     def connect(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self._sock:
+            events = self._poll.poll(0)
+            if events:
+                sock = self._sock
+                del self._poll
+                self._poll = None
+                self._sock = None
+                if (events[0][1] & (select.POLLIN | select.POLLOUT))!=0:
+                    sock.settimeout(0)
+                    self.sock = BufferInOut(sock,i_size=self.i_size,o_size=self.o_size)
+                    self.connected()
+                    return
+                else:
+                    sock.close()
+            else:
+                return
+            
         try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(6, 1, 1)    #IP_PROTOTCP,TCP_NODELAY, only on pc
-            sock.settimeout(5)
-            sock.connect((self.host, self.port))
-            sock.settimeout(None)
             sock.setblocking(False)
-            self.sock = BufferInOut(sock)
-            self.connected()
+            sock.connect((self.host, self.port))
+        except OSError as e:
+            if e.errno==errno.EINPROGRESS:
+                self._sock = sock
+                self._poll = select.poll()
+                self._poll.register(sock,select.POLLIN | select.POLLOUT)
+            else:
+                sock.close( )
         except Exception as e:
             sock.close()
             
@@ -77,8 +101,13 @@ class TCPClient():
             
         try:
             if sock.read( ) == -1:
-                self.close()
+                if self._tries>0:
+                    self._tries-=1
+                else:
+                    self.close()
                 return
+            else:
+                self._tries = TCPClient.TRY_LIMIT
             
             if sock.rx.size()!=0:
                 last_processed = processed = self.received( sock.rx.head( ) )
@@ -92,6 +121,9 @@ class TCPClient():
         except Exception as e:
             self.attention(e,'TCPClient')
             self.close()
+        finally:
+            if self.sock is None: 
+                return
             
         try:
             self.routine()
@@ -100,4 +132,3 @@ class TCPClient():
             self.close() 
             
         sock.tx.flush( )
-                           
