@@ -11,7 +11,7 @@ TCP клиент с работой циклами. Синхронно кажды
         client()             #логика работы сервера. 
 """
 class TCPClient():
-    TRY_LIMIT = 1000
+    TRY_LIMIT = 20
     @staticmethod
     def attention(e: Exception,hint: str=''):
         if hasattr(sys,'print_exception'): 

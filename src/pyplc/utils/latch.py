@@ -86,7 +86,8 @@ class RS():
     def unset(self):
         """Произвести сброс выхода q
         """
-        self.q = False
+        self.__q = False
+        self.__set = self.set
 
     def __call__(self,reset:bool=None,set:bool=None):
         reset = self.reset

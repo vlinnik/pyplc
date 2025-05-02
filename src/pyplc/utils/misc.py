@@ -127,9 +127,8 @@ class TOF():
                 yield
 
     def __call__(self,clk: bool = None, pt: int = None):
-        # with self:
-            #self.overwrite('clk',clk)
-            #self.overwrite('pt', pt)
+        if pt is not None: self.pt = pt
+        if clk is not None: self.clk = clk
         next(self._logic)
         return self.q
 

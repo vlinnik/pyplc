@@ -205,7 +205,7 @@ class Subscriber(TCPClient):
                     self.sock.tx.grow(end)
             else:
                 payload = self.sock.tx.data()
-                if time.time_ns() > self.keepalive+5000000000:
+                if time.time_ns() > self.keepalive+1000000000:
                     struct.pack_into('iiq', payload, 0, 3, 8,
                                      time.time_ns())  # keep alive
                     self.sock.tx.grow(16)

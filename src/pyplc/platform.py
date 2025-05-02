@@ -113,7 +113,7 @@ def __load():
                     sys.print_exception(e)
                     errs = errs+1
         gc.collect()
-        plc.config(persist=storage)
+        plc.config(persist=storage,conf_dir=platform_conf.conf_dir)
 
 if __name__ != '__main__':
     plc = None

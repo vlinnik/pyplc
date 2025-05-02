@@ -54,11 +54,12 @@ class PYPLC():
             self.reader = krax.read_to
             self.writer = krax.write
         self.__persist = None
+        self.__conf_dir = '.'
         self.data = array.array('B',[0x00]*io_size) #что писать
         self.mask = array.array('B',[0x00]*io_size) #бит из data писать только если бит=1
         self.dirty = memoryview(self.mask)          #оптимизация
         self.mv_data = memoryview(self.data)        #оптимизация
-        self.instances = []                         #пользовательские программы которые надо выполнять каждое сканирование
+        self.instances = ()                         #пользовательские программы которые надо выполнять каждое сканирование
             
     def __str__(self):
         return f'scan/user/idle/overrun {self.scanTime}/{self.userTime}/{self.idleTime}/{self.overRun}'
@@ -102,13 +103,14 @@ class PYPLC():
     def write(self):
         self.sync(True)
         
-    def config(self,simulator:bool=None,ctx = None,persist = None, **kwds ):
+    def config(self,simulator:bool=None,ctx = None,persist = None, conf_dir=None, **kwds ):
         """Изменение параметров. Вызывается из run.
 
         Args:
             simulator (bool, optional): Режим симулятора. Если включено, то пользовательские программы не вызываются, только опрос и интерфейс обмена. Defaults to None.
             ctx (dict, optional): если указывать, то должно быть так: plc.config(ctx=globals()) . Defaults to None.
             persist (IOBase, optional): Куда производить сохранение persistent переменных. Defaults to None.
+            conf_dir (str,optional): где файлы csv/json
         """
         if ctx is not None:
             for x in ctx:
@@ -122,9 +124,10 @@ class PYPLC():
             self.ctx = ctx
         if simulator is not None: self.simulator = simulator
         if persist is not None: self.__persist = persist
+        if conf_dir is not None: self.__conf_dir = conf_dir
         if self.__persist is not None: 
-            NVD.restore(source = self.__persist)
-            NVD.mkinfo( )
+            NVD.restore(source = self.__persist,index=f'{self.__conf_dir}/persist.json')
+            NVD.mkinfo( file=f'{self.__conf_dir}/persist.json')
     
     def idle(self):
         self.idleTime = self.period - self.userTime
