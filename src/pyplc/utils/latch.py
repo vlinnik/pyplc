@@ -90,8 +90,8 @@ class RS():
         self.__set = self.set
 
     def __call__(self,reset:bool=None,set:bool=None):
-        reset = self.reset
-        set = self.set 
+        reset = self.reset if reset is None else reset
+        set = self.set if set is None else set
         if reset:
             self.q=False
         if set and set!=self.__set:
