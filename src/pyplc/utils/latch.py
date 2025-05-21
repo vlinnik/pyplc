@@ -95,7 +95,7 @@ class RS():
         if reset:
             self.q=False
         if set and set!=self.__set:
-            self.q=True
+            self.q=not reset
         if self.q is None:
             self.q = False
         self.__set = set
