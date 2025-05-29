@@ -160,7 +160,7 @@ class BLINK(SFC):
 
     def __call__(self, enable: bool = None):
         with self:
-            #self.overwrite('enable', enable)
+            if enable is not None: self.enable = enable 
             self.call( )
         return self.q
 
@@ -168,8 +168,8 @@ class TP(SFC):
     """Импульс указанной длины. По входу clk на выходе q генерируется импульс заданной длинны и паузой после.
     """
     clk = POU.input(False) #: вход блока
-    t_on= POU.input(1000)  #: время во включенном состоянии
-    t_off=POU.input(0)     #: минимальное время в выключенном состоянии
+    t_on= POU.input(1000,hidden=True)  #: время во включенном состоянии
+    t_off=POU.input(0,hidden=True)     #: минимальное время в выключенном состоянии
     q = POU.output(False)
     def __init__(self, clk=False, t_on: int = 1000, t_off: int = 0, q:bool = False,id:str =None,parent: POU =None):
         super().__init__( id,parent )
@@ -187,6 +187,6 @@ class TP(SFC):
 
     def __call__(self, clk: bool = None):
         with self:
-            #self.overwrite('clk', clk)
+            if clk is not None: self.clk = clk
             self.call( )
         return self.q

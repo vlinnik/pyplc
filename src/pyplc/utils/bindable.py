@@ -12,6 +12,7 @@ class Property():
         self.__binds.append( __sink )
         if not no_init:
             __sink(self.read())
+        return self.write
 
     def unbind(self,__sink = None):
         self.__binds = list(filter( lambda x: not (x==__sink or __sink is None)), self.__binds )

@@ -172,7 +172,13 @@ class POSTO(TCPServer):
                     return s
 
             source = eval(item, self.ctx)
-            s = Subscription(str(item), remote_id, value=source)
+            if source and hasattr(source, 'bind'):  #возможно bindable.Property
+                s = Subscription(str(item), remote_id)
+                callback = s.changed                        # когда подписка измеется
+                s.bound = (item, source,id(callback))       # сохраним информацию для unbind
+                s.write = source.bind(callback )            # POU.bind может возвращать функцию для записи в указанное свойство
+            else:
+                s = Subscription(str(item), remote_id, value=source)
             self.subscriptions[s.local_id] = s
             s.modified = True
             return s

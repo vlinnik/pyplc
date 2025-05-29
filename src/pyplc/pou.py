@@ -56,11 +56,13 @@ class POU():
             if obj is None:
                 return self
             return obj.__values__[self._index]
-             
+
         def __set__(self,obj,value):
+            if self._notify: obj.__touched__[self._index]=True
+            
             if obj.__values__[self._index]!=value:
                 if self._persistent: POU.__dirty__ = True
-                if self._notify: obj.__touched__[self._index]=True
+                
 
             obj.__values__[self._index] = value
 
