@@ -7,6 +7,7 @@
 
 from pyplc.sfc import SFC,POU
 from typing import *
+from time import time_ns
 
 class Stopwatch(SFC):
     """Таймер с настраевыемым моментом сработки. Подобие часов используемых при игре в шахматы
@@ -117,13 +118,14 @@ class TOF():
         """
         while True:
             self.et = 0
-            while self.clk:
-                self.q = self.clk
-                yield
-            begin = POU.NOW_MS
+            begin = time_ns()
             while not self.clk:
-                self.et = POU.NOW_MS - begin
-                self.q = self.et <= self.pt and self.q
+                self.et = time_ns() - begin
+                self.q = self.et <= self.pt*1_000_000 and self.q
+                yield
+            self.q = True
+            while self.clk:
+                self.q = True
                 yield
 
     def __call__(self,clk: bool = None, pt: int = None):

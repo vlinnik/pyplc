@@ -21,7 +21,7 @@ class RTRIG(POU):
 
     def __call__(self, clk=None) :
         with self:
-            clk = self.clk #self.overwrite('clk',clk)
+            if clk is None: clk = self.clk 
             self.q = (not self.__clk and clk)
             self.__clk = clk
         return self.q

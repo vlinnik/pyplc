@@ -132,7 +132,9 @@ class PYPLC():
     def idle(self):
         self.idleTime = self.period - self.userTime
         if self.idleTime>0:
-            if self.eventCycle is None: self.sleep(self.idleTime)
+            if self.eventCycle is None: 
+                self.sleep(self.idleTime) 
+                
             self.scanTime = self.period
         else:
             self.scanTime = self.period-self.idleTime
@@ -221,6 +223,15 @@ class PYPLC():
                 remote.bind( channel.force )
             channel.bind(remote.write)  #изменения канала ввода/вывода производит запись в Subscription
         return channel
+    def _heating(self,instances=None,**kwds):
+        if instances is not None: 
+            self.instances = tuple( [i,None] for i in instances )
+        self.config( **kwds )
+        Channel.runtime = True
+        for _ in range(0,10):
+            with self:  #первое сканирование
+                pass
+        
     def run(self,instances=None,**kwds ):
         """Запуск работы пользовательских программ.
 
@@ -229,14 +240,8 @@ class PYPLC():
         Args:
             instances (callable|generator, optional): Пользовательские программы.
         """
-        if instances is not None: 
-            self.instances = tuple( [i,None] for i in instances )
-        self.config( **kwds )
-        Channel.runtime = True
         try:
-            for _ in range(0,10):
-                with self:  #первое сканирование
-                    pass
+            self._heating(instances,**kwds)
             while True:
                 self.scan( )
         except KeyboardInterrupt as kbi:
@@ -244,28 +249,34 @@ class PYPLC():
             print('PYPLC: Task aborted!')
             self.cleanup( )
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
+            if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
         Channel.runtime = False
     
     async def cycle(self):
         await self.eventCycle.wait()
         self.eventCycle.clear( )
 
-    async def exec(self,instances=[]):
+    async def exec(self,instances=None, **kwds ):
         coros = list(filter( lambda item: not callable(item), instances ))
         non_coros = list(filter( lambda item: callable(item), instances ))
-        self.eventCycle = asyncio.Event( )
-        self.instances = [ [i,None] for i in non_coros]
 
         _ = [ asyncio.create_task( c ) for c in coros ]
+        self.eventCycle = asyncio.Event( )
         have_ms = hasattr(asyncio,'sleep_ms')
-                
-        while True:
-            self.scan( )
-            self.eventCycle.set( )
-            now = self.ms( )
-            if self.__fts + self.period > now:
-                if have_ms: await asyncio.sleep_ms(self.__fts + self.period - now )
-                else: await asyncio.sleep( (self.__fts + self.period - now) /1000 )
+        try:
+            self._heating(non_coros,**kwds)                    
+            while True:
+                self.scan( )
+                self.eventCycle.set( )
+                if have_ms: self.sleep = await asyncio.sleep_ms(self.idleTime)
+                else: await asyncio.sleep( self.idleTime /1000 )        
+        except KeyboardInterrupt as kbi:
+            from sys import modules
+            print('PYPLC: Task aborted!')
+            self.cleanup( )
+            if 'pyplc.config' in modules: modules.pop('pyplc.config')
+            if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
+        Channel.runtime = False
 
     def bind(self,__name:str,__notify: callable):   
         if __name not in self.vars:
