@@ -135,6 +135,15 @@ class SFC(POU):
         return job
             
     def call( self ):
+        if self.sfc_reset:
+            for job in self.jobs:
+                job.close()
+            self.jobs.clear( )
+            if self.sfc_main: 
+                self.sfc_main.close()
+                self.sfc_main = None
+            return
+        
         for s in self.subtasks:
             s()
 
@@ -155,15 +164,6 @@ class SFC(POU):
             self.jobs = list( filter( lambda item: item is not None,self.jobs ) )
 
     def __call__(self):
-        if self.sfc_reset:
-            for job in self.jobs:
-                job.close()
-            self.jobs.clear( )
-            if self.sfc_main: 
-                self.sfc_main.close()
-                self.sfc_main = None
-            return
-        
         with self:
             self.call( )
 
