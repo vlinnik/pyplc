@@ -6,6 +6,8 @@
 """
 
 from pyplc.sfc import SFC,POU
+from typing import *
+from time import time_ns
 
 class Stopwatch(SFC):
     """Таймер с настраевыемым моментом сработки. Подобие часов используемых при игре в шахматы
@@ -77,24 +79,39 @@ class TON(SFC):
 
     def __call__(self,clk: bool = None, pt: int = None):
         with self:
-            self.overwrite('pt', pt)
-            self.overwrite('clk', clk)
+            #self.overwrite('pt', pt)
+            #self.overwrite('clk', clk)
             self.call() 
         return self.q
 
-class TOF(SFC):
+class TOF():
     """Задержка при отключении
     """
-    clk = POU.input(False)  #: вход, который с задержкой pt снимается с выхода q
-    pt  = POU.input(1000)   #: задержка в мсек
-    q   = POU.output(False) #: выход блока
-    et  = POU.output( 0 )   #: сколько времени прошло с момента установки clk
-    def __init__(self, clk: bool = False, q: bool=False, et: int = 0, pt: int = 1000,id:str =None,parent: POU =None):
-        super().__init__( id,parent )
-        self.clk = clk
+    # clk = POU.input(False)  #: вход, который с задержкой pt снимается с выхода q
+    # pt  = POU.input(1000)   #: задержка в мсек
+    # q   = POU.output(False) #: выход блока
+    # et  = POU.output( 0 )   #: сколько времени прошло с момента установки clk
+    def __init__(self, clk: bool | Callable[[],bool] = False, q: bool | Callable[[bool],None]=False, pt: int = 1000,**kwargs):
+        self._clk = clk
+        self._q = q
         self.pt = pt
-        self.q = q
-        self.et = et    
+        self.et = 0
+        self._logic = self.main( )
+        self.__q = None
+    
+    @property
+    def clk(self)->bool:
+        if callable(self._clk):
+            return self._clk( )
+    @property
+    def q(self)->bool:
+        return self.__q
+    @q.setter
+    def q(self,q:bool):
+        if self.__q==q: return
+        self.__q = q
+        if callable(self._q):
+            self._q(q)
 
     def main(self):
         """Если clk==True, то q=True. При clk==False через pt мсек q = False. 
@@ -103,20 +120,20 @@ class TOF(SFC):
         yield from self.until(lambda: self.clk)
         while not self.sfc_reset:
             self.et = 0
-            for _ in self.till(lambda: self.clk):
-                self.q = self.clk
+            begin = time_ns()
+            while not self.clk:
+                self.et = time_ns() - begin
+                self.q = self.et <= self.pt*1_000_000 and self.q
                 yield
-            begin = POU.NOW_MS
-            for _ in self.until(lambda: self.clk):
-                self.et = POU.NOW_MS - begin
-                self.q = self.et <= self.pt and self.q
+            self.q = True
+            while self.clk:
+                self.q = True
                 yield
 
     def __call__(self,clk: bool = None, pt: int = None):
-        with self:
-            self.overwrite('clk',clk)
-            self.overwrite('pt', pt)
-            self.call( )
+        if pt is not None: self.pt = pt
+        if clk is not None: self.clk = clk
+        next(self._logic)
         return self.q
 
 
@@ -147,7 +164,7 @@ class BLINK(SFC):
 
     def __call__(self, enable: bool = None):
         with self:
-            self.overwrite('enable', enable)
+            if enable is not None: self.enable = enable 
             self.call( )
         return self.q
 
@@ -155,8 +172,8 @@ class TP(SFC):
     """Импульс указанной длины. По входу clk на выходе q генерируется импульс заданной длинны и паузой после.
     """
     clk = POU.input(False) #: вход блока
-    t_on= POU.input(1000)  #: время во включенном состоянии
-    t_off=POU.input(0)     #: минимальное время в выключенном состоянии
+    t_on= POU.input(1000,hidden=True)  #: время во включенном состоянии
+    t_off=POU.input(0,hidden=True)     #: минимальное время в выключенном состоянии
     q = POU.output(False)
     def __init__(self, clk=False, t_on: int = 1000, t_off: int = 0, q:bool = False,id:str =None,parent: POU =None):
         super().__init__( id,parent )
@@ -174,6 +191,6 @@ class TP(SFC):
 
     def __call__(self, clk: bool = None):
         with self:
-            self.overwrite('clk', clk)
+            if clk is not None: self.clk = clk
             self.call( )
         return self.q

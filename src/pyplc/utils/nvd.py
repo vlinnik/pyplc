@@ -74,6 +74,7 @@ class NVD(POU):
             return False
         
         NVD.__seek_end(source)
+        name = '<entry>'
 
         try:
             with open(index,'r') as f:

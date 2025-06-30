@@ -63,7 +63,7 @@ class CLI(TCPServer):
         self.mod = 0        # 0 - normal 1 - iac 2 - escape
         self.eat = 0
         self.echo= False
-        super().__init__(port)
+        super().__init__(port,1024,1024)
         
     def connected(self,sock: BufferInOut):
         self.telnet = BufferOut( send = sock.client.send )

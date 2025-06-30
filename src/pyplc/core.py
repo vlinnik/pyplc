@@ -23,52 +23,8 @@ class PYPLC():
     TICKS_MAX = 0                           #сколько максиальное значение ms()
     GENERATOR_TYPE = type((lambda: (yield))())
 
-    # class __State():
-    #     """
-    #     прокси для удобного доступа к значениям переменных ввода вывода
-    #     например если есть канал ввода/вывода MIXER_ON_1, то для записи необходимо MIXER_ON_1(True). 
-    #     альтернативный метод через state.MIXER_ON_1 = True, что выглядит привычнее
-    #     """
-    #     def __init__(self,parent ):
-    #         self.__parent = parent 
-        
-    #     def __item(self,name:str)->Channel:
-    #         if name in self.__parent.vars:
-    #             return self.__parent.vars[name]
-    #         return None
-
-    #     def __getattr__(self, __name: str):
-    #         if not __name.endswith('__parent') and __name in self.__parent.vars:
-    #             obj = self.__item(__name)
-    #             return obj()
-    #         # try:
-    #         return getattr(super(),__name)
-    #         #     return super().__getattribute__(__name)
-    #         # except Exception as e:
-    #         #     print(f'Exception in PYPLC.State.__getattr__ {e}')
-
-    #     def __setattr__(self, __name: str, __value):
-    #         if not __name.endswith('__parent') and __name in self.__parent.vars:
-    #             obj = self.__item(__name)
-    #             obj(__value)
-    #             return
-
-    #         super().__setattr__(__name,__value)
-
     def __data__(self):
         return self.vars
-
-    #     def bind(self,__name:str,__notify: callable):   
-    #         if __name not in self.__parent.vars:
-    #             return
-    #         s = self.__item(__name)
-    #         s.bind( __notify )
-
-    #     def unbind(self,__name:str,__notify: callable):
-    #         if __name not in self.__parent.vars:
-    #             return
-    #         s = self.__item(__name)
-    #         s.unbind( __notify )
 
     def __init__(self,io_size:int,krax=None,pre=None,post=None,period:int=100):
         if PYPLC.HAS_TICKS_MS:
@@ -98,14 +54,13 @@ class PYPLC():
             self.reader = krax.read_to
             self.writer = krax.write
         self.__persist = None
+        self.__conf_dir = '.'
         self.data = array.array('B',[0x00]*io_size) #что писать
         self.mask = array.array('B',[0x00]*io_size) #бит из data писать только если бит=1
         self.dirty = memoryview(self.mask)          #оптимизация
         self.mv_data = memoryview(self.data)        #оптимизация
-        self.instances = []                         #пользовательские программы которые надо выполнять каждое сканирование
-        
-        print(f'Initialized PYPLC with scan time={self.period} msec!')
-    
+        self.instances = ()                         #пользовательские программы которые надо выполнять каждое сканирование
+            
     def __str__(self):
         return f'scan/user/idle/overrun {self.scanTime}/{self.userTime}/{self.idleTime}/{self.overRun}'
     
@@ -148,13 +103,14 @@ class PYPLC():
     def write(self):
         self.sync(True)
         
-    def config(self,simulator:bool=None,ctx = None,persist = None, **kwds ):
+    def config(self,simulator:bool=None,ctx = None,persist = None, conf_dir=None, **kwds ):
         """Изменение параметров. Вызывается из run.
 
         Args:
             simulator (bool, optional): Режим симулятора. Если включено, то пользовательские программы не вызываются, только опрос и интерфейс обмена. Defaults to None.
             ctx (dict, optional): если указывать, то должно быть так: plc.config(ctx=globals()) . Defaults to None.
             persist (IOBase, optional): Куда производить сохранение persistent переменных. Defaults to None.
+            conf_dir (str,optional): где файлы csv/json
         """
         if ctx is not None:
             for x in ctx:
@@ -168,14 +124,17 @@ class PYPLC():
             self.ctx = ctx
         if simulator is not None: self.simulator = simulator
         if persist is not None: self.__persist = persist
+        if conf_dir is not None: self.__conf_dir = conf_dir
         if self.__persist is not None: 
-            NVD.restore(source = self.__persist)
-            NVD.mkinfo( )
+            NVD.restore(source = self.__persist,index=f'{self.__conf_dir}/persist.json')
+            NVD.mkinfo( file=f'{self.__conf_dir}/persist.json')
     
     def idle(self):
         self.idleTime = self.period - self.userTime
         if self.idleTime>0:
-            if self.eventCycle is None: self.sleep(self.idleTime)
+            if self.eventCycle is None: 
+                self.sleep(self.idleTime) 
+                
             self.scanTime = self.period
         else:
             self.scanTime = self.period-self.idleTime
@@ -238,7 +197,7 @@ class PYPLC():
                             next(i[1])
                         except StopIteration:
                             i[1] = None
-                    else:
+                    elif i[0]:
                         i[1] = i[0]( )
     
     def declare(self,channel: Channel, name: str = None):
@@ -264,6 +223,15 @@ class PYPLC():
                 remote.bind( channel.force )
             channel.bind(remote.write)  #изменения канала ввода/вывода производит запись в Subscription
         return channel
+    def _heating(self,instances=None,**kwds):
+        if instances is not None: 
+            self.instances = tuple( [i,None] for i in instances )
+        self.config( **kwds )
+        Channel.runtime = True
+        for _ in range(0,10):
+            with self:  #первое сканирование
+                pass
+        
     def run(self,instances=None,**kwds ):
         """Запуск работы пользовательских программ.
 
@@ -272,14 +240,8 @@ class PYPLC():
         Args:
             instances (callable|generator, optional): Пользовательские программы.
         """
-        if instances is not None: 
-            self.instances = [ [i,None] for i in instances]
-        self.config( **kwds )
-        Channel.runtime = True
         try:
-            for _ in range(0,10):
-                with self:  #первое сканирование
-                    pass
+            self._heating(instances,**kwds)
             while True:
                 self.scan( )
         except KeyboardInterrupt as kbi:
@@ -287,28 +249,34 @@ class PYPLC():
             print('PYPLC: Task aborted!')
             self.cleanup( )
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
+            if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
         Channel.runtime = False
     
     async def cycle(self):
         await self.eventCycle.wait()
         self.eventCycle.clear( )
 
-    async def exec(self,instances=[]):
+    async def exec(self,instances=None, **kwds ):
         coros = list(filter( lambda item: not callable(item), instances ))
         non_coros = list(filter( lambda item: callable(item), instances ))
-        self.eventCycle = asyncio.Event( )
-        self.instances = [ [i,None] for i in non_coros]
 
         _ = [ asyncio.create_task( c ) for c in coros ]
+        self.eventCycle = asyncio.Event( )
         have_ms = hasattr(asyncio,'sleep_ms')
-                
-        while True:
-            self.scan( )
-            self.eventCycle.set( )
-            now = self.ms( )
-            if self.__fts + self.period > now:
-                if have_ms: await asyncio.sleep_ms(self.__fts + self.period - now )
-                else: await asyncio.sleep( (self.__fts + self.period - now) /1000 )
+        try:
+            self._heating(non_coros,**kwds)                    
+            while True:
+                self.scan( )
+                self.eventCycle.set( )
+                if have_ms: self.sleep = await asyncio.sleep_ms(self.idleTime)
+                else: await asyncio.sleep( self.idleTime /1000 )        
+        except KeyboardInterrupt as kbi:
+            from sys import modules
+            print('PYPLC: Task aborted!')
+            self.cleanup( )
+            if 'pyplc.config' in modules: modules.pop('pyplc.config')
+            if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
+        Channel.runtime = False
 
     def bind(self,__name:str,__notify: callable):   
         if __name not in self.vars:
