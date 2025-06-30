@@ -10,3 +10,4 @@ tests/lesson#*.py
 docs/_build
 krax.csv
 krax.json
+__version__.py

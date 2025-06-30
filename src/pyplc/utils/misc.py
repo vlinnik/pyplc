@@ -120,7 +120,7 @@ class TOF():
         while not self.clk:
             yield 
         #yield from self.until(lambda: self.clk)
-        while not self.sfc_reset:
+        while True:
             self.et = 0
             begin = time_ns()
             while not self.clk:

@@ -16,7 +16,7 @@ dirs:
 	@mkdir -p $(ODIR)/$(INSTALL_DIR)
 
 package:
-	git-versioner --save && mv _version.py src/pyplc/
+	git-versioner --tag
 	python -m build --wheel
 	# pip install ./dist/pyplc-`git-versioner --python`-py3-none-any.whl --force-reinstall
 $(ODIR)/$(INSTALL_DIR)/%.mpy: %.py
