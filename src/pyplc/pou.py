@@ -13,6 +13,7 @@ class POU():
     EPOCH=time.time_ns( )   
     NOW  = 0                #: момент начала цикла работы логики в нано-сек
     NOW_MS=0                #: момент начала цикла работы логики в мсек
+    USE_COUNT=0
     __dirty__ = False
     __persistable__ = []    #все POU с id!=None переменными с атрибутом persistent = True
 
@@ -26,10 +27,10 @@ class POU():
             setattr(type(parent),__name,attr)
             if __name not in parent.__vars__:
                 attr._index = len(parent.__vars__)
-                parent.__vars__.append(__name)
+                parent.__vars__+=(__name,)
                 parent.__values__.append(initial)
-                parent.__inputs__.append(None)
-                parent.__outputs__.append([])
+                parent.__inputs__+=(None,)
+                parent.__outputs__+=([],)
                 parent.__touched__.append(False)
                 parent.__access__.append( attr.__access__(parent) )
 
@@ -55,11 +56,13 @@ class POU():
             if obj is None:
                 return self
             return obj.__values__[self._index]
-             
+
         def __set__(self,obj,value):
+            if self._notify: obj.__touched__[self._index]=True
+            
             if obj.__values__[self._index]!=value:
                 if self._persistent: POU.__dirty__ = True
-                if self._notify: obj.__touched__[self._index]=True
+                
 
             obj.__values__[self._index] = value
 
@@ -129,20 +132,24 @@ class POU():
             o.persistent(id)
         return not found
     def log(self,*args,**kwds):
-        print(f'[{POU.NOW_MS}] #{self.full_id:12.12s}:', *args, **kwds)
+        if self.full_id:
+            print(f'[{POU.NOW_MS}] #{self.full_id:12.12s}:', *args, **kwds)
+        else:
+            print(f'[{POU.NOW_MS}] #            :', *args, **kwds)            
         
     def __init__(self,id:str = None,parent: 'POU' = None) -> None:
         self.id = id
         self.full_id = id
-        self.__vars__   = []
+        self.__vars__   = ()
         self.__values__ = []
-        self.__inputs__ = []
-        self.__outputs__= []
+        self.__inputs__ = ()
+        self.__outputs__= ()
         self.__touched__= []
         self.__persistent__=[]
         self.__children__=[]
         self.__access__=[]
         if parent is not None: parent.__children__.append(self)
+        self.__class__.USE_COUNT += 1
         
         hierarchy = []
         ordered = []
@@ -170,7 +177,7 @@ class POU():
         try:
             setattr(self,input,fn())         # начальное значение + проверка работоспособности fn
             p = getattr(self.__class__,input)
-            self.__inputs__[p._index] = fn
+            self.__inputs__ = self.__inputs__[:p._index]+(fn,)+self.__inputs__[p._index+1:]
         except Exception as e:
             raise RuntimeError(f'Error {e} in POU.join {self}.{input}')
 
@@ -197,7 +204,7 @@ class POU():
                 p = getattr(self.__class__,__name)
             except:
                 return
-        self.__outputs__[p._index] = list(filter( lambda i : __sink!=None and i!=__sink and id(i)!=__sink ,self.__outputs__[p._index] ))
+        self.__outputs__ =self.__outputs__[:p._index]+ (list(filter( lambda i : __sink!=None and i!=__sink and id(i)!=__sink ,self.__outputs__[p._index] )),)+self.__outputs__[p._index+1:]
 
     def __enter__(self):
         i = 0

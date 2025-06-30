@@ -8,7 +8,10 @@ class Cell():
         self._last = None
         self._prev = None
         self._next = None
-
+        
+    def __bool__(self):
+        return self._last==True if self._last is not None else False
+    
     def __call__(self,value=None,state:bool=None)->bool:
         if state is None:
             if self._prev is not None:
@@ -35,7 +38,7 @@ class Cell():
         print(self.dump())
 
     def dump(self)->str:
-        if self._next:
+        if self._next is not None:
             return ('├─' if self._prev is None else '' ) + str(self)+self._next.dump()
         return str(self)+'─┤'
 
@@ -69,7 +72,27 @@ class Cell():
         return self.next(CTU(max))
     def ctd(self,max)->'CTD':
         return self.next(CTD(max))
-
+    def call(self,what: callable=None)->'CALL':
+        return self.next(CALL(what))
+    
+class CALL(Cell):
+    def __init__(self,what: callable = None):
+        super().__init__()
+        self._call = what
+        self._value= None
+    def __call__(self, value=None, state = None):
+        self._value = value
+        if self._call is not None:
+            ret = self._call( value )
+            self._last = ret==True if ret is not None else False
+        else:
+            self._last = state
+        if self._next is not None:
+            return self._next( value=value,state=self._last)
+        return self._last
+    def __str__(self):
+        return f'─[{self._call}]─'
+    
 class NO(Cell):
     """Блок, выполнение следующего на RAIL если выражение cond() истинно
     """
@@ -85,7 +108,7 @@ class NO(Cell):
             self._last = False
         else:
             self._last = self._cond()==True
-        if self._next:
+        if self._next is not None:
             tail = self._next( value=value,state=self._last and state)
             return self._last and state and tail
         return self._last and state
@@ -105,13 +128,14 @@ class NC(Cell):
             self._last = True
         else:
             self._last = self._cond()==False
-        if self._next:
+        if self._next is not None:
             tail = self._next( value=value,state=self._last and state)
             return self._last and state and tail
         return self._last and state
     def __str__(self):
         return f'─┤║{self._last:1}║├─'
 class OUT(Cell):
+    """Копирует входное состояние (state) в указанное место (what), state не меняет"""
     def __init__(self,what: callable = None):
         super().__init__()
         self._what = what
@@ -122,12 +146,13 @@ class OUT(Cell):
         self._last = state
         if self._what is not None:
             self._what(state)
-        if self._next:
+        if self._next is not None:
             return self._next( value=value,state=self._last) and state
         return self._last
     def __str__(self):
         return f'─({self._last})─'
 class MOV(Cell):
+    """Если входное состояние = True копирует входное значение(или True) в указанное место (what), state не меняет"""
     def __init__(self,what: callable = None):
         super().__init__()
         self._what = what
@@ -138,7 +163,7 @@ class MOV(Cell):
         self._last = state
         if self._what is not None:
             if state: self._what(state if value is None else value)
-        if self._next:
+        if self._next is not None:
             return self._next( value=value,state=self._last) and state
         return self._last
     def __str__(self):
@@ -156,7 +181,7 @@ class SET(Cell):
         if self._what is not None and self._before==False and state==True:
             self._what(state)
         self._before = state 
-        if self._next:
+        if self._next is not None:
             return self._next( value=value,state=self._last) and state
         return self._last
     
@@ -175,7 +200,7 @@ class RST(Cell):
         if self._what is not None and self._before==True and state==False:
             self._what(state)
         self._before = state 
-        if self._next:
+        if self._next is not None:
             return self._next( value=value,state=self._last) and state
         return self._last
     def __str__(self):
@@ -195,7 +220,7 @@ class CTU(Cell):
             self._cnt = (self._cnt+1) % self._max
             if self._cnt==0: self._last = state
         self._before = state 
-        if self._next:
+        if self._next is not None:
             return self._next( value=value,state=self._last) and state
         return self._last
     def __str__(self):
@@ -218,7 +243,7 @@ class CTD(Cell):
             else:
                 self._cnt -= 1
         self._before = state 
-        if self._next:
+        if self._next is not None:
             return self._next( value=value,state=self._last) and state
         return self._last
     def __str__(self):
@@ -272,6 +297,24 @@ class Coil():
         return ret
 
 class LD(POU):
+    class __ENTRY(Cell):
+        def __init__(self):
+            super().__init__()
+            self._value = None
+        def __call__(self,value:bool=None)->bool:
+            if value is not None: self._value = value
+            self._last = self._value==True if self._value is not None else False
+            if self._next is not None:
+                return self._next( value=value,state=self._last)
+
+            return self._last
+        def __str__(self):
+            return f'─┤ {bool(self)} ├─'
+
+    @staticmethod
+    def entry():
+        return LD.__ENTRY()
+    
     def __init__(self):
         self.rails = []
 
