@@ -1,5 +1,9 @@
 """Библиотека для написания программ в IEC-подобном стиле"""
-from .__version__ import version
+try:
+    from .__version__ import version
+except ImportError:
+    version = '0.0.0+unknown'
+
 print(f'Loading PyPLC version {version}: ',end='')
 
 if __name__!="__main__":
