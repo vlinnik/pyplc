@@ -83,6 +83,14 @@ class TON(SFC):
             #self.overwrite('clk', clk)
             self.call() 
         return self.q
+    
+    def __invert__(self):
+        """Получить инверсированный канал
+
+        Returns:
+            callable: функция, которая возвращает противоположное значение канала
+        """
+        return lambda: not self()
 
 class TOF():
     """Задержка при отключении

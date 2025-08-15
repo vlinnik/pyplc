@@ -90,6 +90,7 @@ def __load():
                     info = [i.strip() for i in info.split(';')]
                     if len(info) < 4:
                         continue
+                    info = info[:4]
                     if id.match(info[0]) and num.match(info[-2]) and num.match(info[-1]):
                         info = [i.strip() for i in info]
                         slot_n = int(info[-2])
