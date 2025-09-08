@@ -199,6 +199,14 @@ class PYPLC():
                             i[1] = None
                     elif i[0]:
                         i[1] = i[0]( )
+                        
+    def force(self,**kwargs):  #для удобства доступа (покороче) к channel переменным 
+        for key,value in kwargs.items():
+            try:
+                var = getattr(self.__class__,key)
+                var.force(value)
+            except AttributeError as e:
+                pass
     
     def declare(self,channel: Channel, name: str = None):
         """Добавить канал ввода/вывода
@@ -214,7 +222,7 @@ class PYPLC():
             name = channel.name
         self.vars[name] = channel
         # setattr(self,name,channel)
-        setattr(PYPLC,name,channel)
+        setattr(self.__class__,name,channel)
         if self.connection is not None: #в режиме Coupler здесь Subscriber подключенный к физическому PLC
             remote = self.connection.subscribe(f'hw.{name}')
             if channel.rw:

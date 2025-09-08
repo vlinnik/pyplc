@@ -46,7 +46,10 @@ class Property():
         
     def __set__(self,_,value):
         self.write(value)
-
+        
+    def __repr__(self) -> str:
+        return f'Property <{self.value}|lazy={self._read is not None}>'
+    
 class Expressions(dict):
     class Expression(Property):
         def __init__(self, ctx, source: str) -> None:

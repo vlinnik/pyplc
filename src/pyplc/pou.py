@@ -180,6 +180,20 @@ class POU():
             self.__inputs__ = self.__inputs__[:p._index]+(fn,)+self.__inputs__[p._index+1:]
         except Exception as e:
             raise RuntimeError(f'Error {e} in POU.join {self}.{input}')
+        
+    def inspect(self,**kwargs):
+        for key,item in kwargs.items():
+            try:
+                p = getattr(self.__class__,key)
+                if p and p._index is not None:
+                    if isinstance(p,POU.input):
+                        item( self.__inputs__[p._index] )
+                    elif isinstance(p,POU.output):
+                        for o in self.__outputs__[p._index]:
+                            item( o )
+            except Exception as e:
+                pass
+                
 
     def bind(self,output: str | output,__sink):   #bind and atrribute to callback
         if isinstance(output,POU.output):
