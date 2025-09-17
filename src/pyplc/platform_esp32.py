@@ -1,5 +1,8 @@
 import sys
-from ._version import version
+try:
+    from ._version import version
+except:
+    version = '0.0.0+unknown'
 from collections import namedtuple
 
 print(f'''
