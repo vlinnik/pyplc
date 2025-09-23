@@ -71,7 +71,10 @@ platform_conf   = PLATFORM_CONF( conf_dir= ns.conf,port=ns.port,nocli=ns.nocli,c
 after = None
 
 workdir = os.path.abspath(os.curdir)
-os.chdir('src')
+try:
+    os.chdir('src')
+except FileNotFoundError:
+    pass
 io = IO( )
 
 try:
