@@ -3,10 +3,6 @@ try:
     from ._version import version
 except ImportError:
     version = '0.0.0+unknown'
-try:
-    from ._version import version
-except:
-    version = '0.0.0+unknown'
 from collections import namedtuple
 
 print(f'''
