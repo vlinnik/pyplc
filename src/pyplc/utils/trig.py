@@ -83,7 +83,7 @@ class TRIG(POU):
     def __call__(self,clk = None):
         with self:
             clk = clk if clk is not None else self.clk #self.overwrite('clk',clk)
-            if self.q!=(self.__clk and not clk) or (not self.__clk and clk):
+            if self.q!=(self.__clk==True and clk==False) or (self.__clk==False and clk==True):
                 self.q = not self.q
             self.__clk = clk
         return self.q        

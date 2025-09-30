@@ -124,10 +124,11 @@ class TOF():
     def main(self):
         """Если clk==True, то q=True. При clk==False через pt мсек q = False. 
         """
-        self.q = self.clk
-        while not self.clk:
+        clk = self.clk
+        self.q = clk == True
+        while clk is None or clk==True:
+            clk = self.clk
             yield 
-        #yield from self.until(lambda: self.clk)
         while True:
             self.et = 0
             begin = time_ns()
