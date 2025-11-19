@@ -1,6 +1,7 @@
 from pyplc.pou import POU
 import json,hashlib,struct,time
 from io import IOBase
+from pyplc.utils.logging import logger
 
 class NVD(POU):
     """Менеджер сохранения энергонезависимых переменных """
@@ -51,8 +52,8 @@ class NVD(POU):
         info = [ ]
         total = 8   #заголовок записи 8 байт
         for so in POU.__persistable__:
-            properties = so.__persistent__
-            sha1 = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(so.__persistent__).encode( ) ).digest( ))
+            properties = so.__save__()
+            sha1 = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties.keys()).encode( ) ).digest( ))
             size = len( so.to_bytearray( ) )
             info.append( { 'item': so.full_id , 'properties': properties, 'sha1':sha1 , 'size': size  } )
             total+=size
@@ -79,26 +80,28 @@ class NVD(POU):
         try:
             with open(index,'r') as f:
                 info = json.load(f)
+        except OSError:
+            logger.error(f'Нет файла информации об backup(persist.json)')
+            return False
                 
-            backup = POU.__persistable__    # объекты persistable
-            for i in info:  #info - список словарей, для каждого persistable объекта с указанием имени объекта, его свойств, sha1 хеша свойств и размера для сохранения
-                name = i['item']
-                size = i['size']
-                sha1 = i['sha1']
-                properties = i['properties']
+        backup = POU.__persistable__    # объекты persistable
+        for i in info:  #info - список словарей, для каждого persistable объекта с указанием имени объекта, его свойств, sha1 хеша свойств и размера для сохранения
+            name = i['item']
+            size = i['size']
+            sha1 = i['sha1']
+            properties = i['properties']
 
-                so = list( filter( lambda x: x.full_id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
-                crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
-                if crc != sha1:
-                    raise f"sha1 digest properties list is invalid: {so.id}"
-                
+            so = list( filter( lambda x: x.full_id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
+            crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
+            if crc != sha1:
+                raise RuntimeError(f"sha1 digest properties list is invalid: {so.id}")
+            
+            try:
                 data = source.read(size)
                 so.from_bytearray( data, properties )
-        except OSError:
-            print(f'E: backup index file not found(persist.json)')
-        except Exception as e:
-            print(f'E: cannot restore {name}:{e}')
-            return False
+            except Exception as e:
+                logger.error(f'{e} (size={size},properties={properties})')
+                
         return True
 
     def __mkbackup(self):

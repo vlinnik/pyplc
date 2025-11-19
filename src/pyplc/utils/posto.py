@@ -183,6 +183,7 @@ class POSTO(TCPServer):
             s.modified = True
             return s
         except Exception as e:
+            import traceback; traceback.print_exc();
             TCPServer.attention(e, 'POSTO::subscribe')
 
         return None

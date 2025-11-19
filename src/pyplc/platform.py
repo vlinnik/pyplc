@@ -1,18 +1,20 @@
 import sys
 import os
 import json
+from pyplc.drivers import Device
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.cli import CLI
 from pyplc.utils.posto import POSTO
 from pyplc.utils.nvd import NVD
-import re,gc,time
+from pyplc.utils.logging import logger
+import re,gc
+from typing import Optional
 
-sys.modules['_platform'] = __import__(f'pyplc.platform_{sys.platform}',None,None,['platform_linux'])
-try:
-    from _platform import io,before,after,storage,platform_conf
-except:
-    from platform_linux import io,before,after,storage,platform_conf
+if sys.platform=='esp32':
+    from pyplc.platform_esp32 import io,before,after,storage,platform_conf
+elif sys.platform=='linux':
+    from pyplc.platform_linux import io,before,after,storage,platform_conf
 
 def __fexists(filename):
     try:
@@ -23,10 +25,11 @@ def __fexists(filename):
 
 cli = None
 posto = None
-plc = None
+plc:Optional[PYPLC] = None
+hw:Optional[Device] = None
 
 def __cleanup():
-    global cli, posto, plc
+    global cli, posto, plc, hw
     try:
         if plc is not None:
             del plc
@@ -39,24 +42,24 @@ def __cleanup():
             posto.term()
             del posto
             post = None
-        io.deinit( )
-        if '_platform' in sys.modules: 
-            del(sys.modules['_platform'])
-        if 'pyplc.platform' in sys.modules: 
-            del(sys.modules['pyplc.platform'])        
+        if hw is not None:
+            hw.deinit( )
+            del hw
     except Exception as e:
-        print('cleanup:',e)
+        logger.error('проблема при освобождении ресурсов {e}',e=e)
         pass
     gc.collect()
 
 def __load():
-    global cli, posto, plc
+    global cli, posto, plc, hw
     conf = {'node_id': 1, 'layout': [], 'devs': [], 'init' : { 'iface': 0, 'hostname' : 'krax'} }
-    krax_json = f'{platform_conf.conf_dir}/krax.json'
-    krax_csv = f'{platform_conf.conf_dir}/krax.csv'
+    krax_json = f'{platform_conf.conf}/krax.json'
+    krax_csv = f'{platform_conf.conf}/krax.csv'
     if __fexists(krax_json):
         with open(krax_json, 'rb') as f:
             conf = json.load(f)
+    else:
+        logger.warning('отсутствует krax.json')
 
     scanTime = conf['scanTime'] if 'scanTime' in conf else 100
     slots = conf['slots'] if 'slots' in conf else []
@@ -69,14 +72,14 @@ def __load():
         if not platform_conf.nocli: cli = CLI(port=platform_conf.cli)  # simple telnet
         posto = POSTO(port=platform_conf.port)   # simple share data over tcp
     except Exception as e:
-        print(f'\tCLI/POSTO порты заняты ({e}).')
+        logger.warning('CLI/POSTO порты заняты ({e})',e=e)
         cli = None
         posto = None
-        
-    io.init( conf['node_id'],**conf['init'] )
-    plc = PYPLC(sum(slots), period=scanTime, krax = io, pre=[before,cli], post=[posto,after,NVD(storage)])
+
+    hw = io( slots=conf['slots'],init=conf['init'] )
+
+    plc = PYPLC(period=scanTime, pre=[before,cli], post=[posto,after,NVD(storage) if storage else None])
     plc.cleanup = __cleanup
-    plc.connection = None
 
     if __fexists(krax_csv):
         vars = 0
@@ -106,17 +109,21 @@ def __load():
                             ch = QWord(addr+((ch_n-1)<<1),info[0])                               
                         elif info[1].upper( ) == 'CNT8':
                             ch = ICounter8(addr+ch_n,info[0])  
-                        ch.comment = f'S{slot_n:02}C{ch_n:02}'                             
-                        plc.declare(ch, info[0])
+                        ch.comment = f'S{slot_n:02}C{ch_n:02}'
+                        hw.register(ch, name=info[0])
                         vars = vars+1
                 except Exception as e:
-                    print(e, info)
-                    sys.print_exception(e)
+                    if hasattr(sys, 'print_exception'):
+                        sys.print_exception(e)
+                    else:
+                        print(e, info)                    
                     errs = errs+1
-        gc.collect()
-        plc.config(persist=storage,conf_dir=platform_conf.conf_dir)
+        plc.config(persist=storage,conf_dir=platform_conf.data)
+    else:
+        logger.info('krax.csv отсутствует - пользовательская настройка раскладки по каналам')
 
 if __name__ != '__main__':
     plc = None
     __load( )
-    __all__ = ['plc']
+
+__all__ = ['plc']

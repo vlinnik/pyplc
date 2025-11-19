@@ -1,9 +1,10 @@
-from .channel import Channel
-from .pou import POU
-from io import IOBase
+from pyplc.channel import Channel
+from pyplc.pou import POU
 from pyplc.utils.nvd import NVD
-import time,re,array
+from pyplc.drivers import device_manager
+import time
 import asyncio
+import sys
 
 class PYPLC():
     """Реализация управления циклом работы программы.
@@ -23,11 +24,8 @@ class PYPLC():
     TICKS_MAX = 0                           #сколько максиальное значение ms()
     GENERATOR_TYPE = type((lambda: (yield))())
 
-    def __data__(self):
-        return self.vars
-
-    def __init__(self,io_size:int,krax=None,pre=None,post=None,period:int=100):
-        if PYPLC.HAS_TICKS_MS:
+    def __init__(self,pre=None,post=None,period:int=100):
+        if sys.platform=='esp32':
             self.ms = time.ticks_ms 
             self.sleep = time.sleep_ms
             PYPLC.TICKS_MAX = time.ticks_add(0,-1)
@@ -41,24 +39,12 @@ class PYPLC():
         self.__ts = None
         self.pre = pre
         self.post = post
-        self.krax = krax
         self.period = period
-        self.vars = {}
-        # self.state = self.__State(self)
         self.ctx = None
         self.simulator = False
-        self.reader = None
-        self.writer = None
         self.eventCycle = None
-        if krax is not None:
-            self.reader = krax.read_to
-            self.writer = krax.write
         self.__persist = None
         self.__conf_dir = '.'
-        self.data = array.array('B',[0x00]*io_size) #что писать
-        self.mask = array.array('B',[0x00]*io_size) #бит из data писать только если бит=1
-        self.dirty = memoryview(self.mask)          #оптимизация
-        self.mv_data = memoryview(self.data)        #оптимизация
         self.instances = ()                         #пользовательские программы которые надо выполнять каждое сканирование
             
     def __str__(self):
@@ -67,42 +53,6 @@ class PYPLC():
     def cleanup(self):
         pass
 
-    def sync(self,output=True):
-        """Произвести синхронизацию памяти ввода-вывода и каналов pyplc.channel.*
-
-        Args:
-            output (bool, optional): Выходы и Входы синхронизируются отдельно. Defaults to True.
-        """
-        if output and self.writer:
-            for var in self.vars.values():
-                if var.rw:
-                    try:
-                        var.sync( self.mv_data, self.dirty )    #если были изменения self.dirty установится
-                    except Exception as e:
-                        print(f'Exception {e} in sync {var}')
-            self.writer(0, self.mv_data, self.dirty )       #запись по маске (только если dirty)
-            for var in self.vars.values():                  #второй раз уже dirty сбросится.
-                if var.rw:
-                    try:
-                        var.sync( self.mv_data, self.dirty )    #только чтение значений
-                    except Exception as e:
-                        print(f'Exception {e} in sync {var}')
-            
-        elif not output and self.reader:
-            self.reader(0,self.mv_data)
-            for var in self.vars.values():
-                if not var.rw:
-                    try:
-                        var.sync( self.mv_data,self.dirty )
-                    except Exception as e:
-                        print(f'Exception {e} in sync {var}')
-    
-    def read(self):
-        self.sync(False)
-        
-    def write(self):
-        self.sync(True)
-        
     def config(self,simulator:bool=None,ctx = None,persist = None, conf_dir=None, **kwds ):
         """Изменение параметров. Вызывается из run.
 
@@ -110,15 +60,12 @@ class PYPLC():
             simulator (bool, optional): Режим симулятора. Если включено, то пользовательские программы не вызываются, только опрос и интерфейс обмена. Defaults to None.
             ctx (dict, optional): если указывать, то должно быть так: plc.config(ctx=globals()) . Defaults to None.
             persist (IOBase, optional): Куда производить сохранение persistent переменных. Defaults to None.
-            conf_dir (str,optional): где файлы csv/json
+            conf_dir (str,optional): где файлы persist.dat/persist.json
         """
         if ctx is not None:
             for x in ctx:
                 var = ctx[x]
-                if isinstance(var,Channel):
-                    var.name = x
-                    self.declare( var, x )
-                elif isinstance(var,POU):
+                if isinstance(var,POU):
                     if var.id is None: var.id = x
                     var.persistent( )
             self.ctx = ctx
@@ -149,21 +96,14 @@ class PYPLC():
                     pre( ctx=self.ctx )
         elif callable(self.pre):
             self.pre( ctx=self.ctx )
-        if self.krax is not None :
-            self.krax.master(1) #dummy krax exchange - only process messages 
-        self.sync( False )
 
     def __exit__(self, type, value, traceback):
-        self.sync(True)
-
         if isinstance(self.post,list):
             for post in self.post:
                 if callable(post):
                     post(ctx=self.ctx)
         elif callable(self.post):
             self.post( ctx=self.ctx )
-        if self.krax is not None :
-            self.krax.master(2) #krax exchange 
             
         self.userTime = int((time.time_ns( )-POU.EPOCH-POU.NOW)/1000000)
         self.idle( )
@@ -189,16 +129,17 @@ class PYPLC():
     def scan(self):
         """однократное выполнение цикла работы: синхронизация памяти и каналов ввода - функции pre - пользовательская логика - функции post - пауза
         """
-        with self:
-            if not self.simulator:
-                for i in self.instances:
-                    if type(i[1])==PYPLC.GENERATOR_TYPE:
-                        try:
-                            next(i[1])
-                        except StopIteration:
-                            i[1] = None
-                    elif i[0]:
-                        i[1] = i[0]( )
+        with device_manager:
+            with self:
+                if not self.simulator:
+                    for i in self.instances:
+                        if type(i[1])==PYPLC.GENERATOR_TYPE:
+                            try:
+                                next(i[1])
+                            except StopIteration:
+                                i[1] = None
+                        elif i[0]:
+                            i[1] = i[0]( )
                         
     def force(self,**kwargs):  #для удобства доступа (покороче) к channel переменным 
         for key,value in kwargs.items():
@@ -208,37 +149,14 @@ class PYPLC():
             except AttributeError as e:
                 pass
     
-    def declare(self,channel: Channel, name: str = None):
-        """Добавить канал ввода/вывода
-
-        Args:
-            channel (Channel): канал
-            name (str, optional): имя канала. Defaults to None.
-
-        Returns:
-            Channel: возвращает значение параметра channel
-        """
-        if not name:
-            name = channel.name
-        self.vars[name] = channel
-        # setattr(self,name,channel)
-        setattr(self.__class__,name,channel)
-        if self.connection is not None: #в режиме Coupler здесь Subscriber подключенный к физическому PLC
-            remote = self.connection.subscribe(f'hw.{name}')
-            if channel.rw:
-                remote.bind( channel )
-            else:
-                remote.bind( channel.force )
-            channel.bind(remote.write)  #изменения канала ввода/вывода производит запись в Subscription
-        return channel
     def _heating(self,instances=None,**kwds):
         if instances is not None: 
             self.instances = tuple( [i,None] for i in instances )
         self.config( **kwds )
-        Channel.runtime = True
         for _ in range(0,10):
-            with self:  #первое сканирование
-                pass
+            with device_manager:  #первое сканирование
+                with self:
+                    pass
         
     def run(self,instances=None,**kwds ):
         """Запуск работы пользовательских программ.
@@ -258,7 +176,6 @@ class PYPLC():
             self.cleanup( )
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
             if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
-        Channel.runtime = False
     
     async def cycle(self):
         await self.eventCycle.wait()
@@ -285,15 +202,3 @@ class PYPLC():
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
             if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
         Channel.runtime = False
-
-    def bind(self,__name:str,__notify: callable):   
-        if __name not in self.vars:
-            return
-        s = self.vars[__name]
-        s.bind( __notify )
-
-    def unbind(self,__name:str,__notify: callable):
-        if __name not in self.vars:
-            return
-        s = self.vars[__name]
-        s.unbind( __notify )

@@ -5,6 +5,7 @@
 """
 
 import struct,re
+from typing import Optional
 
 class Channel(object):        
     """Основа для всех измерительных каналов
@@ -15,13 +16,14 @@ class Channel(object):
         rw (bool, optional): Тип измерительного канала (можно изменять или только читать). По умолчанию только читать.
     """
     runtime = False #< во время работы PYPLC.run установлено в True, что меняет поведение __get__. из за чего plc.MIXER_ON_1 будет значением канала, а иначе экземпляром Channel
-    def __init__(self, name='', init_val=None, rw=False):
+    def __init__(self, name='', init_val=None, rw=False,*_,device:Optional[str]=None):
         self.rw = rw
         self.name = name
         self.value = init_val
         self.forced = None
         self.callbacks = []
         self.comment = ''
+        self.device = device
     def __eq__(self, __value: object) -> bool:
         return self.value==__value
     def __ne__(self, __value: object) -> bool:
@@ -168,6 +170,11 @@ class Channel(object):
         
     def __set__(self,_,value):
         self.write(value)
+
+    def __str__(self):
+        return f'{self.value}[{self.name}:{type(self)}]'
+    def __repr__(self):
+        return f'Channel(name={self.name},rw={self.rw},device={self.device},init_val={self.value})'
 
 class IBool(Channel):
     """Дискретный вход (логический True/False)

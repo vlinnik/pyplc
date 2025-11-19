@@ -1,42 +1,18 @@
-import sys
-try:
-    from ._version import version
-except ImportError:
-    version = '0.0.0+unknown'
+from pyplc.drivers.krax import KRAX
 from collections import namedtuple
-
-print(f'''
-PYPLC:\t\t{version}
-Платформа:\t{sys.platform}
-    ''')
+from pyplc.utils.logging import logger
 
 try:
-    import kraxio as io
-except:
-    class IO():
-        def __init__(self):
-            pass
-        def init(self,*args, **kwargs):
-            pass
-        def master(self,flags: int=0):
-            pass
-        def read_to(self,*_):
-            pass
-        def write(self,*_):
-            pass
-        
-    io = IO()
-
-try:
-    from esp32_conf import conf_dir,port,nocli
-except Exception as e:
-    print(f'\tПроблема импорта пользовательской конфигурации ({e})')
+    from esp32_conf import conf_dir,port,nocli #type: ignore
+except ImportError:
+    logger.info(f'Нет esp32_conf, конфигурация по умолчанию.')
     port = 9004
     nocli= False
-    conf_dir = '.'
+    conf = '.'
+    data = '.'
 
-PLATFORM_CONF = namedtuple('PLATFORM_CONF',( 'conf_dir','port','nocli','cli' ) )    
-platform_conf   = PLATFORM_CONF( conf_dir= conf_dir,port=port,nocli=nocli,cli=2455 )
+PLATFORM_CONF = namedtuple('PLATFORM_CONF',( 'conf','port','nocli','cli','data' ) )    
+platform_conf   = PLATFORM_CONF( conf= conf,port=port,nocli=nocli,cli=2455,data=conf )
 
 before = None
 after = None
@@ -46,5 +22,6 @@ try:
 except:
     storage = None
 
+io = KRAX
 
 __all__ = ['io','before','after','storage','platform_conf']
