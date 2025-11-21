@@ -172,9 +172,17 @@ class Channel(object):
         self.write(value)
 
     def __str__(self):
-        return f'{self.value}[{self.name}:{type(self)}]'
+        if self.name!='':
+            return f'{self()}[{self.name}:{type(self).__name__}]'
+        else:
+            return f'{self()}[{type(self).__name__}]'
+
     def __repr__(self):
-        return f'Channel(name={self.name},rw={self.rw},device={self.device},init_val={self.value})'
+        if self.device is None:
+            device = None
+        else:
+            device = f'"{self.device}"'
+        return f'{type(self).__name__}(name="{self.name}",rw={self.rw},device={device},init_val={self.value})'
 
 class IBool(Channel):
     """Дискретный вход (логический True/False)
@@ -241,12 +249,6 @@ class IBool(Channel):
         """
         return lambda: not self.read()
 
-    def __str__(self):
-        if self.name!='':
-            return f'IXBool({self.name} AT %IX{self.addr}.{self.num}={self()}) #{self.comment}'
-        else:
-            return f'IXBool(%IX{self.addr}.{self.num}={self()}) #{self.comment}'                
-
     def sync(self,data: memoryview, dirty: memoryview ):
         o_val = self.read()
         self.value = (data[ self.addr ] & self.mask)!=0
@@ -294,12 +296,6 @@ class QBool(Channel):
 
     def __invert__(self):
         return lambda: not self.read()
-
-    def __str__(self):
-        if self.name!='':
-            return f'QXBool({self.name} AT %QX{self.addr}.{self.num}={self()}) #{self.comment}'
-        else:
-            return f'QXBool(%QX{self.addr}.{self.num}={self()}) #{self.comment}'
             
     def set(self):
         self.write(True)

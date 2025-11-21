@@ -1,7 +1,7 @@
 import sys
 import os
 import json
-from pyplc.drivers import Device
+from pyplc.drivers import Manager,Device
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.cli import CLI
@@ -12,9 +12,21 @@ import re,gc
 from typing import Optional
 
 if sys.platform=='esp32':
-    from pyplc.platform_esp32 import io,before,after,storage,platform_conf
+    from pyplc.platform_esp32 import config_loader
 elif sys.platform=='linux':
-    from pyplc.platform_linux import io,before,after,storage,platform_conf
+    from pyplc.platform_linux import config_loader
+
+class AttrDict(dict):
+    def __init__(self,data: dict) -> None:
+        super().__init__(data)
+        for k,v in data.items():
+            setattr(self,k,v)
+    
+    def __getattr__(self, name):
+        return self[name]
+    def __setattr__(self, name, value):
+        self[name] = value
+
 
 def __fexists(filename):
     try:
@@ -41,7 +53,7 @@ def __cleanup():
         if posto is not None: 
             posto.term()
             del posto
-            post = None
+            posto = None
         if hw is not None:
             hw.deinit( )
             del hw
@@ -52,39 +64,48 @@ def __cleanup():
 
 def __load():
     global cli, posto, plc, hw
-    conf = {'node_id': 1, 'layout': [], 'devs': [], 'init' : { 'iface': 0, 'hostname' : 'krax'} }
-    krax_json = f'{platform_conf.conf}/krax.json'
-    krax_csv = f'{platform_conf.conf}/krax.csv'
-    if __fexists(krax_json):
-        with open(krax_json, 'rb') as f:
-            conf = json.load(f)
-    else:
-        logger.warning('отсутствует krax.json')
+    conf = AttrDict(config_loader( ))
 
-    scanTime = conf['scanTime'] if 'scanTime' in conf else 100
-    slots = conf['slots'] if 'slots' in conf else []
+    scanTime = conf.get('scanTime',100)
 
     __cleanup( )
     cli = None
     posto = None
 
     try:
-        if not platform_conf.nocli: cli = CLI(port=platform_conf.cli)  # simple telnet
-        posto = POSTO(port=platform_conf.port)   # simple share data over tcp
+        if not conf.get('nocli',False): 
+            cli = CLI(port=conf.get('cli',2455) )       # simple telnet
+        posto = POSTO(port=conf.get('port',9004) )      # simple share data over tcp
     except Exception as e:
         logger.warning('CLI/POSTO порты заняты ({e})',e=e)
         cli = None
         posto = None
+    
+    hw_info = conf.get('hw',{'driver':'default'})
+    if 'config' in hw_info: 
+        hw_conf = conf.get( hw_info['config'],{} )
+    else:
+        if 'hw' in conf:
+            hw_conf = conf.get('hw')
+        else:   #failsafe
+            hw_conf = {'slots':slots,'init':conf.get('init',{})}
+            
+    slots=hw_conf.get('slots',conf.get('slots',[])) #информация об слотах где то может быть
+    hw = Manager.create(driver=hw_info.get('driver','default'),**hw_conf )
 
-    hw = io( slots=conf['slots'],init=conf['init'] )
-
-    plc = PYPLC(period=scanTime, pre=[before,cli], post=[posto,after,NVD(storage) if storage else None])
+    before = conf.get('before',[]) 
+    after = conf.get('after',[])
+    before.append(cli)
+    after.insert(0,posto)
+    if 'storage' in conf: after.append(NVD(conf['storage']))
+    
+    plc = PYPLC(period=scanTime, pre=before, post=after)
     plc.cleanup = __cleanup
 
-    if __fexists(krax_csv):
+    try:
         vars = 0
         errs = 0
-        with open(krax_csv, 'r') as csv:
+        with open(conf.get('db','krax.csv'), 'r') as csv:
             csv.readline()  # skip column headers
             id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
             num = re.compile(r'[0-9]+')
@@ -110,20 +131,20 @@ def __load():
                         elif info[1].upper( ) == 'CNT8':
                             ch = ICounter8(addr+ch_n,info[0])  
                         ch.comment = f'S{slot_n:02}C{ch_n:02}'
-                        hw.register(ch, name=info[0])
+                        if hw: hw.register(ch, name=info[0])
                         vars = vars+1
                 except Exception as e:
                     if hasattr(sys, 'print_exception'):
                         sys.print_exception(e)
                     else:
-                        print(e, info)                    
+                        logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
                     errs = errs+1
-        plc.config(persist=storage,conf_dir=platform_conf.data)
-    else:
-        logger.info('krax.csv отсутствует - пользовательская настройка раскладки по каналам')
+        plc.config(persist=conf.storage,conf_dir=conf.data)
+    except Exception as e:
+        logger.info('проблема при загрузке {db}: {e}',e=e,db=conf.get("db","./krax.csv"))
 
 if __name__ != '__main__':
     plc = None
     __load( )
 
-__all__ = ['plc']
+__all__ = ['plc','hw']

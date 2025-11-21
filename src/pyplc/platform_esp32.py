@@ -1,27 +1,49 @@
+from pyplc.drivers import Manager
 from pyplc.drivers.krax import KRAX
 from collections import namedtuple
 from pyplc.utils.logging import logger
+import json
+import yaml
 
-try:
-    from esp32_conf import conf_dir,port,nocli #type: ignore
-except ImportError:
-    logger.info(f'Нет esp32_conf, конфигурация по умолчанию.')
-    port = 9004
-    nocli= False
-    conf = '.'
-    data = '.'
+def config_loader()->dict:
+    conf_data = { 'before':[],'after':[],'data':'' }
 
-PLATFORM_CONF = namedtuple('PLATFORM_CONF',( 'conf','port','nocli','cli','data' ) )    
-platform_conf   = PLATFORM_CONF( conf= conf,port=port,nocli=nocli,cli=2455,data=conf )
+    conf_file = f'krax.json'
+        
+    for conf_file in ['data/krax.yaml','krax.json']:
+        try:
+            with open(conf_file, 'rb') as f:
+                if conf_file.endswith('.yaml'):
+                    conf_data.update(yaml.load(conf_file))            
+                else:
+                    conf_data.update(json.load(f))
+            logger.debug('Использованы настройки из {f}',f=conf_file)
+            break
+        except OSError:
+            pass
+        except Exception as e:
+            logger.debug('При загрузки настроек: {e}',e=e)
 
-before = None
-after = None
-try:
-    from at25640b import AT25640B
-    storage = AT25640B()
-except:
-    storage = None
+    platform = conf_data.get('platforms',{}).get('esp32',{})
+    conf_dir = platform.get('conf','.')
+            
+    conf_data["db"] = f'{conf_dir}/krax.csv'
+        
+    hw_info = platform.get('hw')
+    if hw_info:
+        conf_data['hw']=hw_info
 
-io = KRAX
+    Manager.register('default',KRAX)
 
-__all__ = ['io','before','after','storage','platform_conf']
+    try:
+        from at25640b import AT25640B
+        storage = AT25640B()
+    except:
+        storage = None
+        
+    if storage: conf_data["storage"] = storage
+    return conf_data
+    
+    
+
+__all__ = ['config_loader']

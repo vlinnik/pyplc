@@ -1,21 +1,15 @@
-import os
+import json
 import sys
-from pyplc.drivers import MemoryDevice,device_manager
-from pyplc.core import PYPLC
+import os
+from pyplc.drivers import Manager
+from pyplc.drivers.krax import KRAX
+from pyplc.drivers.modbusclient import ModbusTCP
 from collections import namedtuple
 from pyplc.utils.logging import logger
-
-try:
-    from linux_conf import conf,port,nocli,data #type: ignore
-except ImportError:
-    logger.info(f'Нет linux_conf, конфигурация по умолчанию')
-    port = 9004
-    nocli= False
-    conf = 'src'
-    data = '.'
-
-PLATFORM_CONF = namedtuple('PLATFORM_CONF',( 'conf','port','nocli','cli','data' ) )    
-platform_conf   = PLATFORM_CONF( conf= conf,port=port,nocli=nocli,cli=2455,data=data )
+from typing import Optional
+from os import path
+import typer 
+import yaml
 
 def __typeof(var):
     if isinstance(var,float):
@@ -28,7 +22,7 @@ def __typeof(var):
         return 'STRING'
     return f'{type(var)}'
 
-def exports(ctx: dict,prefix:str=None):
+def __exports(ctx: dict,prefix:Optional[str]=None):
     """Вывод всех доступных для обмена переменных
 
     Args:
@@ -38,7 +32,7 @@ def exports(ctx: dict,prefix:str=None):
     print('VAR_CONFIG')
     prefix = '' if prefix is None else f'{prefix}.'
 
-    for d in device_manager.devices:
+    for d in Manager.__manager__().devices:
         try:
             data = d.__data__()
             if d.name is not None:
@@ -61,34 +55,134 @@ def exports(ctx: dict,prefix:str=None):
     print('END_VAR')
     sys.exit(0)
 
-import argparse
-args = argparse.ArgumentParser(sys.argv)
-args.add_argument('--exports',action='store_true',default=False)
-args.add_argument('--conf', action='store', type=str, default=conf, help='IO files name, default=src (krax.json/krax.csv)')
-args.add_argument('--data', action='store', type=str, default=data, help='Data dir, default=. (persist.dat/persist.json))')
-args.add_argument('--port', action='store', type=int, default=port, help='Interface port, default 9004')
-args.add_argument('--cli', action='store', type=int, default=2455, help='Interface port, default 2455')
-args.add_argument('--nocli', action='store_true', default=False, help='Dont start CLI interface (2455 port)')
+def __path(path: Optional[str],default:Optional[str] = None)->Optional[str]:
+    if path is None:
+        if default is not None: return os.path.abspath(default)
+        return None
+    return os.path.abspath(path)
+    
 
-ns = args.parse_args()
+import typer
+cli = typer.Typer()
 
-before = None
+@cli.command( )
+def run(
+    exports: bool = typer.Option(
+        False,
+        "--exports",
+        help="Export mode"
+    ),
+    conf: Optional[str] = typer.Option(
+        None,
+        "--conf",
+        help="Имя файла с настройками (src/krax.json)"
+    ),
+    conf_dir: Optional[str] = typer.Option(
+        None,
+        "--conf_dir",
+        help="Where required files  name, default=src (krax.json/krax.csv)"
+    ),
+    work_dir: str = typer.Option(
+        "src",
+        "-w",
+        "--work_dir",
+        help="Изменить рабочую папку, default=src (krax.json/krax.csv)"
+    ),
+    db: Optional[str] = typer.Option(
+        None,
+        "--db",
+        help="IO variables data-file, default {conf_dir}/krax.csv"
+    ),
+    data: Optional[str] = typer.Option(
+        None,
+        "--data",
+        help="Data dir, default=. (persist.dat/persist.json)"
+    ),
+    port: int = typer.Option(
+        9004,
+        "--port",
+        help="Interface port, default 9004"
+    ),
+    cli: int = typer.Option(
+        2455,
+        "--cli",
+        help="Interface port, default 2455"
+    ),
+    nocli: bool = typer.Option(
+        False,
+        "--nocli",
+        help="Dont start CLI interface (2455 port)"
+    ),
+    driver: str = typer.Option(
+        "default",
+        "--driver",
+        help="Default driver for IO variables"
+    )    
+):
+    conf_data = { 'before':[],'after':[] }
+    
+    if exports:
+        conf_data["before"] = [__exports]
+        
+    conf_dir = __path(conf_dir)
+    conf = __path(conf)
+    db = __path(db)
+    data = __path(data)
+    
+    try:
+        os.chdir(work_dir)
+    except:
+        logger.debug('Не удалось смесить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
+        pass
+    
+    conf_dir = __path(conf_dir,'data')
+    db = __path(db,f'{conf_dir}/krax.csv')
+    data = __path(data,'..')
+                    
+    conf_data["nocli"] = nocli
+    conf_data["cli"] = cli
+    conf_data["port"] = port
+    conf_data["data"] = data
+    conf_data["driver"] = driver
+    conf_data["db"] = db
+        
+    for conf_file in [conf,f'{conf_dir}/krax.yaml',f'{conf_dir}/krax.json','krax.json']:
+        try:
+            conf_file = __path(conf_file)
+            if conf_file:
+                with open(conf_file, 'rb') as f:
+                    if conf_file.endswith('.yaml'):
+                        conf_data.update(yaml.load(f,yaml.FullLoader))            
+                    else:
+                        conf_data.update(json.load(f))
+                logger.debug('Использованы настройки из {f}',f=conf_file)
+                break
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            logger.debug('При загрузки настроек: {e}',e=e)
+        
+    hw_info = conf_data.get('platforms',{}).get(sys.platform,{}).get('hw')
+    if hw_info:
+        conf_data['hw']=hw_info
+    
+    Manager.register('default',KRAX)
+    Manager.register('modbustcp',ModbusTCP)    
 
-if ns.exports:
-    before = exports
+    persist = f'{data}/persist.dat'
+    try:
+        storage = open(persist,'r+b')
+    except FileNotFoundError:
+        with open(persist,'w+b') as f:
+            f.write(bytearray(256))
+        storage = open(persist,'r+b')
+        storage.seek(0)
+    conf_data['storage'] = storage
+        
+    return conf_data
 
-PLATFORM_CONF = namedtuple('PLATFORM_CONF',( 'conf','port','nocli','cli','data' ) )    
-platform_conf   = PLATFORM_CONF( conf= ns.conf,port=ns.port,nocli=ns.nocli,cli=ns.cli,data=ns.data )
-after = None
 
-io = MemoryDevice
+def config_loader()->dict:
+    return cli(standalone_mode=False)
 
-try:
-    storage = open(f'{ns.data}/persist.dat','r+b')
-except FileNotFoundError:
-    with open(f'{ns.data}/persist.dat','w+b') as f:
-        f.write(bytearray(256))
-    storage = open(f'{ns.data}/persist.dat','r+b')
-    storage.seek(0)
-
-__all__ = ['io','before','after','storage','platform_conf']
+__all__ = ['config_loader']
