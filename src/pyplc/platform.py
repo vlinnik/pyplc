@@ -88,7 +88,7 @@ def __load():
         if 'hw' in conf:
             hw_conf = conf.get('hw')
         else:   #failsafe
-            hw_conf = {'slots':slots,'init':conf.get('init',{})}
+            hw_conf = {'slots':conf.get('slots',[]),'init':conf.get('init',{})}
             
     slots=hw_conf.get('slots',conf.get('slots',[])) #информация об слотах где то может быть
     hw = Manager.create(driver=hw_info.get('driver','default'),**hw_conf )

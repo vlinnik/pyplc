@@ -6,7 +6,7 @@ from pyplc.drivers.krax import KRAX
 from pyplc.drivers.modbusclient import ModbusTCP
 from collections import namedtuple
 from pyplc.utils.logging import logger
-from typing import Optional
+from typing import Optional,List,Union
 from os import path
 import typer 
 import yaml
@@ -55,9 +55,14 @@ def __exports(ctx: dict,prefix:Optional[str]=None):
     print('END_VAR')
     sys.exit(0)
 
-def __path(path: Optional[str],default:Optional[str] = None)->Optional[str]:
+def __path(path: Optional[str],default:Optional[Union[str,List[str]]] = None)->Optional[str]:
     if path is None:
-        if default is not None: return os.path.abspath(default)
+        if default is not None: 
+            if isinstance(default,str):
+                default = [default]
+            for f in default:
+                if os.path.exists(f):
+                    return os.path.abspath(f)
         return None
     return os.path.abspath(path)
     
@@ -135,8 +140,8 @@ def run(
         logger.debug('Не удалось смесить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
         pass
     
-    conf_dir = __path(conf_dir,'data')
-    db = __path(db,f'{conf_dir}/krax.csv')
+    conf_dir = __path(conf_dir,['data','.'])
+    db = __path(db,[f'{conf_dir}/krax.csv',f'krax.csv'])
     data = __path(data,'..')
                     
     conf_data["nocli"] = nocli

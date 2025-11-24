@@ -91,7 +91,12 @@ class NVD(POU):
             sha1 = i['sha1']
             properties = i['properties']
 
-            so = list( filter( lambda x: x.full_id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
+            try:
+                so = list( filter( lambda x: x.full_id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
+            except IndexError:
+                logger.error('Не найден #{id} в persist.json, попробуйте удалить persist.json',id=name)
+                return False
+                
             crc = ':'.join('{:02x}'.format(x) for x in hashlib.sha1( '|'.join(properties).encode( ) ).digest( ))
             if crc != sha1:
                 raise RuntimeError(f"sha1 digest properties list is invalid: {so.id}")
