@@ -105,7 +105,7 @@ class NVD(POU):
                 data = source.read(size)
                 so.from_bytearray( data, properties )
             except Exception as e:
-                logger.error(f'{e} (size={size},properties={properties})')
+                logger.error('{e} (size={size},properties={properties})',e=e,size=size,properties=properties)
                 
         return True
 

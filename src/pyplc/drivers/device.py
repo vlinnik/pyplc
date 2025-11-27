@@ -1,8 +1,8 @@
 from array import array
-from typing import Optional, Union,cast,Protocol,Callable
-from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8
+from typing import Optional, cast
+from pyplc.channel import Channel
 from pyplc.utils.logging import logger
-from .manager import Device,Manager,VAR_TYPE
+from .manager import Device,VAR_TYPE
 
 class MemoryDevice(Device):
     def __init__(self,*_,name: Optional[str] = None,size: int = 128,**kwargs):

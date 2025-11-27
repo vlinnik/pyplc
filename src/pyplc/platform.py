@@ -9,7 +9,7 @@ from pyplc.utils.posto import POSTO
 from pyplc.utils.nvd import NVD
 from pyplc.utils.logging import logger
 import re,gc
-from typing import Optional
+from typing import Optional,List
 
 if sys.platform=='esp32':
     from pyplc.platform_esp32 import config_loader
@@ -61,51 +61,12 @@ def __cleanup():
         logger.error('проблема при освобождении ресурсов {e}',e=e)
         pass
     gc.collect()
-
-def __load():
-    global cli, posto, plc, hw
-    conf = AttrDict(config_loader( ))
-
-    scanTime = conf.get('scanTime',100)
-
-    __cleanup( )
-    cli = None
-    posto = None
-
-    try:
-        if not conf.get('nocli',False): 
-            cli = CLI(port=conf.get('cli',2455) )       # simple telnet
-        posto = POSTO(port=conf.get('port',9004) )      # simple share data over tcp
-    except Exception as e:
-        logger.warning('CLI/POSTO порты заняты ({e})',e=e)
-        cli = None
-        posto = None
     
-    hw_info = conf.get('hw',{'driver':'default'})
-    if 'config' in hw_info: 
-        hw_conf = conf.get( hw_info['config'],{} )
-    else:
-        if 'hw' in conf:
-            hw_conf = conf.get('hw')
-        else:   #failsafe
-            hw_conf = {'slots':conf.get('slots',[]),'init':conf.get('init',{})}
-            
-    slots=hw_conf.get('slots',conf.get('slots',[])) #информация об слотах где то может быть
-    hw = Manager.create(driver=hw_info.get('driver','default'),**hw_conf )
-
-    before = conf.get('before',[]) 
-    after = conf.get('after',[])
-    before.append(cli)
-    after.insert(0,posto)
-    if 'storage' in conf: after.append(NVD(conf['storage']))
-    
-    plc = PYPLC(period=scanTime, pre=before, post=after)
-    plc.cleanup = __cleanup
-
+def __import_csv(file:str,slots:List[int]):
     try:
         vars = 0
         errs = 0
-        with open(conf.get('db','krax.csv'), 'r') as csv:
+        with open(file, 'r') as csv:
             csv.readline()  # skip column headers
             id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
             num = re.compile(r'[0-9]+')
@@ -134,14 +95,54 @@ def __load():
                         if hw: hw.register(ch, name=info[0])
                         vars = vars+1
                 except Exception as e:
-                    if hasattr(sys, 'print_exception'):
-                        sys.print_exception(e)
-                    else:
-                        logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
+                    logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
                     errs = errs+1
-        plc.config(persist=conf.storage,conf_dir=conf.data)
     except Exception as e:
         logger.info('проблема при загрузке {db}: {e}',e=e,db=conf.get("db","./krax.csv"))
+
+def __load():
+    global cli, posto, plc, hw
+    conf = AttrDict(config_loader( ))
+
+    scanTime = conf.get('scanTime',100)
+
+    __cleanup( )
+    cli = None
+    posto = None
+
+    try:
+        if not conf.get('nocli',False): 
+            cli = CLI(port=conf.get('cli',2455) )       # simple telnet
+        posto = POSTO(port=conf.get('port',9004) )      # simple share data over tcp
+    except Exception as e:
+        logger.warning('CLI/POSTO порты заняты ({e})',e=e)
+        cli = None
+        posto = None
+    
+    #основное устройство IO описано в .hw + .hw.config хранит в каком разделе параметры для инициализации 
+    hw_info = conf.get('hw',{})
+    if 'config' in hw_info: 
+        hw_conf = conf.get( hw_info['config'],{} )
+    else: #
+        hw_conf = {'slots':conf.get('slots',[]),'init':conf.get('init',{})}
+        
+    if 'slots' not in hw_conf:
+        hw_conf['slots'] = conf.get('slots',[])
+
+    hw = Manager.create(driver=hw_info.get('driver','default'),**hw_conf )
+
+    before = conf.get('before',[]) 
+    after = conf.get('after',[])
+    before.append(cli)
+    after.insert(0,posto)
+    if 'storage' in conf: after.append(NVD(conf['storage']))
+    
+    plc = PYPLC(period=scanTime, pre=before, post=after)
+    plc.cleanup = __cleanup
+    
+    __import_csv(conf.get('db','krax.csv'),slots=hw_conf.get('slots',[]))
+    plc.config(persist=conf.storage,conf_dir=conf.data)
+
 
 if __name__ != '__main__':
     plc = None

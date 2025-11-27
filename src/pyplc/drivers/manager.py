@@ -42,6 +42,13 @@ class Manager():
         if Manager.__instance__ is None:
             Manager.__instance__ = Manager( )
         return Manager.__instance__
+
+    @staticmethod
+    def start(ctx: dict):
+        mngr = Manager.__manager__()
+        logger.debug('starting devices: {devs}',devs=mngr.devices)
+        for device in mngr.devices:
+            device.start( ctx )
     
     @staticmethod
     def append(device: Device):
@@ -62,10 +69,6 @@ class Manager():
     def __init__(self):
         self.devices = [ ]
         
-    def start(self,ctx: dict):
-        for device in self.devices:
-            device.start( ctx )
-                
     def __enter__(self):
         for device in self.devices:
             device.__enter__()

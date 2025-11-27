@@ -1,5 +1,6 @@
 from pyplc.drivers import Manager
 from pyplc.drivers.krax import KRAX
+from pyplc.drivers.modbusclient import ModbusTCP
 from collections import namedtuple
 from pyplc.utils.logging import logger
 from typing import Union,List,Optional
@@ -21,7 +22,7 @@ def __path(hints:Union[str,List[str]])->Optional[str]:
 def config_loader()->dict:
     conf_data = { 'before':[],'after':[],'data':'' }
 
-    conf_file = __path([f'data/krax.yaml',f'data/krax.json',f'krax.json'])
+    conf_file = __path([f'krax.json',f'data/krax.json',f'data/krax.yaml'])
         
     if conf_file:
         try:
@@ -48,6 +49,7 @@ def config_loader()->dict:
         conf_data['hw']=hw_info
 
     Manager.register('default',KRAX)
+    Manager.register('modbustcp',ModbusTCP)
 
     try:
         from at25640b import AT25640B
