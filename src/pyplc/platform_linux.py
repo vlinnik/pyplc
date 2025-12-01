@@ -137,7 +137,7 @@ def run(
     try:
         os.chdir(work_dir)
     except:
-        logger.debug('Не удалось смесить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
+        logger.debug('Не удалось сменить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
         pass
     
     conf_dir = __path(conf_dir,['data','.'])
@@ -149,7 +149,7 @@ def run(
     conf_data["port"] = port
     conf_data["data"] = data
     conf_data["driver"] = driver
-    conf_data["db"] = db
+    if db: conf_data["db"] = db
         
     for conf_file in [conf,f'{conf_dir}/krax.yaml',f'{conf_dir}/krax.json','krax.json']:
         try:

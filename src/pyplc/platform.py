@@ -98,7 +98,7 @@ def __import_csv(file:str,slots:List[int]):
                     logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
                     errs = errs+1
     except Exception as e:
-        logger.info('проблема при загрузке {db}: {e}',e=e,db=conf.get("db","./krax.csv"))
+        logger.info('проблема при загрузке {db}: {e}',e=e,db=file)
 
 def __load():
     global cli, posto, plc, hw

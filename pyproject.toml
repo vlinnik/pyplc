@@ -28,3 +28,10 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/vlinnik/pyplc"
 "Bug Tracker" = "https://github.com/vlinnik/pyplc/issues"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --ignore=tests/legacy"
+testpaths = [
+    "tests"
+]

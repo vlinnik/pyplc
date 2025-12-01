@@ -186,7 +186,7 @@ class Manager():
             plc = PYPLC( sum(slots), period = scanTime, pre = [cli,__plc] ,post = [posto,__plc,NVD(board.eeprom)]  )
             plc.connection = __plc
         else:
-            plc = PYPLC( sum(slots), period = scanTime, pre = [cli] ,post = [posto,NVD(board.eeprom)]  )
+            plc = PYPLC( pre = [cli] ,post = [posto,NVD(board.eeprom)]  )
             # hw = plc.state
             plc.connection = None
         

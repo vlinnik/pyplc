@@ -51,3 +51,5 @@ class Attribute():
 
     def __str__(self)->str:
         return str(self.read())
+
+Property = Attribute

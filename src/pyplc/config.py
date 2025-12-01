@@ -133,7 +133,7 @@ class Manager():
     """
     def __init__(self):
         self.conf = {'node_id': 1, 'layout': [], 'devs': [], 'AP' : True, 'STA' : True, 
-                     'init' : { 'iface': 0, 'hostname' : 'krax'} }
+                    'init' : { 'iface': 0, 'hostname' : 'krax'} }
         pass
 
     @staticmethod
