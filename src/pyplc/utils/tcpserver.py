@@ -1,6 +1,7 @@
 import socket,sys,time
 import errno
 from pyplc.utils.buffer import BufferInOut
+from pyplc.utils.logging import logger
 """
 TCP Cервер с работой циклами. Синхронно каждый вызов происходит проверка наличия данных и их обработка. 
 Реализация по умолчанию работает как Echo сервер. Необходимо реализовать методы connected,disconnected,received
@@ -12,11 +13,9 @@ TCP Cервер с работой циклами. Синхронно кажды�
 class TCPServer():
     @staticmethod
     def attention(e: Exception,hint: str=''):
+        logger.warning(f'{e}({hint})')
         if hasattr(sys,'print_exception'): 
-            print(f'Attention: {e}({hint})',end=':')
             sys.print_exception(e)
-        else:
-            print(f'Attention: {e}({hint})')
                                                     
     def __init__(self,port:int ,i_size:int=256, o_size: int = 256):
         """Инициализация и запуск сервера на указанном порту
@@ -38,16 +37,17 @@ class TCPServer():
         self.o_size = o_size
         
     def term(self):
+        logger.debug( f'останов сервера {type(self).__name__}' )
         for s in self.clients:
             self.close(s)
         self.svr.close( )
         self.svr = None
 
     def connected(self,sock:BufferInOut):
-        print(f'{self}: Client connected...')
+        logger.debug(f'{self}: client online')
         
     def disconnected(self,sock:BufferInOut):
-        print(f'{self}: Client disconnected...')
+        logger.debug(f'{self}: client offline')
 
     def received(self,client:BufferInOut,data:memoryview):
         client.send( data ) #default implementation is echo server

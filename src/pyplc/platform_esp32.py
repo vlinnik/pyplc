@@ -1,6 +1,5 @@
 from pyplc.drivers import Manager
 from pyplc.drivers.krax import KRAX
-from pyplc.drivers.modbusclient import ModbusTCP
 from collections import namedtuple
 from pyplc.utils.logging import logger
 from typing import Union,List,Optional
@@ -42,14 +41,13 @@ def config_loader()->dict:
     platform = conf_data.get('platforms',{}).get('esp32',{})
     conf_dir = platform.get('conf','.')
             
-    conf_data["db"] = __path([f'{conf_dir}/krax.csv',f'krax.csv'])
+    conf_data["db"] = __path([f'krax.csv',f'{conf_dir}/krax.csv'])
         
     hw_info = platform.get('hw')
     if hw_info:
         conf_data['hw']=hw_info
 
     Manager.register('default',KRAX)
-    Manager.register('modbustcp',ModbusTCP)
 
     try:
         from at25640b import AT25640B

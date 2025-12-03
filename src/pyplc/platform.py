@@ -1,7 +1,8 @@
 import sys
 import os
 import json
-from pyplc.drivers import Manager,Device
+from pyplc.drivers import Manager as IO
+from pyplc.drivers.posto import Publisher
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.cli import CLI
@@ -27,22 +28,13 @@ class AttrDict(dict):
     def __setattr__(self, name, value):
         self[name] = value
 
-
-def __fexists(filename):
-    try:
-        os.stat(filename)
-        return True
-    except OSError:
-        return False
-
 cli = None
-posto = None
 plc:Optional[PYPLC] = None
-hw:Optional[Device] = None
 
 def __cleanup():
-    global cli, posto, plc, hw
+    global cli, plc
     try:
+        IO.stop( )
         if plc is not None:
             del plc
             plc = None
@@ -50,13 +42,6 @@ def __cleanup():
             cli.term()
             del cli
             cli = None
-        if posto is not None: 
-            posto.term()
-            del posto
-            posto = None
-        if hw is not None:
-            hw.deinit( )
-            del hw
     except Exception as e:
         logger.error('проблема при освобождении ресурсов {e}',e=e)
         pass
@@ -101,23 +86,22 @@ def __import_csv(file:str,slots:List[int]):
         logger.info('проблема при загрузке {db}: {e}',e=e,db=file)
 
 def __load():
-    global cli, posto, plc, hw
+    global cli, plc, hw
     conf = AttrDict(config_loader( ))
-
+    
     scanTime = conf.get('scanTime',100)
 
     __cleanup( )
+    
+    IO.register('posto',Publisher)
     cli = None
-    posto = None
 
     try:
         if not conf.get('nocli',False): 
             cli = CLI(port=conf.get('cli',2455) )       # simple telnet
-        posto = POSTO(port=conf.get('port',9004) )      # simple share data over tcp
     except Exception as e:
         logger.warning('CLI/POSTO порты заняты ({e})',e=e)
         cli = None
-        posto = None
     
     #основное устройство IO описано в .hw + .hw.config хранит в каком разделе параметры для инициализации 
     hw_info = conf.get('hw',{})
@@ -129,12 +113,18 @@ def __load():
     if 'slots' not in hw_conf:
         hw_conf['slots'] = conf.get('slots',[])
 
-    hw = Manager.create(driver=hw_info.get('driver','default'),**hw_conf )
+    hw = IO.create(driver=hw_info.get('driver','default'),name='hw',**hw_conf )
+    
+    publishers = conf.get('publishers',[])
+    for pub in publishers:
+        init = conf.get(pub,{})
+        driv = init.get('driver')
+        if driv is not None and IO.create(**init) is None:
+            logger.warning('Создание {pub} не удалось',pub=pub)
 
     before = conf.get('before',[]) 
     after = conf.get('after',[])
     before.append(cli)
-    after.insert(0,posto)
     if 'storage' in conf: after.append(NVD(conf['storage']))
     
     plc = PYPLC(period=scanTime, pre=before, post=after)
@@ -142,7 +132,7 @@ def __load():
     
     __import_csv(conf.get('db','krax.csv'),slots=hw_conf.get('slots',[]))
     plc.config(persist=conf.storage,conf_dir=conf.data)
-
+    
 
 if __name__ != '__main__':
     plc = None

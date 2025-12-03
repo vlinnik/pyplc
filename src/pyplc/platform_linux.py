@@ -140,8 +140,8 @@ def run(
         logger.debug('Не удалось сменить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
         pass
     
-    conf_dir = __path(conf_dir,['data','.'])
-    db = __path(db,[f'{conf_dir}/krax.csv',f'krax.csv'])
+    conf_dir = __path(conf_dir,['.','data'])
+    db = __path(db,[f'krax.csv',f'{conf_dir}/krax.csv'])
     data = __path(data,'..')
                     
     conf_data["nocli"] = nocli
@@ -151,7 +151,7 @@ def run(
     conf_data["driver"] = driver
     if db: conf_data["db"] = db
         
-    for conf_file in [conf,f'{conf_dir}/krax.yaml',f'{conf_dir}/krax.json','krax.json']:
+    for conf_file in [conf,'krax.json',f'{conf_dir}/krax.json',f'{conf_dir}/krax.yaml']:
         try:
             conf_file = __path(conf_file)
             if conf_file:

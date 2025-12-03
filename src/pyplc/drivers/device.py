@@ -2,7 +2,7 @@ from array import array
 from typing import Optional, cast
 from pyplc.channel import Channel
 from pyplc.utils.logging import logger
-from .manager import Device,VAR_TYPE
+from .manager import Manager as IO,Device,VAR_TYPE
 
 class MemoryDevice(Device):
     def __init__(self,*_,name: Optional[str] = None,size: int = 128,**kwargs):
@@ -21,10 +21,7 @@ class MemoryDevice(Device):
             result[ var.name ] = var
         return result
         
-    def init(self,*args, **kwargs):
-        pass
-    
-    def deinit(self,*args, **kwargs):
+    def stop(self,*args, **kwargs):
         pass
 
     def force(self,**kwargs):  #для удобства доступа (покороче) к channel переменным 

@@ -1,26 +1,31 @@
 
-from typing import Optional, Union,cast,Protocol,Callable,Type,List,Dict
+from typing import Any, Optional, Union,cast,Protocol,Callable,Type,List,Dict,Tuple
 from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8
 from pyplc.utils.logging import logger
 
 VAR_TYPE = Union[ QBool, QWord, IBool, IWord, ICounter8 ]
 
-class Device(Protocol):
+class IODevice(Protocol):
     name: Optional[str]
-    vars: tuple[ VAR_TYPE,... ]
     runtime: bool
-    def init(self,*args, **kwargs):
-        ...
-    def deinit(self,*args, **kwargs):
-        ...
-    def register(self,var: VAR_TYPE,*_,name: Optional[str] = None):
-        ...
     def start(self,ctx: dict):
+        ...
+    def stop(self,*args, **kwargs):
         ...
     def __enter__(self)-> 'Device':
         ...
     def __exit__(self, exc_type, exc_value, traceback):
         ...
+
+class Device(IODevice):
+    vars: tuple[ VAR_TYPE,... ]
+    def register(self,var: VAR_TYPE,*_,name: Optional[str] = None):
+        ...
+    def get(self,name: str):
+        for var in self.vars:
+            if var.name == name:
+                return var
+        
     def bind(self,__name:str,__notify: Callable):
         for var in self.vars:
             if var.name == __name:
@@ -35,45 +40,65 @@ class Device(Protocol):
 
 class Manager():
     __instance__: Optional['Manager'] = None
-    __drivers__: Dict[str,Type[Device]] = { }
+    __drivers__: Dict[str,Type[IODevice]] = { }
+    __devices__: Tuple[IODevice,...] = ( )
+    __r_devices__: Tuple[IODevice,...] = ( )
     
-    @staticmethod
-    def __manager__():
-        if Manager.__instance__ is None:
-            Manager.__instance__ = Manager( )
-        return Manager.__instance__
-
+    @classmethod
+    def instance(cls):
+        if cls.__instance__ is None:
+            cls.__instance__ = cls()
+        return cls.__instance__
+    
     @staticmethod
     def start(ctx: dict):
-        mngr = Manager.__manager__()
-        logger.debug('starting devices: {devs}',devs=mngr.devices)
-        for device in mngr.devices:
+        mngr = Manager.instance()
+        Manager.__devices__ = tuple(mngr.devices)
+        Manager.__r_devices__ = tuple(reversed(mngr.devices))
+        for device in Manager.__devices__:
+            logger.info('Запуск устройства: {d}',d=device)
             device.start( ctx )
+            
+    @staticmethod
+    def stop():
+        for device in Manager.__r_devices__:
+            logger.info('Остановка устройства: {d}',d=device)
+            device.stop( )
+        Manager.__devices__ = ( )
+        Manager.__r_devices__ = ( )
+        Manager.instance().devices.clear()
     
     @staticmethod
-    def append(device: Device):
-        Manager.__manager__( ).devices.append(device)
+    def append(device: IODevice)->IODevice:
+        Manager.instance( ).devices.append(device)
         return device
     
     @staticmethod
-    def create(*args,driver:str='default',**kwargs)->Optional[Device]:
+    def create(*args,driver:str='default',**kwargs)->Optional[IODevice]:
         if driver in Manager.__drivers__:
-            return Manager.append(Manager.__drivers__[driver](*args,**kwargs))
+            try:
+                return Manager.append(Manager.__drivers__[driver](*args,**kwargs))
+            except Exception as e:
+                logger.warning('При создании {driver} {e}',driver=driver,e=e)
         else:
             logger.opt(depth = -1).critical('Драйвер {driver} не доступен: есть {avail}',driver=driver,avail=Manager.__drivers__.keys())
             
     @staticmethod
-    def register(driver:str , cls: Type[Device] ):
-        Manager.__manager__().__drivers__[driver] = cls
+    def register(driver:str , cls: Type[IODevice] ):
+        Manager.instance().__drivers__[driver] = cls
+
+    @staticmethod
+    def remove(device: IODevice):
+        Manager.instance().devices.remove(device)
     
     def __init__(self):
-        self.devices = [ ]
-        
+        self.devices:List[ IODevice ] = [ ]
+
     def __enter__(self):
-        for device in self.devices:
+        for device in Manager.__devices__:
             device.__enter__()
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
-        for device in self.devices:
+        for device in Manager.__r_devices__:
             device.__exit__( exc_type, exc_value, traceback )

@@ -129,8 +129,8 @@ class PYPLC():
     def scan(self):
         """однократное выполнение цикла работы: синхронизация памяти и каналов ввода - функции pre - пользовательская логика - функции post - пауза
         """
-        with Manager.__manager__():
-            with self:
+        with self:
+            with Manager.instance():
                 if not self.simulator:
                     for i in self.instances:
                         if type(i[1])==PYPLC.GENERATOR_TYPE:
@@ -154,7 +154,7 @@ class PYPLC():
             self.instances = tuple( [i,None] for i in instances )
         self.config( **kwds )
         for _ in range(0,10):
-            with Manager.__manager__():  #первое сканирование
+            with Manager.instance():  #первое сканирование
                 with self:
                     pass
         

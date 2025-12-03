@@ -107,16 +107,12 @@ class ModbusTCP(MemoryDevice):
         self.client.map( holdings, 16, True )
         self.client.map( digits, 1, False)
         self.client.map( coils, 1, True)
-        self.init(host=host,port=port)
-
-    def init(self,*_,host:str,port:int=502,**kwargs):        
-        super().init( **kwargs )
         logger.info('Подключение к ModbusTCP({host}:{port})',host=host,port=port)
         self.client.init(host=host,port=port,timeout=0.2)
 
-    def deinit(self):
+    def stop(self,*args, **kwargs):
         if self.client: self.client.close( )
-        super().deinit( )    
+        super().stop(*args,**kwargs )    
         
     def start(self,ctx:dict={}):
         super().start(ctx=ctx)

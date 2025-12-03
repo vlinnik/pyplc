@@ -25,21 +25,17 @@ class KRAX(MemoryDevice):
     def __init__(self,*_,name: Optional[str] = None,slots: Optional[List[int]]=None, size: Optional[int]=None , init:dict={}, **kwargs ):
         super().__init__( name=name,size=size or (sum(slots) if slots else 128 ))
         self.slots = slots
-        self.init(**init)
-
-    def init(self,*_,**kwargs):
-        kraxio.init( 1, **kwargs )
-        super().init( **kwargs )        
+        kraxio.init(1,**init)
         
-    def deinit(self):
+    def stop(self,*args, **kwargs):
         kraxio.deinit()
-        super().deinit( )    
+        super().stop( )
     
     def __del__(self):
         kraxio.deinit()
             
     def __repr__(self):
-        return f"KRAX(name={self.name},slots={self.slots},size={self.size})"
+        return f"KRAX(name='{self.name}',slots={self.slots},size={self.size})"
 
     def __enter__(self)-> 'KRAX':
         kraxio.master(1)

@@ -13,7 +13,7 @@ class Subscription(Property):
         Args:
             item (str): Идентификатор подписки
         """
-        super().__init__()
+        super().__init__(None,read=self.__read,write=self.__write)
         self.item = item            # идентификатор подписки: например motor.ison
         self.modified = False       # флаг что есть изменения и надо отправить удаленной стороне
         self.remote_id = None       # номер подписки на удаленной стороне
@@ -21,18 +21,23 @@ class Subscription(Property):
         self.local_id = Subscription.next_id    # номер подписки на этой стороне
         self.tx = 0                 #сколько раз отправлено
         self.rx = 0                 #сколько раз получено
+        self._value = None
         Subscription.next_id += 1
 
     def __str__(self) -> str:
-        return f'{self.item}({self.local_id}) = {self.read()}'
+        return f'{self.item}({self.local_id}) = {self._value}'
 
     def cleanup(self):
-        self.__sinks.clear( )
+        self.unbind(None)
+        # self.__sinks.clear( )
 
-    def write(self, value):  # modify current value for underlying subscription's item
-        if self.read()!=value:
+    def __write(self, value):  # modify current value for underlying subscription's item
+        if self._value!=value:
             self.modified = True     #нужно отправить удаленной стороне
-        super().write(value)
+        self._value = value
+        
+    def __read(self):
+        return self._value
 
     # subscribed item changed on remote side
     def remote(self, value):

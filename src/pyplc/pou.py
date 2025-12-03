@@ -63,16 +63,22 @@ class AttrDescriptor():
         __inputs = getattr(obj, '_inputs_')
 
         def write(value: Any):
+            __dirty[index] = __values[index]!=value
+            __touched[index] = True
             __values[index] = value
 
         def read() -> Any:
             return __values[index]
         
-        attr: Attribute = self.new(read=read, write=write)
+        write.__qualname__ = f'{type(self).__name__}'
+        read.__qualname__ = f'{type(self).__name__}'
+        
         __values.append(self._initial)
         __touched.append(True)
         __dirty.append(True)
         __inputs.append(None)
+        
+        attr: Attribute = self.new(read=read, write=write)
 
         if self._flags & self.PERSISTENT:
             obj._persistent_.append(name)  # type: ignore
@@ -207,6 +213,8 @@ class Base(AttrObjProto):
             return Float(value, cached=cached, flags=flags)
         elif type(value) is str:
             return Str(value, cached=cached, flags=flags)
+        elif type(value) is bool:
+            return Bool(value, cached=True, flags=flags)
         return AttrDescriptor(value, cached=cached, flags=flags)
 
     @staticmethod
@@ -501,25 +509,50 @@ POU = Base
 class ACL():
     """Описание доступа к свойствам объекта.  
     """
-    READ = 1
-    WRITE = 2
-    RW = 3
+    class Record():
+        def __init__(self,*args:str,**kwargs: Type[Union[str, bool, float, POU]]):
+            self.data = kwargs
+            self.names= args
 
-    def __init__(self, name: str, allowed: List[str] = [], exclude: List[str] = []):
-        self._registry = {}
+    def __init__(self, name: str,strict: bool=False):
+        self._allow  = { }
+        self._exclude= { }
+        self._strict = strict
+        self.name = name
 
-    def allow(self, cls: Type[POU], mode: int, *_: str, **kwargs: Type[Union[str, bool, float, POU]]) -> 'ACL':
+    def allow(self, cls: Type[POU], *names: str, **kwargs: Type[Union[str, bool, float, POU]]) -> 'ACL':
+        if cls in self._allow:
+            rec: ACL.Record = self._allow[cls]
+            rec.names = set(rec.names + names)
+            rec.data.update(kwargs)
+        else:
+            self._allow[cls] = ACL.Record(*names,**kwargs)
         return self
 
-    def exclude(self, cls: Type[POU], *_: str) -> 'ACL':
+    def exclude(self, cls: Type[POU], *names: str) -> 'ACL':
+        self._exclude[cls] = set(self._exclude.get(cls,()) + names)
         return self
 
-    def access(self, obj: POU,name: str ) -> Optional[Attribute]:
+    def access(self, obj: POU,name: str ) -> Optional[Union[Attribute,POU]]:
         #check access availablity 
-        ...
+        if type(obj) in self._exclude and name in self._exclude[type(obj)]:
+            raise AttributeError
+
+        if type(obj) in self._allow:
+            rec: ALC.Record = self._allow[type(obj)]
+            if name not in rec.names and name not in rec.data:
+                raise AttributeError
+        elif self._strict:
+            raise AttributeError            
+            
         #return Attribute for accessing 
-        try:
-            d: AttrDescriptor=getattr(type(obj),name)
-            return d.of(obj)
-        except AttributeError:
-            return None
+        if hasattr(type(obj),name):
+            d: Union[AttrDescriptor,POU]=getattr(type(obj),name)
+            if isinstance(d,AttrDescriptor):
+                return d.of(obj)
+        
+        d = getattr(obj,name)
+        if isinstance(d,POU):
+            return d
+        
+        return None #обычное свойство
