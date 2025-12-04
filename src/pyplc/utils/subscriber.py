@@ -25,7 +25,7 @@ class Subscription(Property):
         Subscription.next_id += 1
 
     def __str__(self) -> str:
-        return f'{self.item}({self.local_id}) = {self._value}'
+        return f'{self._value}[{self.item}]'
 
     def cleanup(self):
         self.unbind(None)

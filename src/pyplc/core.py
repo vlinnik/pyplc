@@ -129,17 +129,16 @@ class PYPLC():
     def scan(self):
         """однократное выполнение цикла работы: синхронизация памяти и каналов ввода - функции pre - пользовательская логика - функции post - пауза
         """
-        with self:
-            with IO.instance():
-                if not self.simulator:
-                    for i in self.instances:
-                        if type(i[1])==PYPLC.GENERATOR_TYPE:
-                            try:
-                                next(i[1])
-                            except StopIteration:
-                                i[1] = None
-                        elif i[0]:
-                            i[1] = i[0]( )
+        with self,IO.instance():
+            if not self.simulator:
+                for i in self.instances:
+                    if type(i[1])==PYPLC.GENERATOR_TYPE:
+                        try:
+                            next(i[1])
+                        except StopIteration:
+                            i[1] = None
+                    elif i[0]:
+                        i[1] = i[0]( )
                         
     def force(self,**kwargs):  #для удобства доступа (покороче) к channel переменным 
         for key,value in kwargs.items():
@@ -154,9 +153,8 @@ class PYPLC():
             self.instances = tuple( [i,None] for i in instances )
         self.config( **kwds )
         for _ in range(0,10):
-            with IO.instance():  #первое сканирование
-                with self:
-                    pass
+            with self,IO.instance():  #первое сканирование
+                pass
         
     def run(self,instances=None,**kwds ):
         """Запуск работы пользовательских программ.

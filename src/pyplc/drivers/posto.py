@@ -60,7 +60,7 @@ class Publisher(IODevice,TCPServer):
     def init(self,*args,port=9004, size=512, **kwargs):
         pass
     
-    def deinit(self,*args, **kwargs):
+    def stop(self,*args, **kwargs):
         self.term( )    #tcp server
 
     def register(self,var: Attribute,*_,name: str):
