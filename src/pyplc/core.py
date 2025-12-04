@@ -1,7 +1,7 @@
 from pyplc.channel import Channel
 from pyplc.pou import POU
 from pyplc.utils.nvd import NVD
-from pyplc.drivers import Manager
+from pyplc.device import Manager as IO
 import time
 import asyncio
 import sys
@@ -130,7 +130,7 @@ class PYPLC():
         """однократное выполнение цикла работы: синхронизация памяти и каналов ввода - функции pre - пользовательская логика - функции post - пауза
         """
         with self:
-            with Manager.instance():
+            with IO.instance():
                 if not self.simulator:
                     for i in self.instances:
                         if type(i[1])==PYPLC.GENERATOR_TYPE:
@@ -154,7 +154,7 @@ class PYPLC():
             self.instances = tuple( [i,None] for i in instances )
         self.config( **kwds )
         for _ in range(0,10):
-            with Manager.instance():  #первое сканирование
+            with IO.instance():  #первое сканирование
                 with self:
                     pass
         

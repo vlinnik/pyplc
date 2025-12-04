@@ -21,4 +21,4 @@ def configs_dir(pytestconfig):
     """
     Фикстура: путь к папке с тестовыми конфигами.
     """ 
-    return pytestconfig.rootpath / "tests" / "configs"
+    return pytestconfig.rootpath /"tests"/ "configs"

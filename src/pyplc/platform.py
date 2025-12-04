@@ -1,12 +1,10 @@
 import sys
-import os
-import json
-from pyplc.drivers import Manager as IO
+from pyplc.device import Manager as IO
 from pyplc.drivers.posto import Publisher
+from pyplc.drivers.krax import KRAX
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.cli import CLI
-from pyplc.utils.posto import POSTO
 from pyplc.utils.nvd import NVD
 from pyplc.utils.logging import logger
 import re,gc
@@ -94,6 +92,7 @@ def __load():
     __cleanup( )
     
     IO.register('posto',Publisher)
+    IO.register('default',KRAX)
     cli = None
 
     try:

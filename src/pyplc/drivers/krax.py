@@ -1,4 +1,4 @@
-from pyplc.drivers.device import MemoryDevice
+from pyplc.device import MemoryDevice
 from pyplc.utils.logging import logger
 from typing import Optional,List
 import sys 

@@ -1,5 +1,3 @@
-from pyplc.drivers import Manager
-from pyplc.drivers.krax import KRAX
 from collections import namedtuple
 from pyplc.utils.logging import logger
 from typing import Union,List,Optional
@@ -46,8 +44,6 @@ def config_loader()->dict:
     hw_info = platform.get('hw')
     if hw_info:
         conf_data['hw']=hw_info
-
-    Manager.register('default',KRAX)
 
     try:
         from at25640b import AT25640B

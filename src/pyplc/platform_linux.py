@@ -1,13 +1,10 @@
 import json
 import sys
 import os
-from pyplc.drivers import Manager
-from pyplc.drivers.krax import KRAX
-from pyplc.drivers.modbusclient import ModbusTCP
-from collections import namedtuple
+from pyplc.device import Manager
+from pyplc.device import Device
 from pyplc.utils.logging import logger
-from typing import Optional,List,Union
-from os import path
+from typing import Optional,List,Union,Dict,Any
 import typer 
 import yaml
 
@@ -32,7 +29,7 @@ def __exports(ctx: dict,prefix:Optional[str]=None):
     print('VAR_CONFIG')
     prefix = '' if prefix is None else f'{prefix}.'
 
-    for d in Manager.__manager__().devices:
+    for d in Manager.instance().devices:
         try:
             data = d.__data__()
             if d.name is not None:
@@ -45,7 +42,7 @@ def __exports(ctx: dict,prefix:Optional[str]=None):
         obj = ctx[i]
         try:
             data = obj.__data__()
-            if not isinstance(obj,MemoryDevice):
+            if not isinstance(obj,Device):
                 vars = [ f'\t{prefix}{i}.{x} AT {prefix}{i}.{x}: {__typeof(data[x])};' for x in data.keys() ]
             else:
                 vars = [ f'\t{prefix}{x} AT {prefix}{i}.{x}: {__typeof(data[x]( ))};' for x in data.keys() ]
@@ -124,7 +121,7 @@ def run(
         help="Default driver for IO variables"
     )    
 ):
-    conf_data = { 'before':[],'after':[] }
+    conf_data:Dict[str,Any] = { 'before':[],'after':[] }
     
     if exports:
         conf_data["before"] = [__exports]
@@ -141,7 +138,7 @@ def run(
         pass
     
     conf_dir = __path(conf_dir,['.','data'])
-    db = __path(db,[f'krax.csv',f'{conf_dir}/krax.csv'])
+    db = __path(db,['krax.csv',f'{conf_dir}/krax.csv'])
     data = __path(data,'..')
                     
     conf_data["nocli"] = nocli
@@ -170,9 +167,6 @@ def run(
     hw_info = conf_data.get('platforms',{}).get(sys.platform,{}).get('hw')
     if hw_info:
         conf_data['hw']=hw_info
-    
-    Manager.register('default',KRAX)
-    Manager.register('modbustcp',ModbusTCP)    
 
     persist = f'{data}/persist.dat'
     try:

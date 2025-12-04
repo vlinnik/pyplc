@@ -1,5 +1,5 @@
 from pyplc.utils.logging import logger
-from pyplc.drivers.device import MemoryDevice
+from pyplc.device import MemoryDevice
 from typing import Optional,List,Tuple
 from array import array
 

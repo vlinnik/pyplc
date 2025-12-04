@@ -4,8 +4,8 @@ from pyplc.pou import POU,ACL
 from pyplc.utils.buffer import BufferInOut
 from pyplc.utils.logging import logger
 from pyplc.channel import Channel
-from pyplc.drivers.manager import IODevice,Device,Manager as IO
-from pyplc.attribute import Attribute,AnyAttribute
+from pyplc.device import IODevice,Device,Manager as IO
+from pyplc.attribute import Attribute
 from pyplc.utils.tcpserver import TCPServer
 
 from time import time_ns as timestamp
@@ -100,7 +100,7 @@ class Publisher(IODevice,TCPServer):
     
     def __exit__(self, exc_type, exc_value, traceback):
         self.runtime = False
-        # self( )
+        self( )
         
     def __repr__(self) -> str:
         return f'{type(self).__name__}(name="{self.name}")'
