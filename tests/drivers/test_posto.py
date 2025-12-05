@@ -46,7 +46,7 @@ def test_subscribe():
                 
     assert foo_q.value==True and foo_clk.value==True
     
-    posto.stop()
+    posto.stop( )
     subscr()
     
     assert len(posto.belongs)>0
@@ -57,22 +57,24 @@ def test_hw_access(monkeypatch, setup_config):
     # подменяем путь поиска конфигов
     monkeypatch.chdir( cfg_dir )
     monkeypatch.setattr("sys.argv", [sys.executable])
-    posto = Publisher('posto',port=9004,size=512)
-    from pyplc.platform import plc,hw,IO
-    
+    posto = Publisher('posto',port=9005,size=512)
+    from pyplc.platform import plc,hw,IO,platform_init
+    plc,hw = platform_init( )
+
     assert plc,'Должен быть инициализирован plc'
+    assert hasattr(hw,'DO_0')
     IO.append(posto)
     IO.start( ctx= { } )
         
-    subscr = Subscriber('127.0.0.1')
+    subscr = Subscriber('127.0.0.1',9005)
     do_0 = subscr.subscribe('hw.DO_0')
     
     
     n_try=0
     while do_0.remote_id is None:
-        subscr( )
         with plc,IO.instance():
             pass
+        subscr( )
         n_try+=1
 
     assert do_0()==False and n_try<=4,f'Оформление подписки за {n_try}<=4 цикла и начальное значение ({do_0}==False) '

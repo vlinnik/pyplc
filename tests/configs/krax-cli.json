@@ -1,0 +1,15 @@
+{
+    "slots": [8,8,1,1,1,1,1,1],
+    "node_id": 1,
+    "init": {
+        "flags": 0,
+        "iface": 0,
+        "hostname": "krax",
+        "rate": 12
+    },
+    "modules" : [ {"class":"pyplc.utils.cli/CLI","name":"cli","type":"begin"} ],
+    "cli" : { "port": 2456 },
+    "layout": [],
+    "via": "0.0.0.0",
+    "scanTime":100
+}

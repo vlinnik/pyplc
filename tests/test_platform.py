@@ -8,7 +8,8 @@ def test_valid_config(monkeypatch, setup_config, configs_dir):
     # подменяем путь поиска конфигов
     monkeypatch.chdir( cfg_dir )
     monkeypatch.setattr("sys.argv", [sys.executable])
-    from pyplc.platform import plc, hw
+    from pyplc.platform import plc, hw, platform_init
+    plc,hw = platform_init()
     assert plc
     assert hw
     assert hasattr(hw,'AI_0')

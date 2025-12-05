@@ -1,19 +1,11 @@
 import sys
-from pyplc.device import Manager as IO
-from pyplc.drivers.posto import Publisher
-from pyplc.drivers.krax import KRAX
+from pyplc.device import Manager as IO,Device,IODevice
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
-from pyplc.utils.cli import CLI
 from pyplc.utils.nvd import NVD
 from pyplc.utils.logging import logger
 import re,gc
-from typing import Optional,List
-
-if sys.platform=='esp32':
-    from pyplc.platform_esp32 import config_loader
-elif sys.platform=='linux':
-    from pyplc.platform_linux import config_loader
+from typing import Optional,List,cast
 
 class AttrDict(dict):
     def __init__(self,data: dict) -> None:
@@ -26,26 +18,34 @@ class AttrDict(dict):
     def __setattr__(self, name, value):
         self[name] = value
 
-cli = None
 plc:Optional[PYPLC] = None
 
+__devices: List[str] = [ ]
+__objects: List[object] = [ ]
+
 def __cleanup():
-    global cli, plc
+    global plc,__objects
     try:
+        while __objects:
+            obj = __objects.pop()
+            del obj
+            
         IO.stop( )
         if plc is not None:
             del plc
             plc = None
-        if cli is not None: 
-            cli.term()
-            del cli
-            cli = None
     except Exception as e:
         logger.error('проблема при освобождении ресурсов {e}',e=e)
         pass
     gc.collect()
     
-def __import_csv(file:str,slots:List[int]):
+def __import_by_name(name: str):
+    mod = __import__(name,globals())
+    for part in name.split(".")[1:]:
+        mod = getattr(mod, part)
+    return mod
+    
+def __import_csv(file:str,slots:List[int],hw: IODevice ):
     try:
         vars = 0
         errs = 0
@@ -75,7 +75,7 @@ def __import_csv(file:str,slots:List[int]):
                         elif info[1].upper( ) == 'CNT8':
                             ch = ICounter8(addr+ch_n,info[0])  
                         ch.comment = f'S{slot_n:02}C{ch_n:02}'
-                        if hw: hw.register(ch, name=info[0])
+                        if hw and isinstance(hw,Device): hw.register(ch, name=info[0])
                         vars = vars+1
                 except Exception as e:
                     logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
@@ -83,25 +83,21 @@ def __import_csv(file:str,slots:List[int]):
     except Exception as e:
         logger.info('проблема при загрузке {db}: {e}',e=e,db=file)
 
-def __load():
-    global cli, plc, hw
-    conf = AttrDict(config_loader( ))
+def platform_init():
+    global __devices
+    logger.debug('инициализация pyplc-платформы')
+    if sys.platform=='esp32':
+        from pyplc.platform_esp32 import platform_init as _platform_init
+    elif sys.platform=='linux':
+        from pyplc.platform_linux import platform_init as _platform_init
+    conf = AttrDict(_platform_init( ))
     
     scanTime = conf.get('scanTime',100)
 
     __cleanup( )
     
-    IO.register('posto',Publisher)
-    IO.register('default',KRAX)
-    cli = None
+    IO.discover()
 
-    try:
-        if not conf.get('nocli',False): 
-            cli = CLI(port=conf.get('cli',2455) )       # simple telnet
-    except Exception as e:
-        logger.warning('CLI/POSTO порты заняты ({e})',e=e)
-        cli = None
-    
     #основное устройство IO описано в .hw + .hw.config хранит в каком разделе параметры для инициализации 
     hw_info = conf.get('hw',{})
     if 'config' in hw_info: 
@@ -112,29 +108,59 @@ def __load():
     if 'slots' not in hw_conf:
         hw_conf['slots'] = conf.get('slots',[])
 
-    hw = IO.create(driver=hw_info.get('driver','default'),name='hw',**hw_conf )
+    hw = IO.create(driver=hw_info.get('driver','krax'),name='hw',**hw_conf )
     
-    publishers = conf.get('publishers',[])
-    for pub in publishers:
-        init = conf.get(pub,{})
-        driv = init.get('driver')
-        if driv is not None and IO.create(**init) is None:
-            logger.warning('Создание {pub} не удалось',pub=pub)
+    devices = conf.get('devices',[{"driver":"krax","name":"hw"},{"driver":"posto","name":"posto"}])
+    for decl in devices:
+        driv = decl.get('driver')
+        name = decl.get('name',driv)
+        init = conf.get( name ,{})
+        dev = None
+        if driv is not None and (dev:=IO.create(name=name, driver=driv,**init)) is None:
+            logger.warning('Создание {dev} не удалось',dev=decl)
+        elif dev is not None:
+            globals().update({ name:dev })
+            __devices.append(name)        
 
     before = conf.get('before',[]) 
     after = conf.get('after',[])
-    before.append(cli)
+
+    modules:List[Dict[str,Any]] = conf.get('modules',[ {'class':'pyplc.utils.cli/CLI','name':'cli','type':'context'} ])
+    for decl in modules:
+        where,what = decl.get('class','/').split('/')
+        name = decl.get('name')
+        typ  = decl.get('type','begin')
+        args = conf.get(name,{ })
+        try:
+            mod = __import_by_name(where)
+            cls = getattr(mod,what)
+            obj = cls(**args)
+            if typ not in ['context','begin','end']: 
+                logger.info(f'Тип модуля "{typ}" должен быть context|begin|end')
+                typ='begin'
+            if typ=='context' or typ=='begin':
+                before.append(obj)
+            if typ=='context' or typ=='end':
+                if typ=='context':
+                    after.insert(0,obj)
+                else: after.append(obj)
+            if name!=None:
+                globals().update({name:obj})
+            __objects.append(obj)
+        except:
+            pass
     if 'storage' in conf: after.append(NVD(conf['storage']))
     
     plc = PYPLC(period=scanTime, pre=before, post=after)
     plc.cleanup = __cleanup
     
-    __import_csv(conf.get('db','krax.csv'),slots=hw_conf.get('slots',[]))
+    __import_csv(conf.get('db','krax.csv'),slots=hw_conf.get('slots',[]),hw=hw )
     plc.config(persist=conf.storage,conf_dir=conf.data)
+    
+    return plc,hw
     
 
 if __name__ != '__main__':
-    plc = None
-    __load( )
+    plc,hw = platform_init( )
 
-__all__ = ['plc','hw']
+__all__ = ['plc','platform_init','hw'] + __devices

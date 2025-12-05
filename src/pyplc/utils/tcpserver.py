@@ -40,7 +40,8 @@ class TCPServer():
         logger.debug( f'останов сервера {type(self).__name__}' )
         for s in self.clients:
             self.close(s)
-        self.svr.close( )
+        if self.svr is not None:
+            self.svr.close( )
         self.svr = None
 
     def connected(self,sock:BufferInOut):

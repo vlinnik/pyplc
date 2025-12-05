@@ -152,6 +152,7 @@ class PYPLC():
         if instances is not None: 
             self.instances = tuple( [i,None] for i in instances )
         self.config( **kwds )
+        IO.start(ctx=kwds.get('ctx',{ }))
         for _ in range(0,10):
             with self,IO.instance():  #первое сканирование
                 pass

@@ -1,0 +1,45 @@
+scanTime: 100
+node_id: 1
+
+modules:
+  - class : pyplc.utils.cli/CLI
+    name  : cli
+    type  : context | begin | end
+
+init:
+  hostname: krax
+  flags: 0
+  iface: 0
+  channel: 1
+  rate: 5
+
+slots:
+  - 8
+  - 8
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+
+wago:
+  host: 192.168.1.11
+  inputs:
+    - [0, 8]
+
+  digits:
+    - [0, 16]
+
+  coils:
+    - [8192, 32]
+
+devs:
+  - "KRAX AI-455"
+  - "KRAX AI-455"
+  - "KRAX DI-430"
+  - "KRAX DI-430"
+  - "KRAX DO-530"
+  - "KRAX DO-530"
+  - "KRAX DO-530"
+  - "KRAX DO-530"

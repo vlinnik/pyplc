@@ -1,0 +1,20 @@
+{
+    "slots": [8,8,1,1,1,1,1,1],
+    "node_id": 1,
+    "init": {
+        "flags": 0,
+        "iface": 0,
+        "hostname": "krax",
+        "rate": 12
+    },
+    "devices":[
+        {"driver":"posto","name":"posto"}
+    ],
+    "posto" : {
+        "port" : 9006,
+        "size" : 1024
+    },
+    "layout": [],
+    "via": "0.0.0.0",
+    "scanTime":100
+}

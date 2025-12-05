@@ -16,7 +16,7 @@ def __path(hints:Union[str,List[str]])->Optional[str]:
             pass
     return None
 
-def config_loader()->dict:
+def platform_init()->dict:
     conf_data = { 'before':[],'after':[],'data':'' }
 
     conf_file = __path([f'krax.json',f'data/krax.json',f'data/krax.yaml'])
@@ -56,4 +56,4 @@ def config_loader()->dict:
     
     
 
-__all__ = ['config_loader']
+__all__ = ['platform_init']

@@ -106,7 +106,7 @@ def run(
         help="Interface port, default 9004"
     ),
     cli: int = typer.Option(
-        2455,
+        None,
         "--cli",
         help="Interface port, default 2455"
     ),
@@ -116,7 +116,7 @@ def run(
         help="Dont start CLI interface (2455 port)"
     ),
     driver: str = typer.Option(
-        "default",
+        "krax",
         "--driver",
         help="Default driver for IO variables"
     )    
@@ -142,7 +142,7 @@ def run(
     data = __path(data,'..')
                     
     conf_data["nocli"] = nocli
-    conf_data["cli"] = cli
+    if cli is not None: conf_data["cli"] = { "port":cli }
     conf_data["port"] = port
     conf_data["data"] = data
     conf_data["driver"] = driver
@@ -181,7 +181,7 @@ def run(
     return conf_data
 
 
-def config_loader()->dict:
+def platform_init()->dict:
     return cli(standalone_mode=False)
 
-__all__ = ['config_loader']
+__all__ = ['platform_init']

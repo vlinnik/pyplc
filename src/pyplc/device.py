@@ -1,12 +1,20 @@
 from array import array
 from typing import  Optional, Union,cast,Protocol,Callable,Type,List,Dict,Tuple,Any
-from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8
+from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8,Channel
 from pyplc.utils.logging import logger
+import sys
             
 logger.info('Запуск подсистемы обмена с устройствами')
 
 VAR_TYPE = Union[ QBool, QWord, IBool, IWord, ICounter8 ]
 
+try:
+    from typing import runtime_checkable
+except ImportError:
+    def runtime_checkable(cls):
+        return cls
+
+@runtime_checkable
 class IODevice(Protocol):
     name: Optional[str]
     runtime: bool
@@ -142,10 +150,10 @@ class Manager():
         return device
     
     @staticmethod
-    def create(*args,driver:str='default',**kwargs)->Optional[IODevice]:
+    def create(*args,name: str, driver:str='default',**kwargs)->Optional[IODevice]:
         if driver in Manager.__drivers__:
             try:
-                return Manager.append(Manager.__drivers__[driver](*args,**kwargs))
+                return Manager.append(Manager.__drivers__[driver](*args,name=name,**kwargs))
             except Exception as e:
                 logger.warning('При создании {driver} {e}',driver=driver,e=e)
         else:
@@ -154,6 +162,28 @@ class Manager():
     @staticmethod
     def register(driver:str , cls: Type[IODevice] ):
         Manager.instance().__drivers__[driver] = cls
+        
+    @staticmethod
+    def discover():
+        from pyplc.drivers import __available__
+        
+        def __import_by_name(name: str):
+            mod = __import__(name,globals())
+            for part in name.split(".")[1:]:
+                mod = getattr(mod, part)
+            return mod
+
+        for item,sym in __available__.items():
+            try:
+                mod = __import_by_name(f'pyplc.drivers.{item}')
+                cls = getattr(mod,sym)
+                if isinstance(cls,type) and (cls,IODevice):
+                    logger.info("Подключен драйвер {item}, реализация {name}",item=item,name=cls.__qualname__)
+                    Manager.register(item,cls)
+            except Exception as e:
+                logger.warning('Подключить драйвер {item} неудалось: {err}',item=item,err=e)
+                pass
+            
 
     @staticmethod
     def remove(device: IODevice):
