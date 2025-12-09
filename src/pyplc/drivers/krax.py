@@ -1,4 +1,4 @@
-from pyplc.device import MemoryDevice
+from pyplc.device import IOMemory
 from pyplc.utils.logging import logger
 from typing import Optional,List
 import sys 
@@ -21,7 +21,7 @@ if sys.platform!='esp32':
 else:
     import kraxio
 
-class KRAX(MemoryDevice):
+class KRAX(IOMemory):
     def __init__(self,*_,name: Optional[str] = None,slots: Optional[List[int]]=None, size: Optional[int]=None , init:dict={}, **kwargs ):
         super().__init__( name=name,size=size or (sum(slots) if slots else 128 ))
         self.slots = slots

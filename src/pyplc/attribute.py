@@ -1,7 +1,10 @@
-from typing import Callable,Optional,Any
+from typing import Callable,Optional,Any,Dict
                 
 class Attribute():
     def __init__(self,*_, read:Callable[[],Any], write:Callable[[Any],None],cached:bool = False):
+        self.hint = 0               #< пометка, AttrDecriptor хранит тут ro/rw
+        self.user:Dict[int,Any]={}  #< пользовательские данные для личных целей. 
+        self.T = type(None)         #< предпочтительный тип аттрибута
         self._binds = [ ]
         self._read = read
         self._write = write
@@ -37,14 +40,19 @@ class Attribute():
     def notify(self):
         _value = self.read()
         for b in self._binds:
-            b(_value)
+            b(_value, self.user)
         self._touched = False
         self._dirty = False
+        
+    def changed(self,val: Any):
+        for b in self._binds:
+            b(val, self.user)
+        
 
-    def bind(self,__sink:Callable[[Any],None],no_init:bool=False):  
+    def bind(self,__sink:Callable[[Any,Dict[int,Any]],None],no_init:bool=False):  
         self._binds.append( __sink )
         if not no_init:
-            __sink(self.read())
+            __sink(self.read(),self.user)
 
     def unbind(self,__sink:Optional[Callable[[Any],None]] = None):
         if __sink is None:

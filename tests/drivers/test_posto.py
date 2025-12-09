@@ -20,11 +20,11 @@ class Foo(POU):
             
 def test_subscribe():
     foo = Foo()
-    posto = Publisher('posto',port=9004,size=512)
+    posto = Publisher(name='posto',port=9006,size=512)
     posto.start(ctx={'foo':foo})
     assert len(posto.vars)!=3
     
-    subscr = Subscriber('127.0.0.1')
+    subscr = Subscriber('127.0.0.1',9006)
     foo_q = subscr.subscribe('foo.q')
     foo_clk = subscr.subscribe('foo.clk')
     
@@ -57,7 +57,7 @@ def test_hw_access(monkeypatch, setup_config):
     # подменяем путь поиска конфигов
     monkeypatch.chdir( cfg_dir )
     monkeypatch.setattr("sys.argv", [sys.executable])
-    posto = Publisher('posto',port=9005,size=512)
+    posto = Publisher(name='posto',port=9005,size=512)
     from pyplc.platform import plc,hw,IO,platform_init
     plc,hw = platform_init( )
 

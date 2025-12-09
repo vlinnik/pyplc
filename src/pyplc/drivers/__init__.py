@@ -1,1 +1,1 @@
-__available__ = {'krax':'KRAX','modbusclient':'ModbusTCP','posto':'Publisher'}
+__available__ = {'krax':'KRAX','modbusclient':'ModbusTCP','posto':'Publisher','modbus':'Publisher'}

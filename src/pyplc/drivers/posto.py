@@ -1,10 +1,10 @@
 import struct
-from typing import Optional, Dict, Union, Tuple
+from typing import Optional, Dict, Union, Tuple,Any
 from pyplc.pou import POU,ACL
 from pyplc.utils.buffer import BufferInOut
 from pyplc.utils.logging import logger
 from pyplc.channel import Channel
-from pyplc.device import IODevice,Device,Manager as IO
+from pyplc.device import IOService,Manager as IO,IOMemory
 from pyplc.attribute import Attribute
 from pyplc.utils.tcpserver import TCPServer
 
@@ -29,7 +29,7 @@ class _Subscription():
         self._value = value
         self.data.write( value )
         
-    def changed(self,value: T ):
+    def changed(self,value: T , user: Dict[int,Any] = { }):
         if value==self._value:
             return
         self._value = value
@@ -39,71 +39,18 @@ class _Subscription():
         self._dirty = False
         return self._value
 
-class Publisher(IODevice,TCPServer):
-    def __init__(self,name: Optional[str] = None,*_,port=9004,size=512, **kwargs):
+class Publisher(IOService,TCPServer):
+    def __init__(self,*_,name: str, port=9004,size=512, **kwargs):
+        IOService.__init__(self,name=name)
         TCPServer.__init__(self,port=port,i_size=size,o_size=size)
-        self.ctx = None
         self.subscriptions = {}     # оформленные подписки
         self.belongs = {}           # для хранения какому socket принадлежит подписка
         self.keepalive = timestamp()# когда последний раз что-то получено
         self.runtime = False        # чтобы правильно трактовать находимся в контексте или вне (__enter__/__exit__)
-        self.name = name
-        self.vars:Dict[str,Attribute] = { }
-        self.acl = ACL('default',strict=False)
-
-    def __data__(self)->dict:
-        result = { }
-        for var in self.vars:
-            result[var] = self.vars[var].read( )
-        return result
-        
-    def init(self,*args,port=9004, size=512, **kwargs):
-        pass
-    
+            
     def stop(self,*args, **kwargs):
         self.term( )    #tcp server
-
-    def register(self,var: Attribute,*_,name: str):
-        self.vars[name] = var
-        
-    def pub(self,pou: POU,*_,name: Optional[str] = None):
-        if name is None:
-            name = pou.full_id
-            
-        for key in dir(pou):
-            try:
-                attr = self.acl.access(pou,key)
-                if isinstance(attr,Attribute):
-                    self.register(attr,name=f'{name}.{key}')
-                if isinstance(attr,POU):
-                    self.pub(attr,name=f'{name}.{key}')
-            except:
-                pass
-        
-    def start(self,ctx: dict):
-        for key,val in ctx.items():
-            if isinstance(val,ACL):
-                if val.name == self.name:
-                    self.acl = val
-                    break
-                
-        for key,val in ctx.items():
-            if isinstance(val,POU):
-                self.pub(val,name=key)
-                
-        self.ctx = ctx  
-
-    def __enter__(self):
-        self( )
-        self.runtime = True
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.runtime = False
-        self( )
-        
-    def __repr__(self) -> str:
-        return f'{type(self).__name__}(name="{self.name}")'
+        super().stop(*args,**kwargs)
     
     def subscribe(self,item: str,remote_id: int):
         var = self.vars.get(item)
@@ -113,7 +60,7 @@ class Publisher(IODevice,TCPServer):
         path = item.split('.')
         iovar= '.'.join(path[1:])
         for x in IO.instance().devices:
-            if not isinstance(x,Device) or x.name!=path[0]:
+            if not isinstance(x,IOMemory) or x.name!=path[0]:
                 continue
             
             var = x.get(iovar)
@@ -266,3 +213,10 @@ class Publisher(IODevice,TCPServer):
         except Exception as e:
             logger.critical(f'Неожиданно {e}')
             self.close(sock)
+            
+    def __enter__(self):        
+        self()
+        super().__enter__()
+    def __exit__(self, exc_type, exc_value, traceback):
+        super().__exit__(exc_type, exc_value, traceback)
+        self()

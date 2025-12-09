@@ -26,11 +26,11 @@ def test_input_attribute():
     foo_clk_1: bool = False
     foo_clk_2: bool = True
     
-    def set_foo_clk_1(x: bool):
+    def set_foo_clk_1(x: bool, user = { } ):
         nonlocal foo_clk_1
         foo_clk_1 = x
     
-    def set_foo_clk_2(x: bool):
+    def set_foo_clk_2(x: bool, user = { } ):
         nonlocal foo_clk_2
         foo_clk_2 = x
     
@@ -77,11 +77,11 @@ def test_output_attribute():
     foo_q_1: bool = False
     foo_q_2: bool = True
     
-    def set_foo_q_1(x: bool):
+    def set_foo_q_1(x: bool,user = { } ):
         nonlocal foo_q_1
         foo_q_1 = x
     
-    def set_foo_q_2(x: bool):
+    def set_foo_q_2(x: bool,user = { } ):
         nonlocal foo_q_2
         foo_q_2 = x
     
@@ -98,7 +98,7 @@ def test_any_attribute():
     attr = AnyAttribute( False )
 
     val = None
-    def on_changed(x: Any):
+    def on_changed(x: Any,user):
         nonlocal val
         val = x
     

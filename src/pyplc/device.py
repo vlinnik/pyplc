@@ -2,6 +2,7 @@ from array import array
 from typing import  Optional, Union,cast,Protocol,Callable,Type,List,Dict,Tuple,Any
 from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8,Channel
 from pyplc.utils.logging import logger
+from pyplc.pou import Attribute,ACL,POU
 import sys
             
 logger.info('Запуск подсистемы обмена с устройствами')
@@ -24,13 +25,24 @@ class IODevice(Protocol):
         ...
     def __data__(self)->Dict[str,Any]:
         ...
-    def __enter__(self)-> 'Device':
+    def __enter__(self):
         ...
     def __exit__(self, exc_type, exc_value, traceback):
         ...
+    def exports(self)->str:
+        ...
 
-class Device(IODevice):
-    vars: tuple[ VAR_TYPE,... ]
+class IOMemory(IODevice):
+    def __init__(self,*_,name: Optional[str] = None,size: int = 128,**kwargs):
+        self.runtime = False
+        self.name = name
+        self.size = size
+        self.vars:Tuple[VAR_TYPE,...] = ( )
+        self.data = array('B',[0x00]*self.size)     #что писать
+        self.mask = array('B',[0x00]*self.size)     #бит из data писать только если бит=1
+        self.mv_dirty= memoryview(self.mask)        #оптимизация
+        self.mv_data = memoryview(self.data)        #оптимизация
+    
     def register(self,var: VAR_TYPE,*_,name: Optional[str] = None):
         ...
     def get(self,name: str):
@@ -56,17 +68,6 @@ class Device(IODevice):
                 var.unbind( __notify )
                 return
 
-class MemoryDevice(Device):
-    def __init__(self,*_,name: Optional[str] = None,size: int = 128,**kwargs):
-        self.runtime = False
-        self.name = name
-        self.size = size
-        self.vars = tuple( )
-        self.data = array('B',[0x00]*self.size)     #что писать
-        self.mask = array('B',[0x00]*self.size)     #бит из data писать только если бит=1
-        self.mv_dirty= memoryview(self.mask)        #оптимизация
-        self.mv_data = memoryview(self.data)        #оптимизация
-    
     def stop(self,*args, **kwargs):
         pass
 
@@ -88,7 +89,7 @@ class MemoryDevice(Device):
             if isinstance(val,Channel) and cast(Channel,val).device==self.name:
                 self.register( cast(VAR_TYPE,val),name=key )
                 
-    def __enter__(self)-> 'Device':
+    def __enter__(self)-> 'IOMemory':
         for var in self.vars:
             if var.rw is True:
                 continue
@@ -113,6 +114,61 @@ class MemoryDevice(Device):
         
     def __repr__(self) -> str:
         return f'{type(self).__name__}(name={self.name})'
+
+class IOService(IODevice):
+    def __init__(self,*args, name: str, **kwargs):
+        self.name = name
+        self.ctx = { }
+        self.vars:Dict[str,Attribute] = { }
+        self.acl = ACL(name)
+        self.runtime = False
+
+    def register(self,var: Attribute,*_,name: str):
+        self.vars[name] = var
+
+    def pub(self,pou: POU,*_,name: Optional[str] = None):
+        if name is None:
+            name = pou.full_id
+        for key in dir(pou):
+            try:
+                attr = self.acl.access(pou,key)
+                if isinstance(attr,Attribute):
+                    self.register(attr,name=f'{name}.{key}')
+                if isinstance(attr,POU):
+                    self.pub(attr,name=f'{name}.{key}')
+            except Exception as e:
+                pass
+
+    def start(self,ctx: dict):
+        for key,val in ctx.items():
+            if isinstance(val,ACL):
+                if val.name == self.name:
+                    self.acl = val
+                    break
+
+        for key,val in ctx.items():
+            if isinstance(val,POU):
+                self.pub(val,name=key)
+        self.ctx = ctx  
+
+    def stop(self,*args, **kwargs):
+        pass
+
+    def __data__(self)->Dict[str,Any]:
+        result = { }
+        for var in self.vars:
+            result[var] = self.vars[var].read( )
+        return result
+
+    def __enter__(self):
+        self.runtime = True
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.runtime = False
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}(name="{self.name}")'
 
 class Manager():
     __instance__: Optional['Manager'] = None
@@ -202,4 +258,4 @@ class Manager():
             device.__exit__( exc_type, exc_value, traceback )
 
                     
-__all__ = ["Manager",'Device','IODevice','MemoryDevice']
+__all__ = ["Manager",'Device','IODevice','IOMemory','IOService']

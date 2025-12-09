@@ -82,8 +82,9 @@ class AttrDescriptor():
 
         if self._flags & self.PERSISTENT:
             obj._persistent_.append(name)  # type: ignore
+        attr.hint = self._flags            
         obj._slots_ += (attr, )  # type: ignore
-        obj._binds_ += (attr._binds, )  # type: ignore
+        obj._binds_ += ([attr.changed], )  # type: ignore
 
     def of(self, obj: AttrObjProto) -> Attribute:
         if self._index is not None:
@@ -219,7 +220,7 @@ class Base(AttrObjProto):
 
     @staticmethod
     def var(value: Union[int, bool, float], *_, cached: bool = False, hidden: bool = False, persistent: bool = False, dynamic: bool = False) -> AttrDescriptor:
-        flags = AttrDescriptor.READ
+        flags = AttrDescriptor.READ | AttrDescriptor.WRITE
         if hidden:
             flags |= AttrDescriptor.HIDDEN
         if persistent:
@@ -514,6 +515,8 @@ class ACL():
             self.data = kwargs
             self.names= args
 
+    EMPTY_REC = Record( )
+
     def __init__(self, name: str,strict: bool=False):
         self._allow  = { }
         self._exclude= { }
@@ -538,18 +541,22 @@ class ACL():
         if type(obj) in self._exclude and name in self._exclude[type(obj)]:
             raise AttributeError
 
+        rec: ACL.Record = ACL.EMPTY_REC
         if type(obj) in self._allow:
-            rec: ALC.Record = self._allow[type(obj)]
+            rec = self._allow[type(obj)]
             if name not in rec.names and name not in rec.data:
                 raise AttributeError
         elif self._strict:
-            raise AttributeError            
+            raise AttributeError
             
         #return Attribute for accessing 
         if hasattr(type(obj),name):
             d: Union[AttrDescriptor,POU]=getattr(type(obj),name)
             if isinstance(d,AttrDescriptor):
-                return d.of(obj)
+                attr = d.of(obj)
+                if name in rec.data:
+                    attr.T = rec.data[name]
+                return attr
         
         d = getattr(obj,name)
         if isinstance(d,POU):

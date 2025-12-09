@@ -1,5 +1,5 @@
 from pyplc.utils.logging import logger
-from pyplc.device import MemoryDevice
+from pyplc.device import IOMemory
 from typing import Optional,List,Tuple
 from array import array
 
@@ -99,7 +99,7 @@ class ModbusClient(ModbusMapping):
         if self._impl:
             self._impl.close()
 
-class ModbusTCP(MemoryDevice):
+class ModbusTCP(IOMemory):
     def __init__(self,*_,name: Optional[str] = None,coils: REG_RANGES=[],digits: REG_RANGES=[], inputs:REG_RANGES=[],holdings: REG_RANGES=[], size: Optional[int]=None ,host:str,port:int=502, **kwargs ):
         super().__init__( name=name,size=size or ((sum( b for _,b in coils)+7)//8 + (sum( b for _,b in digits)+7)//8 + sum(b for _,b in inputs)*2 + sum(b for _,b in holdings)*2 ))
         self.client:ModbusMapping = ModbusClient( self.mv_data)

@@ -2,7 +2,7 @@ import json
 import sys
 import os
 from pyplc.device import Manager
-from pyplc.device import Device
+from pyplc.device import IODevice
 from pyplc.utils.logging import logger
 from typing import Optional,List,Union,Dict,Any
 import typer 
@@ -42,15 +42,13 @@ def __exports(ctx: dict,prefix:Optional[str]=None):
         obj = ctx[i]
         try:
             data = obj.__data__()
-            if not isinstance(obj,Device):
+            if not isinstance(obj,IODevice):
                 vars = [ f'\t{prefix}{i}.{x} AT {prefix}{i}.{x}: {__typeof(data[x])};' for x in data.keys() ]
-            else:
-                vars = [ f'\t{prefix}{x} AT {prefix}{i}.{x}: {__typeof(data[x]( ))};' for x in data.keys() ]
             if len(vars)>0: print('\n'.join(vars))
         except Exception as e:
             pass
     print('END_VAR')
-    sys.exit(0)
+    raise KeyboardInterrupt
 
 def __path(path: Optional[str],default:Optional[Union[str,List[str]]] = None)->Optional[str]:
     if path is None:

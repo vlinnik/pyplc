@@ -1,5 +1,5 @@
 import sys
-from pyplc.device import Manager as IO,Device,IODevice
+from pyplc.device import Manager as IO,IODevice,IOMemory
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.nvd import NVD
@@ -75,7 +75,7 @@ def __import_csv(file:str,slots:List[int],hw: IODevice ):
                         elif info[1].upper( ) == 'CNT8':
                             ch = ICounter8(addr+ch_n,info[0])  
                         ch.comment = f'S{slot_n:02}C{ch_n:02}'
-                        if hw and isinstance(hw,Device): hw.register(ch, name=info[0])
+                        if hw and isinstance(hw,IOMemory): hw.register(ch, name=info[0])
                         vars = vars+1
                 except Exception as e:
                     logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
