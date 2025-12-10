@@ -1,6 +1,5 @@
 import struct
-from typing import Optional, Dict, Union, Tuple,Any
-from pyplc.pou import POU,ACL
+from typing import Dict, Union, Tuple,Any
 from pyplc.utils.buffer import BufferInOut
 from pyplc.utils.logging import logger
 from pyplc.channel import Channel

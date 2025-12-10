@@ -10,6 +10,7 @@ write_to = "src/pyplc/__version__.py"
 pyplc = ["**/*.py", "**/*.json", "**/*.csv" ]
 
 [project]
+requires = ["tkinter"]
 dynamic = ["version"]
 name = "pyplc"
 authors = [

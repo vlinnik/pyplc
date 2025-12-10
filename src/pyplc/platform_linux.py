@@ -2,11 +2,11 @@ import json
 import sys
 import os
 from pyplc.device import Manager
-from pyplc.device import IODevice
 from pyplc.utils.logging import logger
 from typing import Optional,List,Union,Dict,Any
 import typer 
 import yaml
+import pyperclip
 
 def __typeof(var):
     if isinstance(var,float):
@@ -19,44 +19,51 @@ def __typeof(var):
         return 'STRING'
     return f'{type(var)}'
 
-def __exports(ctx: dict,prefix:Optional[str]=None):
+def __exports(ctx: dict,prefix:Optional[str]=None,filter:Optional[str]=None,format:Optional[str]='VAR_CONFIG'):
     """Вывод всех доступных для обмена переменных
 
     Args:
         ctx (dict): как правило globals()
         prefix (str, optional): добавить префикс
     """
-    print('VAR_CONFIG')
+    result = []
+        
     prefix = '' if prefix is None else f'{prefix}.'
 
     for d in Manager.instance().devices:
+        if filter is not None and d.name!=filter: continue
         try:
-            data = d.__data__()
             if d.name is not None:
-                vars = [ f'\t{prefix}{x} AT {prefix}{d.name}.{x}: {__typeof(data[x]( ))};' for x in data.keys() ]
-            if len(vars)>0: print('\n'.join(vars))
+                vars = d.exports( format=format )
+            if len(vars)>0: 
+                result+=vars
+                vars.clear()
         except Exception as e:
             pass
         
-    for i in ctx.keys():
-        obj = ctx[i]
-        try:
-            data = obj.__data__()
-            if not isinstance(obj,IODevice):
-                vars = [ f'\t{prefix}{i}.{x} AT {prefix}{i}.{x}: {__typeof(data[x])};' for x in data.keys() ]
-            if len(vars)>0: print('\n'.join(vars))
-        except Exception as e:
-            pass
-    print('END_VAR')
+    if format=='VAR_CONFIG':
+        result.insert(0,'VAR_CONFIG')
+        result.append('END_VAR')
+
+    print('\n'.join(result))
+    
+    import tkinter as tk
+    root = tk.Tk()
+    root.withdraw()  # скрыть окно
+    root.clipboard_clear()
+    root.clipboard_append('\n'.join(result))
+    root.update()    # важно: фиксирует данные в системном буфере
+    root.destroy()
+    
     raise KeyboardInterrupt
 
-def __path(path: Optional[str],default:Optional[Union[str,List[str]]] = None)->Optional[str]:
+def __path(path: Optional[str],default:Optional[Union[str,List[str]]] = None,dir:bool = False,file:bool = False)->Optional[str]:
     if path is None:
         if default is not None: 
             if isinstance(default,str):
                 default = [default]
             for f in default:
-                if os.path.exists(f):
+                if os.path.exists(f) and ((os.path.isfile(f) and file) or os.path.isdir(f) and dir):
                     return os.path.abspath(f)
         return None
     return os.path.abspath(path)
@@ -117,17 +124,34 @@ def run(
         "krax",
         "--driver",
         help="Default driver for IO variables"
-    )    
+    ),
+    export: Optional[str] = typer.Option(
+        None,
+        "--export",
+        help="Export only specified devices"
+    ),
+    format: str = typer.Option(
+        'VAR_CONFIG',
+        '--format',
+        help="Output format for export, default VAR_CONFIG (VAR_CONFIG|CSV|other)"
+    )
 ):
     conf_data:Dict[str,Any] = { 'before':[],'after':[] }
     
     if exports:
-        conf_data["before"] = [__exports]
+        def __export(ctx: dict):
+            __exports(ctx=ctx,format=format)        
+        conf_data["before"] = [__export]
+    
+    if export:
+        def __export(ctx: dict):
+            __exports(ctx={export:ctx.get(export,{})},filter=export,format=format)
+        conf_data['before']+=[__export]
         
-    conf_dir = __path(conf_dir)
-    conf = __path(conf)
-    db = __path(db)
-    data = __path(data)
+    conf_dir = __path(conf_dir,dir=True)
+    conf = __path(conf,dir=False,file=True)
+    db = __path(db,dir=False,file=True)
+    data = __path(data,file=False,dir=True)
     
     try:
         os.chdir(work_dir)
@@ -135,9 +159,9 @@ def run(
         logger.debug('Не удалось сменить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
         pass
     
-    conf_dir = __path(conf_dir,['.','data'])
-    db = __path(db,['krax.csv',f'{conf_dir}/krax.csv'])
-    data = __path(data,'..')
+    conf_dir = __path(conf_dir,['data','.'],dir=True)
+    db = __path(db,['krax.csv',f'{conf_dir}/krax.csv'],file=True)
+    data = __path(data,'..',dir=True)
                     
     conf_data["nocli"] = nocli
     if cli is not None: conf_data["cli"] = { "port":cli }
@@ -148,7 +172,7 @@ def run(
         
     for conf_file in [conf,'krax.json',f'{conf_dir}/krax.json',f'{conf_dir}/krax.yaml']:
         try:
-            conf_file = __path(conf_file)
+            conf_file = __path(conf_file,file=True)
             if conf_file:
                 with open(conf_file, 'rb') as f:
                     if conf_file.endswith('.yaml'):
@@ -162,9 +186,9 @@ def run(
         except Exception as e:
             logger.debug('При загрузки настроек: {e}',e=e)
         
-    hw_info = conf_data.get('platforms',{}).get(sys.platform,{}).get('hw')
-    if hw_info:
-        conf_data['hw']=hw_info
+    devices = conf_data.get('platforms',{}).get(sys.platform,{}).get('devices')
+    if devices:
+        conf_data['devices']=devices
 
     persist = f'{data}/persist.dat'
     try:

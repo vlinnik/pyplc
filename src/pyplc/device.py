@@ -15,6 +15,17 @@ except ImportError:
     def runtime_checkable(cls):
         return cls
 
+def _typeof(var):
+    if isinstance(var,float):
+        return 'REAL'
+    elif isinstance(var,bool):
+        return 'BOOL'
+    elif isinstance(var,int):
+        return 'LONG'
+    elif isinstance(var,str):
+        return 'STRING'
+    return f'{type(var)}'
+
 @runtime_checkable
 class IODevice(Protocol):
     name: Optional[str]
@@ -29,7 +40,7 @@ class IODevice(Protocol):
         ...
     def __exit__(self, exc_type, exc_value, traceback):
         ...
-    def exports(self)->str:
+    def exports(self,*args,**kwargs)->List[str]:
         ...
 
 class IOMemory(IODevice):
@@ -43,8 +54,12 @@ class IOMemory(IODevice):
         self.mv_dirty= memoryview(self.mask)        #оптимизация
         self.mv_data = memoryview(self.data)        #оптимизация
     
-    def register(self,var: VAR_TYPE,*_,name: Optional[str] = None):
-        ...
+    def exports(self,*args,format:str = 'VAR_CONFIG',**kwargs)->List[str]:
+        if format.upper()=='VAR_CONFIG':
+            data = self.__data__()
+            return [ f'\t{x} AT {self.name}.{x}: {_typeof(data[x]( ))};' for x in data.keys() ]
+        return ''
+
     def get(self,name: str):
         for var in self.vars:
             if var.name == name:
@@ -120,7 +135,7 @@ class IOService(IODevice):
         self.name = name
         self.ctx = { }
         self.vars:Dict[str,Attribute] = { }
-        self.acl = ACL(name)
+        self.acl = ACL()
         self.runtime = False
 
     def register(self,var: Attribute,*_,name: str):
@@ -129,7 +144,7 @@ class IOService(IODevice):
     def pub(self,pou: POU,*_,name: Optional[str] = None):
         if name is None:
             name = pou.full_id
-        for key in dir(pou):
+        for key in sorted(dir(pou)):
             try:
                 attr = self.acl.access(pou,key)
                 if isinstance(attr,Attribute):
@@ -140,13 +155,8 @@ class IOService(IODevice):
                 pass
 
     def start(self,ctx: dict):
-        for key,val in ctx.items():
-            if isinstance(val,ACL):
-                if val.name == self.name:
-                    self.acl = val
-                    break
-
-        for key,val in ctx.items():
+        for key in sorted(ctx.keys()):
+            val = ctx[key]
             if isinstance(val,POU):
                 self.pub(val,name=key)
         self.ctx = ctx  
@@ -170,11 +180,20 @@ class IOService(IODevice):
     def __repr__(self) -> str:
         return f'{type(self).__name__}(name="{self.name}")'
 
+    def exports(self,*args,format:str = 'VAR_CONFIG',**kwargs)->List[str]:
+        if format.upper()!='VAR_CONFIG':
+            return ''
+        
+        data = self.__data__()
+        return [ f'\t{x.upper().replace('.','_')} AT {x}: {_typeof(data[x])};' for x in data.keys() ]
+        
+
 class Manager():
     __instance__: Optional['Manager'] = None
     __drivers__: Dict[str,Type[IODevice]] = { }
     __devices__: Tuple[IODevice,...] = ( )
     __r_devices__: Tuple[IODevice,...] = ( )
+    __acl__:  Dict[str,ACL] = { }
     
     @classmethod
     def instance(cls):
@@ -183,12 +202,19 @@ class Manager():
         return cls.__instance__
     
     @staticmethod
+    def policy(*args:str,acl:ACL):
+        for name in args:
+            Manager.__acl__[name] = acl
+        
+    @staticmethod
     def start(ctx: dict):
         mngr = Manager.instance()
         Manager.__devices__ = tuple(mngr.devices)
         Manager.__r_devices__ = tuple(reversed(mngr.devices))
         for device in Manager.__devices__:
             logger.info('Запуск устройства: {d}',d=device)
+            if device.name in Manager.__acl__ and isinstance(device,IOService):
+                device.acl = Manager.__acl__[device.name]
             device.start( ctx )
             
     @staticmethod

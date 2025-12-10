@@ -8,7 +8,8 @@
         "rate": 12
     },
     "devices":[
-        {"driver":"posto","name":"posto"}
+        {"driver":"posto","name":"posto"},
+        {"driver":"krax","name":"hw"}
     ],
     "posto" : {
         "port" : 9006,

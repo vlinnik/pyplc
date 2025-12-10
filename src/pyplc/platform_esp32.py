@@ -41,9 +41,9 @@ def platform_init()->dict:
             
     conf_data["db"] = __path([f'krax.csv',f'{conf_dir}/krax.csv'])
         
-    hw_info = platform.get('hw')
-    if hw_info:
-        conf_data['hw']=hw_info
+    devices = platform.get('devices')
+    if devices:
+        conf_data['devices']=devices
 
     try:
         from at25640b import AT25640B

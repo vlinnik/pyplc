@@ -99,17 +99,12 @@ def platform_init():
     IO.discover()
 
     #основное устройство IO описано в .hw + .hw.config хранит в каком разделе параметры для инициализации 
-    hw_info = conf.get('hw',{})
-    if 'config' in hw_info: 
-        hw_conf = conf.get( hw_info['config'],{} )
-    else: #
-        hw_conf = {'slots':conf.get('slots',[]),'init':conf.get('init',{})}
+    hw_conf = {'slots':conf.get('slots',[]),'init':conf.get('init',{})}
         
     if 'slots' not in hw_conf:
         hw_conf['slots'] = conf.get('slots',[])
+    conf['hw'] = hw_conf
 
-    hw = IO.create(driver=hw_info.get('driver','krax'),name='hw',**hw_conf )
-    
     devices = conf.get('devices',[{"driver":"krax","name":"hw"},{"driver":"posto","name":"posto"}])
     for decl in devices:
         driv = decl.get('driver')
@@ -120,6 +115,8 @@ def platform_init():
             logger.warning('Создание {dev} не удалось',dev=decl)
         elif dev is not None:
             globals().update({ name:dev })
+            if name=='hw':
+                hw = dev
             __devices.append(name)        
 
     before = conf.get('before',[]) 
@@ -163,4 +160,4 @@ def platform_init():
 if __name__ != '__main__':
     plc,hw = platform_init( )
 
-__all__ = ['plc','platform_init','hw'] + __devices
+__all__ = ['plc','platform_init'] + __devices

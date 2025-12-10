@@ -18,7 +18,7 @@ class Foo(POU):
             self.q = _clk
 
 def test_input_attribute():
-    acl = ACL('acl_default')
+    acl = ACL()
     foo = Foo()
     attr: Optional[Attribute] = acl.access(foo,'clk')
     assert attr
@@ -69,7 +69,7 @@ def test_input_attribute():
     
 
 def test_output_attribute():
-    acl = ACL('acl_default')
+    acl = ACL()
     foo = Foo()
     attr: Optional[Attribute] = acl.access(foo,'q')
     assert attr

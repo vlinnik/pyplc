@@ -517,11 +517,10 @@ class ACL():
 
     EMPTY_REC = Record( )
 
-    def __init__(self, name: str,strict: bool=False):
+    def __init__(self, strict: bool=False):
         self._allow  = { }
         self._exclude= { }
         self._strict = strict
-        self.name = name
 
     def allow(self, cls: Type[POU], *names: str, **kwargs: Type[Union[str, bool, float, POU]]) -> 'ACL':
         if cls in self._allow:
