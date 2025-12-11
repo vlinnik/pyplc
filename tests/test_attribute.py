@@ -6,11 +6,13 @@ from typing import Any
 
 class Foo(POU):
     clk = POU.input(False)
+    en = POU.input(True)
     q = POU.output(False)
-    def __init__(self,clk: IN_BOOL=None,q: OUT_BOOL=None):
+    def __init__(self,/, en:IN_BOOL = None, clk: IN_BOOL=None,q: OUT_BOOL=None):
         super().__init__( )
         self.clk = clk
         self.q = q
+        self.en = en
         
     def __call__(self,clk: Optional[bool] = None):
         _clk = self.clk if clk is None else clk
@@ -18,10 +20,21 @@ class Foo(POU):
             self.q = _clk
 
 def test_input_attribute():
+    foo_en:bool = True
+    copy_foo_en: bool = True
+    def copy_en(x:bool,_):
+        nonlocal copy_foo_en
+        copy_foo_en = x
+        
+    def in_en()->bool:
+        nonlocal foo_en
+        return foo_en
+        
     acl = ACL()
-    foo = Foo()
+    foo = Foo(en=in_en)
     attr: Optional[Attribute] = acl.access(foo,'clk')
-    assert attr
+    attr_en: Optional[Attribute] = acl.access(foo,'en')
+    assert attr and attr_en
     
     foo_clk_1: bool = False
     foo_clk_2: bool = True
@@ -35,7 +48,12 @@ def test_input_attribute():
         foo_clk_2 = x
     
     attr.bind(set_foo_clk_1)
+    attr_en.bind(copy_en)
     foo.bind(Foo.clk,set_foo_clk_2)
+
+    foo_en = False
+    foo( )
+    assert foo.en==False and copy_foo_en==False
 
     foo_clk_1 = (foo_clk_2:= False)
     #вне контекста меняем свойство - оповещения нет, вызова нет

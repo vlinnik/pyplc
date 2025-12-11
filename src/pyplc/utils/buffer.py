@@ -92,8 +92,12 @@ class BufferOut(Buffer):
             self.purge(sent)
             return sent
         except OSError as e:
+            
+            if e.errno==11: return 0                    #micropython have no EWOULDBLOCK
             if e.errno==errno.EAGAIN: return 0
-            if e.errno==errno.EWOULDBLOCK: return 0
+            if e.errno==errno.ECONNRESET: return -1     #ECONNRESET
+            if e.errno==errno.ENOTCONN: return -1
+            self.attention(e,'BufferOut::flush')
             return -1
 
     def putc(self,c:int,off:int=0,echo:bool = False):
@@ -118,8 +122,10 @@ class BufferIn(Buffer):
                 return size
             return 0
         except OSError as e:
-            if e.errno==11: return 0
-            if e.errno==35: return 0
+            if e.errno==11: return 0                 #EWOULDBLOCK
+            if e.errno==errno.EAGAIN: return 0       #EAGAIN
+            if e.errno==errno.ECONNRESET: return -1  #ECONNRESET
+            if e.errno==errno.ENOTCONN: return -1
             self.attention(e,'TCPServer::BufferIn::read')
             return -1
         except Exception as e:

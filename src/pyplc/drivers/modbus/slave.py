@@ -138,7 +138,7 @@ class Publisher(IOService):
         for var in self._digi:
             name = inverse.get(var)
             if name is not None:
-                result.append(f'{self.__normalize(name)};DISCRETE_INPUTS;address;Boolean;Read;10325476;')   
+                result.append(f'{self.__normalize(name)};DISCRETE_INPUTS;{address};Boolean;Read;10325476;')   
             address+=1
         address = 0
         for var in self._inpt:

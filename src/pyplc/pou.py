@@ -83,8 +83,8 @@ class AttrDescriptor():
         if self._flags & self.PERSISTENT:
             obj._persistent_.append(name)  # type: ignore
         attr.hint = self._flags            
-        obj._slots_ += (attr, )  # type: ignore
-        obj._binds_ += ([attr.changed], )  # type: ignore
+        obj._slots_.append(attr)
+        obj._binds_.append([attr.changed])  
 
     def of(self, obj: AttrObjProto) -> Attribute:
         if self._index is not None:
@@ -311,6 +311,7 @@ class Base(AttrObjProto):
         i = 0
         for f in self._inputs_:
             if f is not None:
+                self._touched_[i]= True #если так не сделать, то привязанные input не будут вызывать callback подписки
                 self._values_[i] = f()
             i += 1
 
