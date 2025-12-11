@@ -556,6 +556,8 @@ class ACL():
                 attr = d.of(obj)
                 if name in rec.data:
                     attr.T = rec.data[name]
+                else:
+                    attr.T = type(attr.value)
                 return attr
         
         d = getattr(obj,name)
