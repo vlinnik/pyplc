@@ -16,9 +16,11 @@ def __path(hints:Union[str,List[str]])->Optional[str]:
             pass
     return None
 
+def __dirname(path: str):
+    return path.rsplit('/',1)[0]
+
 def platform_init()->dict:
     conf_data = { 'before':[],'after':[],'data':'' }
-
     conf_file = __path([f'krax.json',f'data/krax.json',f'data/krax.yaml'])
         
     if conf_file:
@@ -30,16 +32,16 @@ def platform_init()->dict:
                     conf_data.update(json.load(f))
             logger.debug('Использованы настройки из {f}',f=conf_file)
         except OSError:
-            pass
+            conf_file = None
         except Exception as e:
             logger.debug('При загрузки настроек: {e}',e=e)
     else:
         logger.error('Не найден файл настроек (krax.json/krax.yaml)')
-
-    platform = conf_data.get('platforms',{}).get('esp32',{})
-    conf_dir = platform.get('conf','.')
             
-    conf_data["db"] = __path([f'krax.csv',f'{conf_dir}/krax.csv'])
+    platform = conf_data.get('platforms',{}).get('esp32',{})
+    conf_dir = platform.get('conf',__dirname(conf_file or '.'))
+    conf_data["db"] = __path(['krax.csv',f'{conf_dir}/krax.csv'])
+    conf_data["conf_file"] = conf_file
         
     devices = platform.get('devices')
     if devices:

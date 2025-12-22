@@ -56,7 +56,7 @@ def test_hw_access(monkeypatch, setup_config):
     setup_config("krax.csv",'krax.csv')
     # подменяем путь поиска конфигов
     monkeypatch.chdir( cfg_dir )
-    monkeypatch.setattr("sys.argv", [sys.executable])
+    monkeypatch.setattr("sys.argv", [sys.executable,'-w',cfg_dir])
     posto = Publisher(name='posto',port=9005,size=512)
     from pyplc.platform import plc,hw,IO,platform_init
     plc,hw = platform_init( )

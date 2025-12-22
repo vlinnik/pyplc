@@ -9,7 +9,7 @@ async def test_cli(monkeypatch, setup_config):
     setup_config("krax.csv",'krax.csv')
     # подменяем путь поиска конфигов
     monkeypatch.chdir( cfg_dir )
-    monkeypatch.setattr("sys.argv", [sys.executable])
+    monkeypatch.setattr("sys.argv", [sys.executable,'-w',cfg_dir])
     from pyplc.platform import plc, hw, IO, platform_init
 
     ctx = {"test": False}

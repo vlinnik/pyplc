@@ -277,11 +277,13 @@ class Manager():
     def __enter__(self):
         for device in Manager.__devices__:
             device.__enter__()
+        Channel.runtime = True
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
         for device in Manager.__r_devices__:
             device.__exit__( exc_type, exc_value, traceback )
+        Channel.runtime = False
 
                     
 __all__ = ["Manager",'Device','IODevice','IOMemory','IOService']

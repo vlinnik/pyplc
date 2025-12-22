@@ -8,7 +8,7 @@ def test_valid_config(monkeypatch, setup_config, configs_dir):
     setup_config("krax.csv",'krax.csv')
     # подменяем путь поиска конфигов
     monkeypatch.chdir( cfg_dir )
-    monkeypatch.setattr("sys.argv", [sys.executable])
+    monkeypatch.setattr("sys.argv", [sys.executable,'-w',cfg_dir])
     from pyplc.platform import plc, hw, platform_init
     plc,hw = platform_init()
     assert plc
@@ -22,7 +22,7 @@ def test_exports(monkeypatch, setup_config, capsys):
     setup_config("krax.csv",'krax.csv')
     # подменяем путь поиска конфигов
     monkeypatch.chdir( cfg_dir )
-    monkeypatch.setattr("sys.argv", [sys.executable,"--exports"])
+    monkeypatch.setattr("sys.argv", [sys.executable,'-w',cfg_dir,"--exports"])
     from pyplc.platform import plc,hw,platform_init
     plc,hw = platform_init( )
     plc.run(instances=(),ctx={ "hw":hw,"plc":plc })

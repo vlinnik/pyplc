@@ -538,8 +538,10 @@ class ACL():
 
     def access(self, obj: POU,name: str ) -> Optional[Union[Attribute,POU]]:
         #check access availablity 
-        if type(obj) in self._exclude and name in self._exclude[type(obj)]:
-            raise AttributeError
+        if type(obj) in self._exclude:
+            for pattern in self._exclude[type(obj)]:
+                if re.search(pattern,name):
+                    raise AttributeError
 
         rec: ACL.Record = ACL.EMPTY_REC
         if type(obj) in self._allow:

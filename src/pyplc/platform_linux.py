@@ -6,7 +6,6 @@ from pyplc.utils.logging import logger
 from typing import Optional,List,Union,Dict,Any
 import typer 
 import yaml
-import pyperclip
 
 def __typeof(var):
     if isinstance(var,float):
@@ -47,14 +46,6 @@ def __exports(ctx: dict,prefix:Optional[str]=None,filter:Optional[str]=None,form
 
     print('\n'.join(result))
     
-    import tkinter as tk
-    root = tk.Tk()
-    root.withdraw()  # скрыть окно
-    root.clipboard_clear()
-    root.clipboard_append('\n'.join(result))
-    root.update()    # важно: фиксирует данные в системном буфере
-    root.destroy()
-    
     raise KeyboardInterrupt
 
 def __path(path: Optional[str],default:Optional[Union[str,List[str]]] = None,dir:bool = False,file:bool = False)->Optional[str]:
@@ -72,7 +63,7 @@ def __path(path: Optional[str],default:Optional[Union[str,List[str]]] = None,dir
 import typer
 cli = typer.Typer()
 
-@cli.command( )
+@cli.callback( invoke_without_command=True )
 def run(
     exports: bool = typer.Option(
         False,
@@ -90,7 +81,7 @@ def run(
         help="Where required files  name, default=src (krax.json/krax.csv)"
     ),
     work_dir: str = typer.Option(
-        "src",
+        None,
         "-w",
         "--work_dir",
         help="Изменить рабочую папку, default=src (krax.json/krax.csv)"
@@ -138,7 +129,7 @@ def run(
 ):
     conf_data:Dict[str,Any] = { 'before':[],'after':[] }
     
-    if exports:
+    if exports and not export:
         def __export(ctx: dict):
             __exports(ctx=ctx,format=format)        
         conf_data["before"] = [__export]
@@ -154,7 +145,12 @@ def run(
     data = __path(data,file=False,dir=True)
     
     try:
-        os.chdir(work_dir)
+        if work_dir:
+            os.chdir(work_dir)
+        elif sys.platform!='esp32':
+            import __main__
+            os.chdir(os.path.dirname(__main__.__file__))
+        logger.debug('Рабочий каталог {cwd}',cwd=os.getcwd())
     except:
         logger.debug('Не удалось сменить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
         pass
@@ -189,6 +185,7 @@ def run(
     devices = conf_data.get('platforms',{}).get(sys.platform,{}).get('devices')
     if devices:
         conf_data['devices']=devices
+    conf_data["conf_file"] = conf_file
 
     persist = f'{data}/persist.dat'
     try:
@@ -201,7 +198,6 @@ def run(
     conf_data['storage'] = storage
         
     return conf_data
-
 
 def platform_init()->dict:
     return cli(standalone_mode=False)

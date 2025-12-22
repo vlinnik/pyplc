@@ -17,7 +17,7 @@ class DataBank():
         slave_read_to(all.mem,all.dirty)
 
 class ModbusServer():
-    def __init__(self, port:int, data_bank:DataBank):
+    def __init__(self, host: str, port:int, data_bank:DataBank):
         self._port = port
         self._data_bank = data_bank
         

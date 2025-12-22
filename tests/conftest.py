@@ -2,6 +2,7 @@
 import shutil
 import pytest
 from typing import Optional
+import os
 
 @pytest.fixture
 def setup_config(tmp_path,configs_dir):
@@ -11,6 +12,7 @@ def setup_config(tmp_path,configs_dir):
     def _setup_config(config_name: str,target:str):
         src = configs_dir / config_name
         dst = tmp_path / target 
+        os.makedirs(os.path.dirname(dst),exist_ok=True)
         shutil.copy(src, dst)
         return tmp_path
     return _setup_config
