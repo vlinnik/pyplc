@@ -39,7 +39,7 @@ class _Subscription():
         return self._value
 
 class Publisher(IOService,TCPServer):
-    def __init__(self,*_,name: str, port=9004,size=512, **kwargs):
+    def __init__(self,*_,name: str, port=9004,size=1024, **kwargs):
         IOService.__init__(self,name=name)
         TCPServer.__init__(self,port=port,i_size=size,o_size=size)
         self.subscriptions = {}     # оформленные подписки
@@ -176,7 +176,7 @@ class Publisher(IOService,TCPServer):
             return
                 
         payload = sock.tx.data()
-        end = 8  # reserverd for response header
+        end = 8  # reserved for response header
         active: Tuple[_Subscription,...] = self.belongs.get(sock.fileno(),())
         for s in active:
             if not s._dirty:
@@ -202,6 +202,7 @@ class Publisher(IOService,TCPServer):
                     end += struct.calcsize(f'!HBH{len(ba)}s')
                 else: 
                     logger.warning(f'Тип подписки не поддерживается')
+                s._dirty = False
             except Exception as e:
                 logger.critical(f'При подготовке: {e}, value={value}')
                 self.close(sock)
