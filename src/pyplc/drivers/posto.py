@@ -205,7 +205,7 @@ class Publisher(IOService,TCPServer):
                 else: 
                     logger.warning(f'Тип подписки не поддерживается')
                 s._dirty = False
-            except BufferError:
+            except ValueError:
                 logger.warning(f'Переполнение буфера при отправке изменений end={end}')
                 break
             except Exception as e:
