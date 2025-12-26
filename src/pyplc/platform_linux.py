@@ -192,7 +192,7 @@ def run(
         storage = open(persist,'r+b')
     except FileNotFoundError:
         with open(persist,'w+b') as f:
-            f.write(bytearray(256))
+            f.write(bytearray(8192))
         storage = open(persist,'r+b')
         storage.seek(0)
     conf_data['storage'] = storage

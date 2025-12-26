@@ -5,6 +5,7 @@ from pyplc.device import Manager as IO
 import time
 import asyncio
 import sys
+import json
 
 class PYPLC():
     """Реализация управления циклом работы программы.
@@ -74,7 +75,6 @@ class PYPLC():
         if conf_dir is not None: self.__conf_dir = conf_dir
         if self.__persist is not None: 
             NVD.restore(source = self.__persist,index=f'{self.__conf_dir}/persist.json')
-            NVD.mkinfo( file=f'{self.__conf_dir}/persist.json')
     
     def idle(self):
         self.idleTime = self.period - self.userTime
@@ -171,10 +171,14 @@ class PYPLC():
                 self.scan( )
         except KeyboardInterrupt as kbi:
             from sys import modules
-            print('PYPLC: Task aborted!')
-            self.cleanup( )
+            print('PYPLC: Штатный останов. Создание persist.json ')
+            NVD.mkinfo(f'{self.__conf_dir}/persist.json')
+            if self.__persist and hasattr(self.__persist,'close'): 
+                self.__persist.close()
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
             if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
+            self.cleanup( )
+            
     
     async def cycle(self):
         await self.eventCycle.wait()
@@ -201,3 +205,15 @@ class PYPLC():
             if 'pyplc.config' in modules: modules.pop('pyplc.config')
             if 'pyplc.platform' in modules: modules.pop('pyplc.platform')
         Channel.runtime = False
+    
+    def load(self,file: str):
+        try:
+            with open(file,'r+t') as data:
+                dump = json.load(data)
+                
+            POU.__restore__( dump )
+                    
+        except Exception as e:
+            return f'Произошло неожиданное: {e}'
+
+        return f'Резервная копия восстановлена из {file}, всего {len(dump)} блоков'

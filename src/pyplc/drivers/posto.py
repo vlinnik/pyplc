@@ -197,14 +197,19 @@ class Publisher(IOService,TCPServer):
                     end += 13
                 elif type(value) is str:
                     ba = value.encode()
+                    if end+len(ba)+6>self.o_size:
+                        continue
                     struct.pack_into(
                         f'!HBH{len(ba)}s', payload, end, remote_id, 3, len(ba), ba)
                     end += struct.calcsize(f'!HBH{len(ba)}s')
                 else: 
                     logger.warning(f'Тип подписки не поддерживается')
                 s._dirty = False
+            except BufferError:
+                logger.warning(f'Переполнение буфера при отправке изменений end={end}')
+                break
             except Exception as e:
-                logger.critical(f'При подготовке: {e}, value={value}')
+                logger.critical(f'При подготовке: {e}, value={value}, end={end}')
                 self.close(sock)
                 return
         try:

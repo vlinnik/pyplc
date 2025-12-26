@@ -159,6 +159,8 @@ class IOService(IODevice):
             val = ctx[key]
             if isinstance(val,POU):
                 self.pub(val,name=key)
+            if isinstance(val,Attribute):
+                self.register(val,name=key)
         self.ctx = ctx  
 
     def stop(self,*args, **kwargs):

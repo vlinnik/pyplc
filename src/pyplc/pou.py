@@ -1,6 +1,6 @@
 import time
 import struct
-from typing import Callable, Optional, Any, Union, List, Protocol, Type, cast
+from typing import Callable, Optional, Any, Union, List, Protocol, Type, Dict, cast
 from pyplc.attribute import Attribute
 from pyplc.utils.logging import logger
 
@@ -66,6 +66,8 @@ class AttrDescriptor():
             __dirty[index] = __values[index]!=value
             __touched[index] = True
             __values[index] = value
+            if self._flags & self.PERSISTENT and __dirty[index]:
+                Base.__dirty__ = True
 
         def read() -> Any:
             return __values[index]
@@ -85,6 +87,7 @@ class AttrDescriptor():
         attr.hint = self._flags            
         obj._slots_.append(attr)
         obj._binds_.append([attr.changed])  
+        obj._persistent_.sort()
 
     def of(self, obj: AttrObjProto) -> Attribute:
         if self._index is not None:
@@ -360,13 +363,13 @@ class Base(AttrObjProto):
         setattr(type(self), name, attr)
         attr.setup(obj=self, name=name, index=len(self._values_))
 
-    def __dump__(self, items: Optional[List[str]]) -> dict:
+    def __dump__(self, items: Optional[List[str]]=None) -> Dict[str,Any]:
         d = {}
         for key in items or self.__data__():
             d[key] = getattr(self, key)
         return d
 
-    def __data__(self):
+    def __data__(self)->Dict[str,Any]:
         items = []
         for key in self.__class__.__dict__:
             try:
@@ -375,9 +378,10 @@ class Base(AttrObjProto):
                     items.append(key)
             except:
                 pass
+        items.sort()
         return self.__dump__(items)
 
-    def __load__(self, data: dict):
+    def __load__(self, data: Dict[str,Any]):
         for key, value in data.items():
             try:
                 setattr(self, key, value)
@@ -385,7 +389,7 @@ class Base(AttrObjProto):
                 logger.warning(
                     'сбой при восстановлении атрибута {} {}', key, self)
 
-    def __save__(self) -> dict:
+    def __save__(self) -> Dict[str,Any]:
         return self.__dump__(self._persistent_)
 
     def __call__(self):
@@ -396,8 +400,9 @@ class Base(AttrObjProto):
         off = 0
         buf = bytearray(b'\x00'*64)
         lev = struct.calcsize('!Bd')
-        data = self.__dump__(self._persistent_)
-        for key, value in data.items():
+        data = self.__save__()
+        for key in sorted(data.keys()):
+            value = data[key]
             if off >= len(buf)-lev:
                 buf.extend(b'\x00'*64)
             try:
@@ -418,7 +423,7 @@ class Base(AttrObjProto):
         if len(items) == 0:
             items = self._persistent_
         off = 0
-        for i in items:
+        for i in sorted(items):
             try:
                 t, = struct.unpack_from('!B', buf, off)
                 off += 1
