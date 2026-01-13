@@ -81,7 +81,7 @@ def __import_csv(file:str,slots:List[int],hw: IODevice ):
                     logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
                     errs = errs+1
     except Exception as e:
-        logger.info('проблема при загрузке {db}: {e}',e=e,db=file)
+        logger.error('Проблема при загрузке {db}: {e}',e=e,db=file)
 
 def platform_init():
     global __devices
@@ -90,7 +90,13 @@ def platform_init():
         from pyplc.platform_esp32 import platform_init as _platform_init
     elif sys.platform=='linux':
         from pyplc.platform_linux import platform_init as _platform_init
-    conf = AttrDict(_platform_init( ))
+        
+    conf = _platform_init( )
+    if not isinstance(conf,dict):
+        logger.warning('Завершение работы: инициализация платформы не вернула dict с параметрами')
+        exit(0)
+    else:
+        conf = AttrDict(_platform_init( ))
     
     scanTime = conf.get('scanTime',100)
 

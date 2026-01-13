@@ -200,6 +200,10 @@ def run(
     return conf_data
 
 def platform_init()->dict:
-    return cli(standalone_mode=False)
+    try:
+        return cli(standalone_mode=False)
+    except Exception as e:
+        logger.error(f'Неожиданная ошибка: {e}')
+        exit(0)
 
 __all__ = ['platform_init']

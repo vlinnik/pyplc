@@ -6,6 +6,6 @@ except ImportError:
     version = '0.0.0+unknown'
 
 print(f'''
-PYPLC:\t\t{version}
-Платформа:\t{platform}
+PYPLC:      {version}
+Платформа:  {platform}
     ''')
