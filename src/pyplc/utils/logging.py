@@ -2,7 +2,7 @@ try:
     import sys
     from loguru import logger
     logger.remove()
-    logger.add(sys.stderr,format='{time:HH:mm:ss.SSS} | <level>{level:7}</level> | {name:>20}.py:{line:<5} | {message} ')
+    logger.add(sys.stdout,format='{time:HH:mm:ss.SSS} | <level>{level:7}</level> | {name:>20}.py:{line:<5} | {message} ')
 except:
     from typing import Union
     class Logger():
