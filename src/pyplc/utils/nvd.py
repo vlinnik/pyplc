@@ -200,7 +200,7 @@ class NVD(SFC):
         elif t is float:
             value, = struct.unpack('!d',buff)
         if value is not None:
-            setattr(so,p,value)
+            setattr(so,p,t(value))
         
     def main(self):
         """Цикл работы. Частота создания копий ограничена (не чаще 1 раз/5сек)
