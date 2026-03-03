@@ -185,7 +185,6 @@ class Str(AttrDescriptor):
             raise RuntimeError('Аттрибут без _index')
         return obj._values_[self._index]
 
-
 class Bool(AttrDescriptor):
     def __init__(self, value: bool, *_, cached: bool = False, flags: int = 0):
         super().__init__(value, cached=cached, flags=flags)
@@ -447,11 +446,14 @@ class Base(AttrObjProto):
                     f'аттрибут {self.full_id}.{i} по off={off} type={t} не удалось восстановить')
 
     def persistent(self) -> bool:
+        ret = False
         if len(self._persistent_) > 0:
+            ret = True
             id = self.full_id
             for o in Base.__persistable__:
                 if o.full_id == id or o == self:
-                    return False
+                    ret = True
+                    break
             else:
                 Base.__persistable__.append(self)
 
@@ -460,11 +462,9 @@ class Base(AttrObjProto):
             for name in data:
                 if data[name] == o and o.id is None:
                     o.id = name
-                    if not o.persistent():
-                        return False
-                    break
-        else:
-            return True
+                    o.persistent()
+        
+        return ret
 
     def log(self, msg, *args, level: Union[int, str] = 'DEBUG', **kwds):
         logger.opt(depth=1).log(level, '#{full_id:12.12s}:{}'.format(

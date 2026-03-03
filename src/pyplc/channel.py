@@ -519,9 +519,9 @@ class ICounter8(Channel):
         if self.value is None:
             self.value = 0 
         if n_val!=o_val:
-            if n_val<o_val:
-                self.value+=(256 - o_val + n_val)
-            else:
+            if n_val>o_val:
                 self.value+=(n_val - o_val)
+            elif n_val+0x7F<o_val:
+                self.value+=(0x100 - o_val + n_val)
             self.changed()            
             self.cnt8 = n_val

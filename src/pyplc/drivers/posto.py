@@ -181,6 +181,8 @@ class Publisher(IOService,TCPServer):
         for s in active:
             if not s._dirty:
                 continue
+            if len(payload)<end+24:
+                continue
             value = s.read( )
             remote_id = s.remote_id
             try:
@@ -198,13 +200,13 @@ class Publisher(IOService,TCPServer):
                 elif type(value) is str:
                     ba = value.encode()
                     if end+len(ba)+6>self.o_size:
+                        s._dirty = True
                         continue
                     struct.pack_into(
                         f'!HBH{len(ba)}s', payload, end, remote_id, 3, len(ba), ba)
                     end += struct.calcsize(f'!HBH{len(ba)}s')
                 else: 
                     logger.warning(f'Тип подписки не поддерживается')
-                s._dirty = False
             except ValueError:
                 logger.warning(f'Переполнение буфера при отправке изменений end={end}')
                 break

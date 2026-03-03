@@ -149,7 +149,7 @@ class IOService(IODevice):
                 attr = self.acl.access(pou,key)
                 if isinstance(attr,Attribute):
                     self.register(attr,name=f'{name}.{key}')
-                if isinstance(attr,POU):
+                if isinstance(attr,POU) and key!='parent':
                     self.pub(attr,name=f'{name}.{key}')
             except Exception as e:
                 pass
