@@ -150,7 +150,8 @@ class BufferInOut(IOBase):
         self.tx.close( )
         self.rx.close( )
         self.client.close( )
-                        
+        del self.client
+                                
     def read( self ):
         return self.rx.read( )
     

@@ -239,7 +239,7 @@ class IBool(Channel):
             Exception: IBool не поддерживает write (только для чтения)
         """
         if self.read()!=val:
-            raise RuntimeError('IXBool is read only',self)
+            raise RuntimeWarning('IXBool is read only',self)
 
     def __invert__(self):
         """Получить инверсированный канал
@@ -380,7 +380,7 @@ class IWord(Channel):
             Exception: IWord не поддерживает write (только для чтения)
         """
         if val!=self.read():
-            raise Exception('IWord is read only',self)
+            raise RuntimeWarning('IWord is read only',self)
 
     def __str__(self):
         if self.name!='':
@@ -505,7 +505,7 @@ class ICounter8(Channel):
             Exception: ICounter8 не поддерживает write (только для чтения)
         """
         if val!=self.read():
-            raise Exception('ICounter8 is read only',self)
+            raise RuntimeWarning('ICounter8 is read only',self)
 
     def __str__(self):
         if self.name!='':
