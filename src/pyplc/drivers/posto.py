@@ -142,6 +142,8 @@ class Publisher(IOService,TCPServer):
                     logger.critical(f'Запись до оформления подписки {local_id}')
                 except IndexError:
                     logger.warning(f'запись по неоформленной подписке {local_id}')
+                except RuntimeError as e:
+                    logger.warning(f'При записи {e}, local_id={local_id}, value={value}')
 
         elif cmd == 3:  #received keepalive message
             if size < 24:   #client initiates keepalive message, just answer

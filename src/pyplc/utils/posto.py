@@ -250,7 +250,10 @@ class POSTO(TCPServer):
                 if local_id in self.subscriptions and value is not None:
                     s = self.subscriptions[local_id]
                     # получено новое значение
-                    s.remote(value, source=id(sock), ctx=self.ctx)
+                    try:
+                        s.remote(value, source=id(sock), ctx=self.ctx)
+                    except Exception as e:
+                        self.attention(e, f'POSTO::received remote callback for {s.item}')
         elif cmd == 3:  #received keepalive message
             if size < 24:   #client initiates keepalive message, just answer
                 response = sock.tx.data()
