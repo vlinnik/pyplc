@@ -45,7 +45,7 @@ class AttrDescriptor():
     DYNAMIC = 0b10000
 
     def __init__(self, value: Any, *_, cached: bool = False, flags: int = 0):
-        self._index: Optional[int]
+        self._index: Optional[int] = None
         self._name: Optional[str]
         self._cached = cached
         self._initial = value
@@ -55,7 +55,11 @@ class AttrDescriptor():
         return Attribute(self._initial, read=read, write=write, cached=self._cached)
 
     def setup(self, *_, obj: AttrObjProto, index: int, name: str):
-        self._index = index
+        if self._index is None:
+            self._index = index
+        else:
+            if self._index!=index:
+                print(f'{name} {index}!={self._index}',obj)
         self._name = name
         __values = getattr(obj, '_values_')
         __touched = getattr(obj, '_touched_')
@@ -271,7 +275,7 @@ class Base(AttrObjProto):
         hierarchy.reverse()
 
         for root in hierarchy:
-            for key, value in root.__dict__.items():
+            for key, value in sorted(root.__dict__.items(), key=lambda x: x[0]):
                 if isinstance(value, AttrDescriptor) and key not in ordered and not (value._flags & AttrDescriptor.DYNAMIC):
                     ordered.append(key)
                     value.setup(obj=self, index=len(self._values_), name=key)

@@ -73,7 +73,7 @@ def __import_csv(file:str,slots:List[int],hw: IODevice ):
                         elif info[1].upper( ) == 'AO':
                             ch = QWord(addr+((ch_n-1)<<1),info[0])                               
                         elif info[1].upper( ) == 'CNT8':
-                            ch = ICounter8(addr+ch_n,info[0])  
+                            ch = ICounter8(addr+ch_n-1,info[0])  
                         ch.comment = f'S{slot_n:02}C{ch_n:02}'
                         if hw and isinstance(hw,IOMemory): hw.register(ch, name=info[0])
                         vars = vars+1
