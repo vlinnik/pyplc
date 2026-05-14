@@ -21,7 +21,6 @@ class _Subscription():
         _value = data.read()
         if _value is not None:
             self._value = _value
-            
         self.data.bind( self.changed )  #_dirty = True
         
     def remote(self,value: T):
@@ -37,6 +36,9 @@ class _Subscription():
     def read(self)->T:
         self._dirty = False
         return self._value
+    
+    def cleanup(self):
+        self.data.unbind(self.changed)
 
 class Publisher(IOService,TCPServer):
     def __init__(self,*_,name: str, port=9004,size=1024, **kwargs):
@@ -228,4 +230,9 @@ class Publisher(IOService,TCPServer):
         super().__enter__()
     def __exit__(self, exc_type, exc_value, traceback):
         super().__exit__(exc_type, exc_value, traceback)
-        self()
+        self()        
+    def disconnected(self, sock: BufferInOut):
+        offline = self.belongs.pop(sock.fileno()) if sock.fileno() in self.belongs else []
+        logger.info(f'POSTO client offline. gone {len(offline)} subscriptions')
+        for s in offline:
+            s.cleanup()

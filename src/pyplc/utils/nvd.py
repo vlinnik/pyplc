@@ -81,7 +81,7 @@ class NVD(SFC):
             bool: True если удачно False иначе
         """        
         if not source or len(POU.__persistable__)==0:
-            return False
+            return True
         
         try:
             with open(index,'r') as f:
@@ -93,7 +93,14 @@ class NVD(SFC):
             logger.error(f'С файлом persist.json что-то не то')
             return False
                 
+        ok = True
         backup = POU.__persistable__    # объекты persistable
+        items = [i.get('item') for i in info]
+        for o in backup:
+            if o.full_id not in items:
+                logger.warning(f'не найдена информация о {o.full_id}')
+                ok=False
+            
         for i in info:  #info - список словарей, для каждого persistable объекта с указанием имени объекта, его свойств, sha1 хеша свойств и размера для сохранения
             name = i.get('item','')
             properties = i.get('properties',[])
@@ -102,7 +109,8 @@ class NVD(SFC):
             try:
                 so:POU = list( filter( lambda x: x.full_id==name, backup ) )[0]  # первый элемент из backup с именем как у текущего элемента списка
             except IndexError:
-                logger.warning(f'не найдена информация о {name}')
+                logger.warning(f'не найден объект {name}')
+                ok = False
                 continue
 
             try:
@@ -112,9 +120,12 @@ class NVD(SFC):
                         
             except Exception as e:
                 logger.error('При восстановлении {name}:{e}',name=name,e=e)
-                
-        logger.info('Состояние восстановлено')
-        return True
+                ok = False
+        if ok:
+            logger.info('Состояние восстановлено')
+        else:
+            logger.warning('Состояние не восстановлено/восстановлено частично')
+        return ok
 
     def __mkbackup(self):
         """Сохраняет текущее состояние в буфере data

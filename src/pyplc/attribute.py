@@ -58,8 +58,8 @@ class Attribute():
         if __sink is None:
             self._binds = []
         else:        
-            self._binds = list(filter( lambda x: not (x is __sink), self._binds ))
-        
+            self._binds = list(filter( lambda x: not (x == __sink), self._binds ))
+                    
     def __call__(self, *args):
         if len(args)>0:
             self.write(args[0])

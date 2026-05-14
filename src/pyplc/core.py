@@ -74,7 +74,9 @@ class PYPLC():
         if persist is not None: self.__persist = persist
         if conf_dir is not None: self.__conf_dir = conf_dir
         if self.__persist is not None: 
-            NVD.restore(source = self.__persist,index=f'{self.__conf_dir}/persist.json')
+            if NVD.restore(source = self.__persist,index=f'{self.__conf_dir}/persist.json')==False:
+                print('PYPLC: Создание persist.json')            
+                NVD.mkinfo(f'{self.__conf_dir}/persist.json')
     
     def idle(self):
         self.idleTime = self.period - self.userTime
@@ -171,8 +173,7 @@ class PYPLC():
                 self.scan( )
         except KeyboardInterrupt as kbi:
             from sys import modules
-            print('PYPLC: Штатный останов. Создание persist.json ')
-            NVD.mkinfo(f'{self.__conf_dir}/persist.json')
+            print('PYPLC: Штатный останов')
             if self.__persist and hasattr(self.__persist,'close'): 
                 self.__persist.close()
             if 'pyplc.config' in modules: modules.pop('pyplc.config')

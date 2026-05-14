@@ -158,7 +158,10 @@ def platform_init():
     plc.cleanup = __cleanup
     
     __import_csv(conf.get('db','krax.csv'),slots=hw_conf.get('slots',[]),hw=hw )
-    plc.config(persist=conf.storage,conf_dir=conf.data)
+    try:
+        plc.config(persist=conf.storage,conf_dir=conf.data)
+    except:
+        plc.config(conf_dir=conf.data)
     
     return plc,hw
     
