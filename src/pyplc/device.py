@@ -147,9 +147,9 @@ class IOService(IODevice):
         for key in sorted(dir(pou)):
             try:
                 attr = self.acl.access(pou,key)
-                if isinstance(attr,Attribute):
+                if isinstance(attr,Attribute) and (attr.hint & 0x4)==0:
                     self.register(attr,name=f'{name}.{key}')
-                if isinstance(attr,POU) and key!='parent':
+                if isinstance(attr,POU) and key!='parent' and attr.parent is pou:
                     self.pub(attr,name=f'{name}.{key}')
             except Exception as e:
                 pass
