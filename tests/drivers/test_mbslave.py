@@ -7,8 +7,8 @@ from typing import Optional
 from pyModbusTCP.client import ModbusClient
 
 class Foo(POU):
-    clk = POU.input(False)
-    q = POU.output(False)
+    clk = POU.input(False,hidden=False)
+    q = POU.output(False,hidden=False)
     en = POU.var(False)
     def __init__(self,clk: IN_BOOL=None,q: OUT_BOOL=None):
         super().__init__( )

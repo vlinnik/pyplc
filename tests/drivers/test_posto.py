@@ -6,8 +6,8 @@ from typing import Optional
 import sys
 
 class Foo(POU):
-    clk = POU.input(False)
-    q = POU.output(False)
+    clk = POU.input(False,hidden=False)
+    q = POU.output(False,hidden=False)
     def __init__(self,clk: IN_BOOL=None,q: OUT_BOOL=None):
         super().__init__( )
         self.clk = clk
@@ -49,8 +49,8 @@ def test_subscribe():
     posto.stop( )
     subscr()
     
-    assert len(posto.belongs)>0
-        
+    assert len(posto.belongs)==0,"Соединение не закрыто полностью"
+    
 def test_hw_access(monkeypatch, setup_config):
     cfg_dir = setup_config("krax-generic_2x3x3.json",'krax.json')
     setup_config("krax.csv",'krax.csv')

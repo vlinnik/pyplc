@@ -8,7 +8,6 @@ upydev_.config
 build
 tests/lesson#*.py
 docs/_build
-krax.csv
 krax.json
 python3-pyplc
 debian/*.postinst.debhelper
