@@ -515,7 +515,273 @@ class Base(AttrObjProto):
         p.disconnect(self, sink)
 
 
-POU = Base
+#import time
+#import struct
+from typing import List,Dict,Tuple
+#from pyplc.utils.logging import logger
+from pyplc.vars import VarObjProto,VarDescriptor,InputDescriptor,OutputDescriptor,Var,InVar,OutVar,T
+
+class Base2(VarObjProto):
+    EPOCH = time.time_ns()
+    NOW = 0                   #: момент начала цикла работы логики в нано-сек
+    NOW_MS = 0                #: момент начала цикла работы логики в мсек
+
+    __persistable__: List['Base2'] = []
+    __dirty__: bool = False
+
+    var = VarDescriptor
+    input = InputDescriptor
+    output= OutputDescriptor
+
+    def __init__(self, *_, id:Optional[str]=None,parent: Optional['Base2'] = None):
+        self._data_: Tuple[Var,...] = ( )
+        self._children_: List[Base2] = []
+        self._persistent_: Tuple[str,...] = ( )     #имена свойств, которые хранятся в EEPROM
+        self._retain_: Tuple[int,...] = ( )         #номера Var которые должны сохранять значения
+        self.id:str = id or ''
+        self.parent = parent
+        if parent is not None:
+            parent._children_.append(self)
+
+        hierarchy: List[type] = []
+        ordered: List[str] = []
+        root = self.__class__
+        while issubclass(root.__bases__[0], Base2):
+            hierarchy.append(root)
+            root = root.__bases__[0]
+        hierarchy.reverse()
+
+        for root in hierarchy:
+            for key, value in sorted(root.__dict__.items(), key=lambda x: x[0]):
+                if isinstance(value, VarDescriptor) and key not in ordered:
+                    ordered.append(key)
+        
+        for name in ordered:
+            attr = getattr(type(self),name)
+            if isinstance(attr, InputDescriptor):
+                self._data_+=(InVar(attr.init,name=name),)
+                attr.setup(len(self._data_)-1,self)
+            elif isinstance(attr, OutputDescriptor):
+                self._data_+=(OutVar(attr.init,name=name),)
+                attr.setup(len(self._data_)-1,self)
+            elif isinstance(attr, VarDescriptor):
+                self._data_+=(Var(attr.init,name=name),)
+                attr.setup(len(self._data_)-1,self)
+        
+
+    @property
+    def full_id(self) -> str:
+        if self.parent and self.id:
+            return '.'.join([self.parent.full_id, self.id])
+        return self.id or self.__class__.__name__
+
+    def links(self, *_, **kwargs):
+        for key, val in kwargs.items():
+            if val is None:
+                continue
+            if not callable(val):
+                logger.warning(f'аттрибут можно привязать только к функции:{key} из {self.__repr__()}')
+                continue
+            try:
+                attr = getattr(type(self),key)
+                if isinstance(attr,VarDescriptor):
+                    setattr(self,key,val)
+            except TypeError as e:
+                logger.critical(f'не удалось подключить {key}: {e} ', self)
+            except AttributeError:
+                logger.critical(f'аттрибут {key} отсутствует в объекте', self)
+
+    def __enter__(self):
+        for f in self._data_:
+            f.activate( )
+
+    def __exit__(self, type, value, traceback):
+        for o in self._data_:
+            o.deactivate()
+
+    def __str__(self):
+        fields: Dict[str,Union[T,str]] = {'id': f'{self.full_id}[{self.__class__.__name__}]'}
+        fields.update(self.__data__())
+        return f'{fields}'
+
+    def __repr__(self):
+        fields = []
+        for key, value in self.__data__().items():
+            fields.append(f'{key}={type(value)}({repr(value)})')
+        if self.id:
+            fields.append(f'id={repr(self.id)}')
+        if self.parent:
+            fields.append(f'parent={repr(self.parent)}')
+        return f'{self.__class__.__name__}( {",".join(fields)} )'
+
+    def overwrite(self, __input: str, __default=None):
+        if __default is None:
+            return getattr(self, __input)
+        else:
+            setattr(self, __input, __default)
+        logger.warning('deprecated expensive method overwrite called', self)
+        return __default
+
+    def export(self, name: str, initial: Union[bool, int, float]):
+        """Во время выполнения создает новый атрибут с функцией как POU.var
+
+        Args:
+            name (str): имя атрибута
+            initial (_type_, optional): начальное значение
+        """
+        logger.error("Метод export запрещен из-за невероятных последствий применения")
+
+    def __dump__(self, items: Optional[List[str]]=None) -> Dict[str,Any]:
+        d = {}
+        for key in items or self.__data__():
+            d[key] = getattr(self, key)
+        return d
+
+    def __data__(self)->Dict[str,T]:
+        items = []
+        for e in self._data_:
+            items.append(e.name)
+        if not items:
+            return { }
+        items.sort()
+        return self.__dump__(items)
+
+    def __load__(self, data: Dict[str,Any]):
+        for key, value in data.items():
+            try:
+                setattr(self, key, value)
+            except AttributeError:
+                logger.warning('сбой при восстановлении атрибута {} {}', key, self)
+
+    def __save__(self) -> Dict[str,Any]:
+        return self.__dump__( list(self._persistent_) )
+    
+    def main(self):
+        pass
+
+    def __call__(self):
+        with self:
+            ret = self.main( )
+            
+        return ret
+
+    def to_bytearray(self):
+        off = 0
+        buf = bytearray(b'\x00'*64)
+        lev = struct.calcsize('!Bd')
+        data = self.__save__()
+        for key in sorted(data.keys()):
+            value = data[key]
+            if off >= len(buf)-lev:
+                buf.extend(b'\x00'*64)
+            try:
+                if type(value) is bool:
+                    struct.pack_into('!Bb', buf, off, 0, value)
+                    off += struct.calcsize('!Bb')
+                elif type(value) is int:
+                    struct.pack_into('!Bq', buf, off, 1, value)
+                    off += struct.calcsize('!Bq')
+                elif type(value) is float:
+                    struct.pack_into('!Bd', buf, off, 2, value)
+                    off += struct.calcsize('!Bd')
+            except Exception as e:
+                logger.critical(f'{e}: не удалось сохранить {key} {self}')
+        return buf[:off]
+
+    def from_bytearray(self, buf: bytearray, items: List[str] = []):
+        if len(items) == 0:
+            items = list(set(self._persistent_))
+        off = 0
+        for i in sorted(items):
+            try:
+                t, = struct.unpack_from('!B', buf, off)
+                off += 1
+                if t == 0:
+                    value, = struct.unpack_from('!b', buf, off)
+                    value = bool(value != 0)
+                    off += struct.calcsize('!b')
+                elif t == 1:  #
+                    value, = struct.unpack_from('!q', buf, off)
+                    off += struct.calcsize('!q')
+                elif t == 2:
+                    value, = struct.unpack_from('!d', buf, off)
+                    off += struct.calcsize('!d')
+                else:
+                    raise TypeError(
+                        f'Unknown type code #{t},{self.full_id}.{i}')
+                if hasattr(self, i):
+                    setattr(self, i, value)
+            except:
+                raise RuntimeError(
+                    f'аттрибут {self.full_id}.{i} по off={off} type={t} не удалось восстановить')
+
+    def persistent(self) -> bool:
+        ret = False
+        if len(self._retain_) > 0:
+            self._persistent_ = tuple([self._data_[index].name for index in self._retain_])
+            ret = True
+            id = self.full_id
+            for o in Base2.__persistable__:
+                if o.full_id == id or o == self:
+                    ret = True
+                    break
+            else:
+                Base2.__persistable__.append(self)
+
+        data = self.__dict__
+        for o in self._children_:
+            for name in data:
+                if data[name] == o and o.id is None:
+                    o.id = name
+                    o.persistent()
+        
+        return ret
+
+    def log(self, msg, *args, level: Union[int, str] = 'DEBUG', **kwds):
+        logger.opt(depth=1).log(level, '#{full_id:12.12s}:{}'.format(
+            msg, *args, **kwds, full_id=self.full_id))
+
+    @staticmethod
+    def __backup__():
+        backup = {}
+        for i in Base2.__persistable__:
+            backup[i.full_id] = i.__save__()
+        return backup
+
+    @staticmethod
+    def __restore__(backup: dict):
+        for i in Base2.__persistable__:
+            id = i.full_id
+            if id in backup:
+                i.__load__(backup.get(i.full_id, {}))
+            else:
+                logger.warning(f'в резервной копии нет состояния {id}')
+        Base2.__dirty__ = False
+
+    def bind(self, output: Union[str, VarDescriptor], sink: Callable[[T], None]) -> int:
+        if isinstance(output, VarDescriptor):
+            return output.connect(self, sink)
+        try:
+            p: OutputDescriptor = getattr(self.__class__, output)
+        except:
+            raise RuntimeError(f'Не-output {self}.{output} нельзя подключить')
+
+        try:
+            return p.connect(self, sink)
+        except Exception as e:
+            raise RuntimeError(f'При подключении {self}.{output}: {e}')
+
+    def unbind(self, name: Union[str, OutputDescriptor], sink: Optional[Union[Callable[[T], None], int]] = None):
+        if isinstance(name, OutputDescriptor):
+            p: OutputDescriptor = name
+        else:
+            try:
+                p: OutputDescriptor = getattr(type(self), name)
+            except:
+                return
+        p.disconnect(self, sink)
+
+POU = Base2
 
 class ACL():
     """Описание доступа к свойствам объекта.  
@@ -545,7 +811,7 @@ class ACL():
         self._exclude[cls] = set(self._exclude.get(cls,()) + names)
         return self
 
-    def access(self, obj: POU,name: str ) -> Optional[Union[Attribute,POU]]:
+    def access(self, obj: POU,name: str ) -> Optional[Union[Attribute,Var,POU]]:
         #check access availablity 
         if type(obj) in self._exclude:
             for pattern in self._exclude[type(obj)]:
@@ -562,7 +828,7 @@ class ACL():
             
         #return Attribute for accessing 
         if hasattr(type(obj),name):
-            d: Union[AttrDescriptor,POU]=getattr(type(obj),name)
+            d: Union[AttrDescriptor,VarDescriptor,POU]=getattr(type(obj),name)
             if isinstance(d,AttrDescriptor):
                 attr = d.of(obj)
                 if name in rec.data:
@@ -570,6 +836,8 @@ class ACL():
                 else:
                     attr.T = type(attr.value)
                 return attr
+            if isinstance(d,VarDescriptor):
+                return d.of(obj)
         
         d = getattr(obj,name)
         if isinstance(d,POU):

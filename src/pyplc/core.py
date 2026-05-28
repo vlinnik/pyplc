@@ -67,7 +67,7 @@ class PYPLC():
             for x in ctx:
                 var = ctx[x]
                 if isinstance(var,POU):
-                    if var.id is None: var.id = x
+                    if var.id is None or var.id=='': var.id = x
                     var.persistent( )
             self.ctx = ctx
         if simulator is not None: self.simulator = simulator

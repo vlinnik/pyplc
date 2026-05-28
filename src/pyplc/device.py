@@ -2,7 +2,7 @@ from array import array
 from typing import  Optional, Union,cast,Protocol,Callable,Type,List,Dict,Tuple,Any
 from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8,Channel
 from pyplc.utils.logging import logger
-from pyplc.pou import Attribute,ACL,POU
+from pyplc.pou import Attribute,ACL,POU,Var
 import sys
             
 logger.info('Запуск подсистемы обмена с устройствами')
@@ -148,6 +148,8 @@ class IOService(IODevice):
             try:
                 attr = self.acl.access(pou,key)
                 if isinstance(attr,Attribute) and (attr.hint & 0x4)==0:
+                    self.register(attr,name=f'{name}.{key}')
+                if isinstance(attr,Var):
                     self.register(attr,name=f'{name}.{key}')
                 if isinstance(attr,POU) and key!='parent' and attr.parent is pou:
                     self.pub(attr,name=f'{name}.{key}')
