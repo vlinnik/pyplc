@@ -111,7 +111,7 @@ class NVManager(SFC):
             except:
                 pass
             with open(file,'w+') as f:
-                json.dump(info,f,sort_keys=True,indent='    ')
+                json.dump(info,f)
             logger.info(f'Обновлена информация {file}. Использовано: {sum(used[-1])}')
             
         NVD.info = info
@@ -189,6 +189,7 @@ class NVManager(SFC):
 
         self.log('Запущен менеджер non-volatile переменных')
         while True:
+            yield
             for p in self.__persistable__:
                 yield from self.__process(p)
         
