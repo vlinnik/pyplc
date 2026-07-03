@@ -111,7 +111,7 @@ class NVManager(SFC):
             except:
                 pass
             with open(file,'w+') as f:
-                json.dump(info,f,sort_keys=True,indent='    ')
+                json.dump(info,f)
             logger.info(f'Обновлена информация {file}. Использовано: {sum(used[-1])}')
             
         NVD.info = info
