@@ -187,8 +187,9 @@ class NVManager(SFC):
         """Цикл работы. Частота создания копий ограничена (не чаще 1 раз/5сек)
         """
 
-        self.log('Запущен менеджер non-volatile переменных')
+        self.log(f'Запущен менеджер non-volatile переменных..')
         while True:
+            yield
             for p in self.__persistable__:
                 yield from self.__process(p)
         
