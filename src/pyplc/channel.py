@@ -23,6 +23,7 @@ class Channel(object):
         self.forced = None
         self.callbacks = []
         self.comment = ''
+        self.meta = ( )
         self.device = device
     def __eq__(self, __value: object) -> bool:
         return self.value==__value

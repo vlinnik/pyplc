@@ -81,7 +81,7 @@ class TCPServer():
                 del e
         except Exception as e:
             self.attention(e,'TCPServer')
-                    
+            
         for sock in self.clients:
             try:
                 if sock.read( ) == -1:
@@ -106,4 +106,4 @@ class TCPServer():
                 sock.tx.flush( )
             except Exception as e:
                 self.attention(e,'TCPServer::routine')
-                self.close(sock)                            
+                self.close(sock)
