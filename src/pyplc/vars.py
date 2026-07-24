@@ -87,6 +87,10 @@ class OutVar(Var):
             self.output(self.value)
         self.touched = False
         super().deactivate()
+        
+    def __call__(self, value:Optional[T] = None):
+        self.value = value
+        self.touched = True
 
 class VarDescriptor:
     """Дескриптор для доступа к элементу объекта-контейнера по индексу."""
