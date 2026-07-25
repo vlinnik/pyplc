@@ -197,7 +197,7 @@ class PYPLC():
                 self.eventCycle.set( )
                 if have_ms: self.sleep = await asyncio.sleep_ms(self.idleTime)
                 else: await asyncio.sleep( self.idleTime /1000 )        
-        except KeyboardInterrupt as kbi:
+        except asyncio.CancelledError:
             from sys import modules
             print('PYPLC: Task aborted!')
             self.cleanup( )
