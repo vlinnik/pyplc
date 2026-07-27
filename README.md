@@ -58,7 +58,16 @@ $ make pdflatex
 * v0.1.8
     * Пробный выпуск для ознакомления просторам сети...
     * See [commit change]() or See [release history]()
-
+* v0.4
+    * Переменные и дескрипторы с поддержкой типизации (branch wip/var)
 ## Лицензия
 
 This project is licensed under the MIT License
+
+## Сборка DEB
+
+сделать changelog
+EMAIL="vlinnik@mail.ru"  gbp dch --debian-branch main
+
+собрать deb
+gbp buildpackage --git-debian-branch=main

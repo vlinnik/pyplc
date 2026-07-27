@@ -1,9 +1,52 @@
-pyplc (0.5) UNRELEASED; urgency=medium
-
-  * После объединения с wip/etalon-250412.
-
 pyplc (0.4) UNRELEASED; urgency=medium
 
+  [ vlinnik ]
   * Initial release.
+  * Синхронизация версий git-versioner и deb  
 
- -- vlinnik <vlinnik@mail.ru>  Fri, 28 Feb 2025 12:17:02 +0300
+  [ Linnik V.V ]
+  * Ошибка в TOF
+  * работа над автоматической версионности
+  * Изменение обработки .csv
+  * Изменения в процессе работы над ETALON-250716
+  * Надоело исправлять это
+  * Незначительные исправления
+  * Merge не так прошел. Исправления
+  * Испрвлены ошибки
+  * Первый вариант с отдельным драйвером IO[KRAX]
+  * ModbusTCP client для Linux
+  * Исправление проблем совместимости с pyplc/drivers
+  * Вариант modbusio как MemoryDevice. Медленный
+  * Хочу сделать авто-проверки через pytest
+  * Интерфейс KRAX тоже через IODriver
+  * drivers для драйверов, типы в pyplc.device
+  * Тесты обмена по posto для доступа к устройствам IO
+  * Тесты CLI + загрузка модулей (CLI) через настройки
+  * Предварительный modbus slave, изменение attribute
+  * Порт ModbusTCP SLAVE для esp32, использует modbusio
+  * EWOULDBLOCK,экспорт CSV, тест Attribute
+  * Тесты ModbusTCP SLAVE
+  * Тесты, драйвера и отладка kraxcli
+  * Очистка _dirty не проводилась (posto.publisher). буффер кончается
+  * NVD(SFC), механизм распределения по фиксированным адресам
+  * BufferError exception не доступен в micropython
+  * \t, --help
+  * лог на stdout
+  * Тип persistable не должен меняться
+  * Исправление ошибок posto, CNT8, POU.export
+  * wip: обнаружено торможение при плохой связи
+  * Исправление ошибки при записи в RO подписку (MIXER_I_1 на ПК БЕТОН)
+  * Работы на СТЕПНОЙ
+  * Освобождение ресурсов при отключении POSTO и др.
+  * Контроль за доступом через IOService
+  * Проверены авто-тесты
+  * Новый NVManager
+  * Новая база для POU (Base2+Var)
+  * На micropython нет sort_keys и т.п.
+  * Завис если нет persistable
+  * Ошибка в BufferInOut + подготовка к таблице сигналов в http сервере
+  * Комментарии устаревшие
+  * OutVar поддержка __call__
+  * Завершение в асинхронном режиме без Exception
+
+ -- vlinnik <vlinnik@mail.ru>  Mon, 27 Jul 2026 12:52:10 +0300
