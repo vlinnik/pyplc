@@ -147,10 +147,13 @@ class BufferInOut(IOBase):
         self.tx = BufferOut( client.send , size=o_size  )
     
     def close(self):
+        if not self.client:
+            return
         self.tx.close( )
         self.rx.close( )
         self.client.close( )
         del self.client
+        self.client = None
                                 
     def read( self ):
         return self.rx.read( )

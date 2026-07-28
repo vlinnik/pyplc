@@ -75,6 +75,7 @@ def __import_csv(file:str,slots:List[int],hw: IODevice ):
                         elif info[1].upper( ) == 'CNT8':
                             ch = ICounter8(addr+ch_n-1,info[0])  
                         ch.comment = f'S{slot_n:02}C{ch_n:02}'
+                        ch.meta = (slot_n,ch_n)
                         if hw and isinstance(hw,IOMemory): hw.register(ch, name=info[0])
                         vars = vars+1
                 except Exception as e:

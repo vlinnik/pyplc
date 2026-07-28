@@ -10,13 +10,11 @@ import json
 class PYPLC():
     """Реализация управления циклом работы программы.
 
-    Вызывается обычно из pyplc.config. pre/post настраиваются так, чтобы к программе можно было подключиться с 
+    pre/post настраиваются так, чтобы к программе можно было подключиться с 
     помощью telnet (диагностика, отладка) и с помощью pyplc.utils.subscriber для реализации интерфейса оператора
     на ПК.
 
     Args:
-        io_size (int): Размер доступной памяти ввода-вывода. Должно быть <200 байт
-        krax (модуль, optional): Объект, который производит синхронизацию памяти ввода-вывода. 
         pre (list[], optional): Список функций, которые надо вызвать перед пользовательскими программами. Defaults to None.
         post (_type_, optional): Список функций, которые надо вызвать после пользовательских программ. Defaults to None.
         period (int, optional): Период работы . Defaults to 100 (мсек).
@@ -199,7 +197,7 @@ class PYPLC():
                 self.eventCycle.set( )
                 if have_ms: self.sleep = await asyncio.sleep_ms(self.idleTime)
                 else: await asyncio.sleep( self.idleTime /1000 )        
-        except KeyboardInterrupt as kbi:
+        except asyncio.CancelledError:
             from sys import modules
             print('PYPLC: Task aborted!')
             self.cleanup( )
