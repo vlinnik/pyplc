@@ -82,6 +82,10 @@ class OutVar(Var):
     def __repr__(self):
         return f'OutVar(name={repr(self.name)},value={type(self.value).__name__}({repr(self.value)}),output={self.output.__name__})'
 
+    def write(self,value: T):
+        self.touched = True
+        super().write(value)
+        
     def deactivate(self):
         if self.touched and self.output is not None:
             self.output(self.value)
