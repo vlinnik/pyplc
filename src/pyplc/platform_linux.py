@@ -156,7 +156,7 @@ def run(
         pass
     
     conf_dir = __path(conf_dir,['data','.'],dir=True)
-    db = __path(db,['krax.csv',f'{conf_dir}/krax.csv'],file=True)
+    db = __path(db,[f'{conf_dir}/krax.csv','krax.csv'],file=True)
     data = __path(data,'..',dir=True)
                     
     conf_data["nocli"] = nocli

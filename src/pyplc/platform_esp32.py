@@ -21,7 +21,11 @@ def __dirname(path: str):
 
 def platform_init()->dict:
     conf_data = { 'before':[],'after':[],'data':'' }
-    conf_file = __path([f'krax.json',f'data/krax.json',f'data/krax.yaml'])
+    try:
+        from esp32_conf import path_prefix
+    except:
+        path_prefix = ''
+    conf_file = __path([f'{path_prefix}krax.json',f'{path_prefix}data/krax.json',f'{path_prefix}data/krax.yaml'])
         
     if conf_file:
         try:
@@ -40,7 +44,7 @@ def platform_init()->dict:
             
     platform = conf_data.get('platforms',{}).get('esp32',{})
     conf_dir = platform.get('conf',__dirname(conf_file or '.'))
-    conf_data["db"] = __path(['krax.csv',f'{conf_dir}/krax.csv'])
+    conf_data["db"] = __path([f'{conf_dir}/krax.csv',f'krax.csv'])
     conf_data["conf_file"] = conf_file
         
     devices = platform.get('devices')

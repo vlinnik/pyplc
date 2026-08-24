@@ -18,7 +18,7 @@ class Channel(object):
     runtime = False #< во время работы PYPLC.run установлено в True, что меняет поведение __get__. из за чего plc.MIXER_ON_1 будет значением канала, а иначе экземпляром Channel
     def __init__(self, name='', init_val=None, rw=False,*_,device:Optional[str]=None):
         self.rw = rw
-        self.name = name
+        self.__name__ = self.name = name
         self.value = init_val
         self.forced = None
         self.callbacks = []

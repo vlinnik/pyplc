@@ -64,7 +64,7 @@ class InVar(Var):
         self.input: Optional[L] = input
 
     def __repr__(self):
-        return f'InVar(name={repr(self.name)},value={type(self.value).__name__}({repr(self.value)}),input={self.input.__name__})'
+        return f'InVar(name={repr(self.name)},value={type(self.value).__name__}({repr(self.value)}),input={self.input.__name__ if self.input else 'N/A'})'
 
     def activate(self):
         if self.input is not None:
@@ -80,7 +80,7 @@ class OutVar(Var):
         self.touched = False
 
     def __repr__(self):
-        return f'OutVar(name={repr(self.name)},value={type(self.value).__name__}({repr(self.value)}),output={self.output.__name__})'
+        return f'OutVar(name={repr(self.name)},value={type(self.value).__name__}({repr(self.value)}),output={self.output.__name__ if self.output else 'N/A'})'
 
     def write(self,value: T):
         self.touched = True

@@ -97,7 +97,7 @@ def platform_init():
         logger.warning('Завершение работы: инициализация платформы не вернула dict с параметрами')
         exit(0)
     else:
-        conf = AttrDict(_platform_init( ))
+        conf = AttrDict(conf)
     
     scanTime = conf.get('scanTime',100)
 
