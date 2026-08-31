@@ -16,3 +16,4 @@ debian/*.substvars
 debian/debhelper-build-stamp
 _version.py
 __version__.py
+plc

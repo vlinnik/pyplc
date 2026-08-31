@@ -1,4 +1,4 @@
-pyplc (0.4) UNRELEASED; urgency=medium
+pyplc (0.5.1) resolute; urgency=medium
 
   [ vlinnik ]
   * Initial release.
@@ -48,5 +48,6 @@ pyplc (0.4) UNRELEASED; urgency=medium
   * Комментарии устаревшие
   * OutVar поддержка __call__
   * Завершение в асинхронном режиме без Exception
+  * Исправлено: При записи в OutVar извне не происходила запись в прикрепленный выход
 
- -- vlinnik <vlinnik@mail.ru>  Mon, 27 Jul 2026 12:52:10 +0300
+ -- vlinnik <vlinnik@mail.ru>  Thu, 13 Aug 2026 16:14:37 +0300

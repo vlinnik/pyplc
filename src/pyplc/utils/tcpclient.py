@@ -121,9 +121,9 @@ class TCPClient():
         except Exception as e:
             self.attention(e,'TCPClient')
             self.close()
-        finally:
-            if self.sock is None: 
-                return
+
+        if self.sock is None: 
+            return
             
         try:
             self.routine()
