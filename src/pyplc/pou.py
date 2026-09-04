@@ -19,6 +19,7 @@ x = Trig( )
 IN_BOOL = Optional[Union[Callable[[], bool], bool]]
 IN_INT = Optional[Union[Callable[[], int], int]]
 IN_FLOAT = Optional[Union[Callable[[], float], float]]
+IN_ANY = Optional[Union[Callable[[], Union[bool,int,float] ], Union[bool,int,float]]]
 
 OUT_BOOL = Optional[Callable[[bool], None]]
 OUT_INT = Optional[Callable[[int], None]]
