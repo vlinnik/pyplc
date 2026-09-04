@@ -63,6 +63,8 @@ class RS():
         self._q = q
         self.__set   = self.set
         self.__q = False
+    def __str__(self):
+        return f'RS(set={self.set},reset={self.reset},q={self.q})'
     @property
     def set(self)->bool:
         if callable(self._set):
