@@ -5,7 +5,7 @@
 """
 
 import struct,re
-from typing import Optional
+from typing import Optional,Any
 
 class Channel(object):        
     """Основа для всех измерительных каналов
@@ -16,10 +16,10 @@ class Channel(object):
         rw (bool, optional): Тип измерительного канала (можно изменять или только читать). По умолчанию только читать.
     """
     runtime = False #< во время работы PYPLC.run установлено в True, что меняет поведение __get__. из за чего plc.MIXER_ON_1 будет значением канала, а иначе экземпляром Channel
-    def __init__(self, name='', init_val=None, rw=False,*_,device:Optional[str]=None):
+    def __init__(self, init: Any, name='', rw=False,*_,device:Optional[str]=None):
         self.rw = rw
         self.__name__ = self.name = name
-        self.value = init_val
+        self.value = init
         self.forced = None
         self.callbacks = []
         self.comment = ''
@@ -29,13 +29,13 @@ class Channel(object):
         return self.value==__value
     def __ne__(self, __value: object) -> bool:
         return self.value!=__value
-    def __lt__(self,__value: object) -> bool:
+    def __lt__(self,__value: Any) -> bool:
         return self.value<__value
-    def __le__(self,__value: object) -> bool:
-        return self.value<=__value
-    def __gt__(self,__value: object) -> bool:
+    def __le__(self,__value: Any) -> bool:
+        return int(self.value or 0)<=__value
+    def __gt__(self,__value: Any) -> bool:
         return self.value>__value
-    def __ge__(self,__value: object) -> bool:
+    def __ge__(self,__value: Any) -> bool:
         return self.value>=__value
     def __pos__(self):
         return self.value
@@ -43,10 +43,6 @@ class Channel(object):
         return self.read() + __value
     def __sub__(self,__value):
         return self.read()-__value
-    def __str__(self):
-        if self.name != '':
-            return f'{self.name}={self.read()}'
-        return f'{self.value}'
 
     def force(self, value):
         """Обеспечивает маханизм записи имитационных значений
@@ -194,11 +190,17 @@ class IBool(Channel):
         name (str, optional): имя канала ввода-вывода.
     """
     def __init__(self,addr:int,num:int,name=''):
-        super( ).__init__(name,init_val=False)
+        super( ).__init__(name=name,init=False)
         self.addr = addr
         self.num = num
         self.mask = 1<<num
         self.forced = None
+
+    def __call__(self, value=None)->bool:
+        if value is None:
+            return bool(self.read())
+        self.write(bool(value))
+        return bool(value)
 
     def __bool__(self)->bool:
         return self.read()==True
@@ -265,7 +267,7 @@ class QBool(Channel):
         name (str, optional): имя канала.
     """
     def __init__(self, addr, num: int, name=''):
-        super().__init__(name,init_val=False,rw=True)
+        super().__init__(name=name,init=False,rw=True)
         self.addr = addr
         self.num = num
         self.mask = 1<<num
@@ -342,9 +344,13 @@ class IWord(Channel):
         name (str, optional): имя канала
     """
     def __init__(self,addr,name=''):
-        super( ).__init__(name,init_val=int(0))
+        super( ).__init__(name=name,init=int(0))
         self.addr = addr
         self.forced = None
+        
+    def __call__(self)->int:
+        return int(self.read() or 0)
+        
     @staticmethod
     def at(addr: str)->'IWord':
         """Создать канал и закрепить его за указанным адресом
@@ -364,7 +370,7 @@ class IWord(Channel):
             raise RuntimeError(f'Ошибка: проверьте формат адреса IWord {addr} ') 
         return IWord( int(mh.group(2))*(2 if mh.group(1)=='W' else 1), addr )
 
-    def read(self):
+    def read(self)->int:
         """Получить значение измерительного/управляющего канала
 
         Returns:
@@ -372,7 +378,7 @@ class IWord(Channel):
         """
         if self.forced:
             return self.forced
-        return super().read( )
+        return super().read( ) or 0
 
     def write(self,val):
         """Вызов этого метода приведет к исключению RuntimeError
@@ -403,7 +409,7 @@ class QWord(Channel):
     name (str, optional): имя канала
     """
     def __init__(self,addr,name=''):
-        super( ).__init__(name,init_val=int(0),rw = True)
+        super( ).__init__(name=name,init=int(0),rw = True)
         self.addr = addr
         self.forced = None
         self.dirty = True
@@ -472,7 +478,7 @@ class ICounter8(Channel):
     """
 
     def __init__(self,addr,name=''):
-        super( ).__init__(name,init_val=int(0))
+        super( ).__init__(name=name,init=int(0))
         self.addr  = addr
         self.forced= None
         self.cnt8  = 0
