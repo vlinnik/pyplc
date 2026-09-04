@@ -22,7 +22,7 @@ class Foo(POU):
 def test_input_attribute():
     foo_en:bool = True
     copy_foo_en: bool = True
-    def copy_en(x:bool,_):
+    def copy_en(x:bool):
         nonlocal copy_foo_en
         copy_foo_en = x
         
@@ -72,7 +72,7 @@ def test_input_attribute():
 
     #изменение аттрибута не приводит к оповещению, но меняет свойство
     foo_clk_1 = (foo_clk_2:=True)
-    if attr is not None: attr(False)
+    if attr is not None: attr.write(False)
     assert foo.clk==False and foo.q==True and foo_clk_1==True and foo_clk_2==True
         
     #вход в контекст, оповещение произойдет по выходу
