@@ -1,3 +1,16 @@
+pyplc (0.5.2) resolute; urgency=medium
+
+  [ Linnik V.V ]
+  * fix: обычные функции не вызывались
+  * chore: вывод понятный на latch
+  * refactor: название параметров, типизация (для LD)
+  * feature: IN_ANY
+  * feature: tick встроен
+  * refactor: обновление LD
+  * chore: при обновлении LD разное
+
+ -- Linnik V.V. <vlinnik@mail.ru>  Fri, 04 Sep 2026 21:57:52 +0300
+
 pyplc (0.5.1) resolute; urgency=medium
 
   [ vlinnik ]
