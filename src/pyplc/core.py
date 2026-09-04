@@ -137,7 +137,7 @@ class PYPLC():
                             next(i[1])
                         except StopIteration:
                             i[1] = None
-                    elif i[0]:
+                    elif i[0] is not None and callable(i[0]):
                         i[1] = i[0]( )
                         
     def force(self,**kwargs):  #для удобства доступа (покороче) к channel переменным 
