@@ -1,6 +1,13 @@
 from collections import namedtuple
 from pyplc.utils.logging import logger
 from typing import Union,List,Optional
+try:
+    from _board import tick
+    def _tick(ctx = None):
+        tick( )
+except:
+    def _tick():
+        pass
 import os
 import json
 import yaml
@@ -20,7 +27,7 @@ def __dirname(path: str):
     return path.rsplit('/',1)[0]
 
 def platform_init()->dict:
-    conf_data = { 'before':[],'after':[],'data':'' }
+    conf_data = { 'before':[],'after':[ _tick ],'data':'' }
     try:
         from esp32_conf import path_prefix
     except:
