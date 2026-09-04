@@ -1,240 +1,334 @@
-from pyplc.pou import POU
+from pyplc.pou import POU,IN_ANY
+from typing import Any,Callable,Optional,Protocol,Tuple
 
-class Cell():
+class ICell(Protocol):
+    id: int                                 #идентификатор элемента цепочки
+    _entry: IEntryCell                      #начало цепочки 
+    _next: Optional[ICell] = None           #следующий элемент цепочки
+    def __call__(self,state:bool)->bool:    #логика элемента цепочки, возвращает состояние RAIL
+        ...
+    def __bool__(self)->bool:
+        ...
+    def __str__(self)->str:
+        ...
+    def __repr__(self)->str:
+        ...
+        
+class IEntryCell(ICell):                    #начало цепочки, результат выполнения может быть передан в целевую функцию target(value)
+    value: Any = None
+    target: Optional[Callable[[Any],None]] = None
+    lazy_value: Optional[Callable[[],Any]] = None 
+    def __call__(self,value:Any=None)->bool:
+        ...
+    def __and__(self,other)->IEntryCell:
+        ...
+    def __or__(self,other)->IEntryCell:
+        ...
+    def end(self,target: Optional[Callable[[Any],Any]]=None)->IEntryCell:
+        ...
+    def input(self)->Any:
+        ...
+
+class Cell(ICell):
     """Базовый класс для элементов LD-подобной программы
     """
-    def __init__(self):
-        self._id   = 1
-        self._last = None
-        self._prev = None
-        self._next = None
+    def __init__(self,entry: IEntryCell):
+        self._entry = entry
+        self.id   = 1
+        self._last = False
         
     def __bool__(self):
-        return self._last==True if self._last is not None else False
+        return self._last
     
-    def __call__(self,value=None,state:bool=None)->bool:
-        if state is None:
-            if self._prev is not None:
-                first = self._prev
-                while first._prev is not None:
-                    first = first._prev
-
-                return first( value, True )
-            else:
-                return self( value, True )
-        self._last = None
-        return None
+    def _begin(self)->IEntryCell:
+        return self._entry
     
-    def end(self)->'Cell':
-        if self._prev is None:
-            return self
-        
-        first = self._prev
-        while first._prev is not None:
-            first = first._prev
-        
-        return first
-    def print(self):
-        print(self.dump())
-
-    def dump(self)->str:
-        if self._next is not None:
-            return ('├─' if self._prev is None else '' ) + str(self)+self._next.dump()
-        return str(self)+'─┤'
-
+    def __call__(self,state:bool)->bool: 
+        return True
+    
+    def end(self,target: Optional[Callable[[Any],Any]] = None)->IEntryCell:
+        return self._entry.end( target )
+            
     def __str__(self)->str:
-        return f'{self.__class__.__name__}#{self._id}({self._last:1})'
+        return f'{self.__class__.__name__}#{self.id}({bool(self):1})'
     
-    def next(self,cell)->'Cell':
+    def __repr__(self)->str:
+        return str(self)
+    
+    def next(self,cell:Cell)->Cell:
         self._next = cell
-        self._next._prev = self
-        self._next._id = self._id+1
-        return self._next
+        self._next.id = self.id+1
+        return cell
     
-    def no(self,cond)->'NO':
-        return self.next(NO(cond))
+    def no(self,cond: Callable[[],bool])->Cell:
+        return self.next(NO(self._entry,cond))
 
-    def nc(self,cond)->'NC':
-        return self.next(NC(cond))
+    def nc(self,cond: Callable[[],bool])->Cell:
+        return self.next(NC(self._entry,cond))
     
-    def out(self,what)->'OUT':
-        return self.next(OUT(what))
+    def out(self,what)->Cell:
+        return self.next(OUT(self._entry,what))
     
-    def mov(self,what)->'MOV':
-        return self.next(MOV(what))
-    
-    def set(self,what)->'SET':
-        return self.next(SET(what))
+    def mov(self,target: Callable[[Any],None],value: Any = None)->Cell:
+        return self.next(MOV(self._entry,target,value=value))
 
-    def rst(self,what)->'RST':
-        return self.next(RST(what))
-    def ctu(self,max)->'CTU':
-        return self.next(CTU(max))
-    def ctd(self,max)->'CTD':
-        return self.next(CTD(max))
-    def call(self,what: callable=None)->'CALL':
-        return self.next(CALL(what))
+    def re(self,cond: Callable[[],bool])->Cell:
+        return self.next(RE(self._entry,cond))
+    
+    def fe(self,cond: Callable[[],bool])->Cell:
+        return self.next(FE(self._entry,cond))
+
+    def set(self,what)->Cell:
+        return self.next(SET(self._entry,what))
+
+    def rst(self,what)->Cell:
+        return self.next(RST(self._entry,what))
+    
+    def ctu(self,max)->Cell:
+        return self.next(CTU(self._entry,max))
+    
+    def ctd(self,max)->Cell:
+        return self.next(CTD(self._entry,max))
+    
+    def call(self,what: Callable[[Any],Any])->Cell:
+        return self.next(CALL(self._entry,what))
+    
+    def any(self,*args)->Cell:
+        return self.next( ANY(self._entry,*args) )
+
+    def all(self,*args)->Cell:
+        return self.next( ALL(self._entry,*args) )
+    
+    def neg(self)->Cell:
+        return self.next( NEG(self._entry) )
     
 class CALL(Cell):
-    def __init__(self,what: callable = None):
-        super().__init__()
+    """Вызов функции если состояние RAIL = True"""
+    
+    def __init__(self,entry: IEntryCell,what: Callable[[Any],Any] ):
+        super().__init__(entry)
         self._call = what
-        self._value= None
-    def __call__(self, value=None, state = None):
-        self._value = value
-        if self._call is not None:
-            ret = self._call( value )
-            self._last = ret==True if ret is not None else False
-        else:
-            self._last = state
+
+    def __call__(self, state: bool):
+        self._last = state
+        if self._call is not None and callable(self._call) and state:
+            self._call( self._entry.value )
+
         if self._next is not None:
-            return self._next( value=value,state=self._last)
+            return self._next( state=state)
+        
+        return self._last
+    
+    def __str__(self):
+        return f'─[{self._call.__name__}]─'
+
+class ANY(Cell):
+    """Состояние True на RAIL если хотя бы одно выражение args истинно"""
+    
+    def __init__(self,entry: IEntryCell, *args: Callable[[],bool]):
+        super().__init__(entry)
+        self._rungs = args
+    def __call__(self,state:bool)->bool:
+        self._vals = [x() for x in self._rungs]
+        self._last = any(self._vals)
+        if self._next is not None:
+            return self._next( state=self._last and state)
         return self._last
     def __str__(self):
-        return f'─[{self._call}]─'
-    
-class NO(Cell):
-    """Блок, выполнение следующего на RAIL если выражение cond() истинно
-    """
-    def __init__(self,cond: callable = None):
-        super().__init__()
-        self._cond = cond
+        return f'─[{"|".join("{:1}".format(v) for v in self._vals)}]─'
 
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
+class ALL(Cell):
+    """Состояние True на RAIL если все выражения args истинно"""
+    
+    def __init__(self,entry: IEntryCell, *args: Callable[[],bool]):
+        super().__init__(entry)
+        self._rungs = args
+    def __call__(self,state:bool)->bool:
+        self._vals = [x() for x in self._rungs]
+        self._last = all(self._vals)
+        if self._next is not None:
+            return self._next( state=self._last and state)
+        return self._last
+    def __str__(self):
+        return f'─[{"&".join("{:1}".format(v) for v in self._vals)}]─'
+
+class NEG(Cell):
+    """Инверсия состояние на RAIL"""
+    def __init__(self,entry: IEntryCell):
+        super().__init__(entry)
+        self._last = True
+
+    def __call__(self,state:bool)->bool:
+        if self._next is not None:
+            return self._next( not state )
+        return not state
+    def __str__(self):
+        return f'─┤X├─'
+
+class NO(Cell):
+    """Состояние True на RAIL если выражение cond() истинно"""
+
+    def __init__(self,entry: IEntryCell,cond: Callable[[],bool]):
+        super().__init__(entry)
+        self._cond: Callable[[],bool] = cond
+        self._last = False
+
+    def __call__(self,state:bool)->bool:
         if self._cond is None:
             self._last = False
         else:
             self._last = self._cond()==True
         if self._next is not None:
-            tail = self._next( value=value,state=self._last and state)
-            return self._last and state and tail
+            return self._next( self._last and state)
         return self._last and state
     def __str__(self):
-        return f'─┤ {self._last:1} ├─'
+        return f'─┤ {self._cond.__name__}:{self._last:1} ├─'
 
 class NC(Cell):
-    def __init__(self,cond: callable = None):
-        super().__init__()
+    """Cостояние True на RAIL если выражение cond() ложно"""
+    def __init__(self,entry: IEntryCell,cond: Callable[[],bool]):
+        super().__init__(entry)
         self._cond = cond
 
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
+    def __call__(self,state:bool)->bool:
         if self._cond is None:
-            self._last = True
+            self._last = False
         else:
             self._last = self._cond()==False
         if self._next is not None:
-            tail = self._next( value=value,state=self._last and state)
-            return self._last and state and tail
-        return self._last and state
+            return self._next( state=self._last and state)
+        return self._last
     def __str__(self):
         return f'─┤║{self._last:1}║├─'
+
+class RE(Cell):
+    """Rising Edge, RAIL =True если выражение cond() False->True"""
+    def __init__(self,entry: IEntryCell,cond: Callable[[],bool] ):
+        super().__init__(entry)
+        self._cond: Callable[[],bool] = cond
+        self._was: Optional[bool] = None
+
+    def __call__(self,state:bool)->bool:
+        if self._cond is None:
+            self._last = False
+        else:
+            cur = self._cond( )
+            self._last = cur==True and self._was==False
+            self._was = cur
+        if self._next is not None:
+            return self._next( self._last and state)
+        return self._last
+    def __str__(self):
+        return f'─┤/{self._cond.__name__}:{bool(self):1} ├─'
+
+class FE(Cell):
+    """Falling Edge блок, выполнение если выражение cond() True->False
+    """
+    def __init__(self,entry: IEntryCell,cond: Callable[[],bool] ):
+        super().__init__(entry)
+        self._cond: Callable[[],bool] = cond
+        self._was: Optional[bool] = None
+    def __call__(self,state:bool)->bool:
+        if self._cond is None:
+            self._last = False
+        else:
+            cur = self._cond()
+            self._last = cur==False and (self._was or False)==True
+            self._was = cur
+            
+        if self._next is not None:
+            return self._next( self._last )
+        return self._last
+    def __str__(self):
+        return f'─┤\\{self._cond.__name__}:{bool(self._last):1} ├─'
+        
 class OUT(Cell):
     """Копирует входное состояние (state) в указанное место (what), state не меняет"""
-    def __init__(self,what: callable = None):
-        super().__init__()
+    def __init__(self, entry: IEntryCell,what: Callable[[bool],None]):
+        super().__init__(entry)
         self._what = what
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
+    def __call__(self,state:bool)->bool:
         self._last = state
         if self._what is not None:
-            self._what(state)
+            self._what(self._last)
         if self._next is not None:
-            return self._next( value=value,state=self._last) and state
+            return self._next( state)
         return self._last
     def __str__(self):
         return f'─({self._last})─'
+    
 class MOV(Cell):
     """Если входное состояние = True копирует входное значение(или True) в указанное место (what), state не меняет"""
-    def __init__(self,what: callable = None):
-        super().__init__()
-        self._what = what
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
-        self._last = state
-        if self._what is not None:
-            if state: self._what(state if value is None else value)
+    def __init__(self,entry: IEntryCell,target: Callable[[Any],None],value: Any = None):
+        super().__init__(entry)
+        self._target = target
+        self._value = value
+    def __call__(self,state:bool)->bool:
+        self._last = state 
+        if self._target is not None and state:
+            self._target(self._value if self._value is not None else self._entry.value)
         if self._next is not None:
-            return self._next( value=value,state=self._last) and state
+            return self._next( state=self._last)
         return self._last
     def __str__(self):
-        return f'─[ {self._last:1} ]─'
-class SET(Cell):
-    def __init__(self,what: callable = None):
-        super().__init__()
-        self._what = what
-        self._before = None
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
-        self._last = state
-        if self._what is not None and self._before==False and state==True:
-            self._what(state)
-        self._before = state 
-        if self._next is not None:
-            return self._next( value=value,state=self._last) and state
-        return self._last
+        return f'─[ {self._target.__name__: ^7} ]─'
     
-    def __str__(self):
-        return f'─(/{self._last:1} )─'
-class RST(Cell):
-    def __init__(self,what: callable = None):
-        super().__init__()
-        self._what = what
-        self._before = None
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
+class SET(Cell):
+    """Если входное состояние = True устанавливает True в указанное место (what), state не меняет"""
+    def __init__(self,entry: IEntryCell,target: Callable[[bool],None]):
+        super().__init__(entry)
+        self._target = target
+    def __call__(self,state:bool)->bool:
         self._last = state
-        if self._what is not None and self._before==True and state==False:
-            self._what(state)
-        self._before = state 
+        if self._target is not None and state==True:
+            self._target(True)
         if self._next is not None:
-            return self._next( value=value,state=self._last) and state
+            return self._next( state )
         return self._last
     def __str__(self):
-        return f'─(\\{self._last:1} )─'
+        if self._target is not None:
+            return f'─(/{self._target.__name__} )─'
+        return f'─(/{bool(self):1} )─'
+
+class RST(Cell):
+    """Если входное состояние = True устанавливает False в указанное место (what), state не меняет"""
+    def __init__(self,entry: IEntryCell,target: Callable[[bool],None]):
+        super().__init__(entry  )
+        self._target = target
+    def __call__(self,state:bool)->bool:
+        self._last = state 
+        if self._target is not None and state==True:
+            self._target(False)
+        if self._next is not None:
+            return self._next( state )
+        return self._last
+    def __str__(self):
+        return f'─(\\{self._target.__name__} )─'
+    
 class CTU(Cell):
-    def __init__(self,max:int ):
-        super().__init__()
+    def __init__(self,entry: IEntryCell,max:int ):
+        super().__init__(entry)
         self._max = max
         self._before = None
         self._cnt = 0
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
-        self._last = False
+    def __call__(self,state:bool)->bool:
         if self._before==False and state==True:
             self._cnt = (self._cnt+1) % self._max
             if self._cnt==0: self._last = state
         self._before = state 
         if self._next is not None:
-            return self._next( value=value,state=self._last) and state
+            return self._next( state=self._last) and state
         return self._last
     def __str__(self):
-        return f'─[┌{self._last:1}┘]─'
+        return f'─[┌{bool(self._last):1}┘]─'
+    
 class CTD(Cell):
-    def __init__(self,max:int ):
-        super().__init__()
+    def __init__(self,entry: IEntryCell,max:int ):
+        super().__init__(entry)
         self._max = max
         self._before = None
         self._cnt = max - 1 
-    def __call__(self,value=None,state:bool=None)->bool:
-        ret = super().__call__( value=value, state=state)
-        if ret is not None:
-            return ret
+    def __call__(self,state:bool)->bool:
         self._last = False
         if self._before==True and state==False:
             if self._cnt==0: 
@@ -244,131 +338,52 @@ class CTD(Cell):
                 self._cnt -= 1
         self._before = state 
         if self._next is not None:
-            return self._next( value=value,state=self._last) and state
+            return self._next( state=self._last) 
         return self._last
     def __str__(self):
-        return f'─[└{self._last:1}┐]─'
+        return f'─[└{bool(self):1}┐]─'
 
-class Coil():
-    """Типы Coil: OUT копирует вход в указанное место SET устанавливает True при положительном фронте, 
-       RST устанавливает False при отрицатиельном фронте,CTU счетчик вверх, CTD счетчик вниз
-    """
-    TYPE_OUT = 0
-    TYPE_SET = 1
-    TYPE_RST = 2
-    TYPE_CTU = 3
-    TYPE_CTD = 4
-
-    def __init__(self,what: callable=None,kind: int = TYPE_OUT,max:int = 1):
-        self._what = what
-        self._kind = kind
-        self._last = None
-        self._cnt  = 0 if kind==Coil.TYPE_CTU else max
-        self._max  = max
-
-    def __call__(self, value = None,clk:bool = True ):
-        ret = None
-        if self._kind == Coil.TYPE_OUT:
-            if self._what is not None: self._what( value )
-        elif self._kind==Coil.TYPE_SET:
-            if self._last==False and clk==True:
-                if self._what is not None: self._what( True )
-                ret = True
-        elif self._kind==Coil.TYPE_RST:                
-            if self._last==True and clk==False:
-                if self._what is not None: self._what( False )
-                ret = True
-        elif self._kind==Coil.TYPE_CTU:
-            if self._last==False and clk==True:
-                self._cnt+=1
-                if self._cnt>=self._max: 
-                    self._cnt = 0
-                    ret = True
-                if self._what is not None: self._what( self._cnt )
-        elif self._kind==Coil.TYPE_CTD:
-            if self._last==True and clk==False:
-                self._cnt-=1
-                if self._cnt<=0: 
-                    self._cnt = self._max
-                    ret = True
-                if self._what is not None: self._what( self._cnt )
-        
-        self._last = clk==True
-        return ret
-
-class LD(POU):
-    class __ENTRY(Cell):
+class LD():    
+    class __ENTRY(Cell,IEntryCell):
         def __init__(self):
-            super().__init__()
-            self._value = None
-        def __call__(self,value:bool=None)->bool:
-            if value is not None: self._value = value
-            self._last = self._value==True if self._value is not None else False
-            if self._next is not None:
-                return self._next( value=value,state=self._last)
-
+            super().__init__(self)
+            self.id = 1
+            self._last = False   
+        def end(self,target: Optional[Callable[[Any],Any]]=None)->IEntryCell:
+            if target is not None: self.target = target 
+            return self
+        def __bool__(self):
             return self._last
+        def __call__(self,value:Any=None)->bool:
+            self.value = value
+            if self._next is not None:
+                self._last = self._next( True )
+            else:
+                self._last = True
+            if self._last is True:
+                if self.target is not None: self.target(self.lazy_value() if self.lazy_value is not None else value)
+            return self._last
+        def input(self)->Any:
+            return self.value
+        def __or__(self, other:IEntryCell) -> IEntryCell:
+            ret = LD.entry( ).any(self,other).end( )
+            self.lazy_value = ret.input
+            other.lazy_value = ret.input
+            return ret
+        def __and__(self, other:IEntryCell) -> IEntryCell:
+            ret = LD.entry( ).all(self,other).end( )
+            self.lazy_value = ret.input
+            other.lazy_value = ret.input
+            return ret
         def __str__(self):
-            return f'─┤ {bool(self)} ├─'
+            i = self
+            ret = '├─'
+            while i._next is not None:                
+                i = i._next
+                ret += f'{str(i)}'
+            ret += '─┤' + (f'{self.value or self._last}' if self._last else '')
+            return ret
 
     @staticmethod
-    def entry():
+    def entry()->Cell:
         return LD.__ENTRY()
-    
-    def __init__(self):
-        self.rails = []
-
-    def __call__(self,value=None):
-        with self:
-            for r in self.rails:
-                r( value )
-
-    def log(self,*args):
-        print(f'{self.id}:',*args)
-
-    @staticmethod
-    def true():
-        return True
-    
-    @staticmethod
-    def false():
-        return False
-
-    @staticmethod
-    def no(cond: callable=None)->NO:
-        """Создать NO контакт следом с указанным выражением. 
-
-        Параметры:
-            cond (callable,optional): Выражение для проверки состояния NO контакта. 
-
-        На выходе:
-            Contact: Созданный NO контакт
-        """
-        return NO(cond)
-    @staticmethod
-    def nc(cond: callable=None)->NC:
-        """Создать NС контакт следом с указанным выражением
-
-        Параметры:
-            cond (callable): Выражение для проверки состояния NO контакта
-
-        На выходе:
-            Contact: Созданный NO контакт
-        """
-        return NC(cond)
-    
-    @staticmethod
-    def any(*args):
-        return NO( lambda: any( [x() for x in args ] ) )
-    
-    @staticmethod
-    def all(*args):
-        return NO( lambda: all( [x() for x in args ] ) )
-    
-    @staticmethod
-    def nor(*args):
-        return NC( lambda: any( [  x() for x in args ] ))
-    
-    @staticmethod
-    def xor(*args):
-        return NO( lambda: (sum( [  1 if x() else 0 for x in args ])%2) == 1 )
