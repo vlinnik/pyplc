@@ -383,6 +383,9 @@ class LD():
                 ret += f'{str(i)}'
             ret += '─┤' + (f'{self.value or self._last}' if self._last else '')
             return ret
+        @property
+        def __name__(self)->str:    #OutVar покажет при инспектировании куда подключен выход
+            return self.__str__()
 
     @staticmethod
     def entry()->Cell:
