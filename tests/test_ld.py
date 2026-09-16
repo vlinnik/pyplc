@@ -287,7 +287,7 @@ def test_neg():
     q     = [0,0,0,1,1,1,1,1,1,0]     #OUT every call 2 = unchanged 
     value = zip(val_a,val_b)
 
-    prg = LD.entry( ).re(cond).nc(out.read).set(out).end( ) | LD.entry( ).re(out.read).neg().re(cond).no(out.read).rst(out).end( )
+    prg = LD().re(cond).nc(out.read).set(out).end( ) | LD.entry( ).re(out.read).neg().re(cond).no(out.read).rst(out).end( )
 
     for num,val in enumerate(value):
         cond.force(val[0])

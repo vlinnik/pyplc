@@ -343,50 +343,49 @@ class CTD(Cell):
     def __str__(self):
         return f'─[└{bool(self):1}┐]─'
 
-class LD():    
-    class __ENTRY(Cell,IEntryCell):
-        def __init__(self):
-            super().__init__(self)
-            self.id = 1
-            self._last = False   
-        def end(self,target: Optional[Callable[[Any],Any]]=None)->IEntryCell:
-            if target is not None: self.target = target 
-            return self
-        def __bool__(self):
-            return self._last
-        def __call__(self,value:Any=None)->bool:
-            self.value = value
-            if self._next is not None:
-                self._last = self._next( True )
-            else:
-                self._last = True
-            if self._last is True:
-                if self.target is not None: self.target(self.lazy_value() if self.lazy_value is not None else value)
-            return self._last
-        def input(self)->Any:
-            return self.value
-        def __or__(self, other:IEntryCell) -> IEntryCell:
-            ret = LD.entry( ).any(self,other).end( )
-            self.lazy_value = ret.input
-            other.lazy_value = ret.input
-            return ret
-        def __and__(self, other:IEntryCell) -> IEntryCell:
-            ret = LD.entry( ).all(self,other).end( )
-            self.lazy_value = ret.input
-            other.lazy_value = ret.input
-            return ret
-        def __str__(self):
-            i = self
-            ret = '├─'
-            while i._next is not None:                
-                i = i._next
-                ret += f'{str(i)}'
-            ret += '─┤' + (f'{self.value or self._last}' if self._last else '')
-            return ret
-        @property
-        def __name__(self)->str:    #OutVar покажет при инспектировании куда подключен выход
-            return self.__str__()
+class LD(Cell,IEntryCell):
+    def __init__(self):
+        super().__init__(self)
+        self.id = 1
+        self._last = False   
+    def end(self,target: Optional[Callable[[Any],Any]]=None)->IEntryCell:
+        if target is not None: self.target = target 
+        return self
+    def __bool__(self):
+        return self._last
+    def __call__(self,value:Any=None)->bool:
+        self.value = value
+        if self._next is not None:
+            self._last = self._next( True )
+        else:
+            self._last = True
+        if self._last is True:
+            if self.target is not None: self.target(self.lazy_value() if self.lazy_value is not None else value)
+        return self._last
+    def input(self)->Any:
+        return self.value
+    def __or__(self, other:IEntryCell) -> IEntryCell:
+        ret = LD.entry( ).any(self,other).end( )
+        self.lazy_value = ret.input
+        other.lazy_value = ret.input
+        return ret
+    def __and__(self, other:IEntryCell) -> IEntryCell:
+        ret = LD.entry( ).all(self,other).end( )
+        self.lazy_value = ret.input
+        other.lazy_value = ret.input
+        return ret
+    def __str__(self):
+        i = self
+        ret = '├─'
+        while i._next is not None:                
+            i = i._next
+            ret += f'{str(i)}'
+        ret += '─┤' + (f'{self.value or self._last}' if self._last else '')
+        return ret
+    @property
+    def __name__(self)->str:    #OutVar покажет при инспектировании куда подключен выход
+        return self.__str__()
 
     @staticmethod
     def entry()->Cell:
-        return LD.__ENTRY()
+        return LD( )
