@@ -1,11 +1,18 @@
 import sys
+
+from pyplc import Config,_path
+if sys.platform=='esp32':   
+    from pyplc.platform_esp32 import config
+elif sys.platform=='linux':
+    from pyplc.platform_linux import config
+    
 from pyplc.device import Manager as IO,IODevice,IOMemory
 from pyplc.core import PYPLC
 from pyplc.channel import IBool,QBool,IWord,ICounter8,QWord
 from pyplc.utils.nvd import NVD
 from pyplc.utils.logging import logger
 import re,gc
-from typing import Optional,List,cast
+from typing import Optional,List,cast,Optional,Dict,Any
 
 class AttrDict(dict):
     def __init__(self,data: dict) -> None:
@@ -87,38 +94,31 @@ def __import_csv(file:str,slots:List[int],hw: IODevice ):
 def platform_init():
     global __devices
     logger.debug('инициализация pyplc-платформы')
-    if sys.platform=='esp32':
-        from pyplc.platform_esp32 import platform_init as _platform_init
-    elif sys.platform=='linux':
-        from pyplc.platform_linux import platform_init as _platform_init
-        
-    conf = _platform_init( )
+
+    conf = config( ) 
+    conf.postinit( )
     if not isinstance(conf,dict):
         logger.warning('Завершение работы: инициализация платформы не вернула dict с параметрами')
         exit(0)
-    else:
-        conf = AttrDict(conf)
     
-    scanTime = conf.get('scanTime',100)
-
     __cleanup( )
     
     IO.discover()
 
     #основное устройство IO описано в .hw + .hw.config хранит в каком разделе параметры для инициализации 
-    hw_conf = {'slots':conf.get('slots',[]),'init':conf.get('init',{})}
+    hw_conf = conf.slots
         
-    if 'slots' not in hw_conf:
-        hw_conf['slots'] = conf.get('slots',[])
-    conf['hw'] = hw_conf
+    if 'hw' not in conf: conf['hw'] = {'slots': hw_conf }    #устройство hw специальное, оно default и slots должно иметь
 
-    devices = conf.get('devices',[{"driver":"krax","name":"hw"},{"driver":"posto","name":"posto"}])
+    devices = conf.devices
     for decl in devices:
-        driv = decl.get('driver')
-        name = decl.get('name',driv)
+        drv = decl.get('driver')
+        if drv is None:
+            continue
+        name = decl.get('name',drv)
         init = conf.get( name ,{})
         dev = None
-        if driv is not None and (dev:=IO.create(name=name, driver=driv,**init)) is None:
+        if drv is not None and (dev:=IO.create(name=name, driver=drv,**init)) is None:
             logger.warning('Создание {dev} не удалось',dev=decl)
         elif dev is not None:
             globals().update({ name:dev })
@@ -126,10 +126,10 @@ def platform_init():
                 hw = dev
             __devices.append(name)        
 
-    before = conf.get('before',[]) 
-    after = conf.get('after',[])
+    before = conf.before
+    after = conf.after
 
-    modules:List[Dict[str,Any]] = conf.get('modules',[ {'class':'pyplc.utils.cli/CLI','name':'cli','type':'context'} ])
+    modules:List[Dict[str,Any]] = conf.modules 
     for decl in modules:
         where,what = decl.get('class','/').split('/')
         name = decl.get('name')
@@ -153,21 +153,20 @@ def platform_init():
             __objects.append(obj)
         except:
             pass
-    if 'storage' in conf: after.append(NVD(conf['storage']))
+    if hasattr(conf,'storage'): after.append(NVD(conf.storage))
     
-    plc = PYPLC(period=scanTime, pre=before, post=after)
+    plc = PYPLC(period=conf.scanTime, pre=conf.before, post=conf.after)
     plc.cleanup = __cleanup
     
-    __import_csv(conf.get('db','krax.csv'),slots=hw_conf.get('slots',[]),hw=hw )
+    __import_csv(conf.db,slots=conf.slots,hw=hw )
     try:
         plc.config(persist=conf.storage,conf_dir=conf.data)
     except:
         plc.config(conf_dir=conf.data)
     
     return plc,hw
-    
 
-if __name__ != '__main__':
-    plc,hw = platform_init( )
+if __name__ != '__main__' or True:
+    plc,hw = platform_init( )    
 
-__all__ = ['plc','platform_init'] + __devices
+__all__ = ['plc'] + __devices

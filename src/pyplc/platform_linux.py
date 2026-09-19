@@ -1,13 +1,14 @@
 import json
 import sys
 import os
+from pyplc import Config as ConfigBase,_path
 from pyplc.device import Manager
 from pyplc.utils.logging import logger
 from typing import Optional,List,Union,Dict,Any
 import typer 
 import yaml
 
-def __typeof(var):
+def __typeof__(var):
     if isinstance(var,float):
         return 'REAL'
     elif isinstance(var,bool):
@@ -48,18 +49,18 @@ def __exports(ctx: dict,prefix:Optional[str]=None,filter:Optional[str]=None,form
     
     raise KeyboardInterrupt
 
-def __path(path: Optional[str],default:Optional[Union[str,List[str]]] = None,dir:bool = False,file:bool = False)->Optional[str]:
-    if path is None:
-        if default is not None: 
-            if isinstance(default,str):
-                default = [default]
-            for f in default:
-                if os.path.exists(f) and ((os.path.isfile(f) and file) or os.path.isdir(f) and dir):
-                    return os.path.abspath(f)
-        return None
-    return os.path.abspath(path)
+class Config(ConfigBase):
+    def postinit(self):
+        persist = f'{self.data}/persist.dat'
+        try:
+            self.storage = open(persist,'r+b')
+        except FileNotFoundError:
+            with open(persist,'w+b') as f:
+                f.write(bytearray(8192))
+            self.storage = open(persist,'r+b')
+            self.storage.seek(0)
+        
     
-
 import typer
 cli = typer.Typer()
 
@@ -127,83 +128,50 @@ def run(
         help="Output format for export, default VAR_CONFIG (VAR_CONFIG|CSV|other)"
     )
 ):
-    conf_data:Dict[str,Any] = { 'before':[],'after':[] }
-    
-    if exports and not export:
-        def __export(ctx: dict):
-            __exports(ctx=ctx,format=format)        
-        conf_data["before"] = [__export]
-    
-    if export:
-        def __export(ctx: dict):
-            __exports(ctx={export:ctx.get(export,{})},filter=export,format=format)
-        conf_data['before']+=[__export]
-        
-    conf_dir = __path(conf_dir,dir=True)
-    conf = __path(conf,dir=False,file=True)
-    db = __path(db,dir=False,file=True)
-    data = __path(data,file=False,dir=True)
-    
     try:
-        if work_dir:
-            os.chdir(work_dir)
-        elif sys.platform!='esp32':
-            import __main__
-            os.chdir(os.path.dirname(__main__.__file__))
+        if work_dir: os.chdir(work_dir)
         logger.debug('Рабочий каталог {cwd}',cwd=os.getcwd())
     except:
         logger.debug('Не удалось сменить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
         pass
     
-    conf_dir = __path(conf_dir,['data','.'],dir=True)
-    db = __path(db,[f'{conf_dir}/krax.csv','krax.csv'],file=True)
-    data = __path(data,'..',dir=True)
-                    
-    conf_data["nocli"] = nocli
-    if cli is not None: conf_data["cli"] = { "port":cli }
-    conf_data["port"] = port
-    conf_data["data"] = data
-    conf_data["driver"] = driver
-    if db: conf_data["db"] = db
+    config  = Config( conf or _path(['krax.json','data/krax.json','krax.yaml','data/krax.yaml'],file=True) )
+    
+    if exports and not export:
+        def __export(ctx: dict):
+            __exports(ctx=ctx,format=format)        
+        config.before += [__export]
+    
+    if export:
+        def __export(ctx: dict):
+            __exports(ctx={export:ctx.get(export,{})},filter=export,format=format)
+        config.before += [__export]
         
-    for conf_file in [conf,'krax.json',f'{conf_dir}/krax.json',f'{conf_dir}/krax.yaml']:
-        try:
-            conf_file = __path(conf_file,file=True)
-            if conf_file:
-                with open(conf_file, 'rb') as f:
-                    if conf_file.endswith('.yaml'):
-                        conf_data.update(yaml.load(f,yaml.FullLoader))            
-                    else:
-                        conf_data.update(json.load(f))
-                logger.debug('Использованы настройки из {f}',f=conf_file)
-                break
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            logger.debug('При загрузки настроек: {e}',e=e)
+    if db: config.db = _path(db,dir=False,file=True) or config.db
+    if data: config.data = _path(data,file=False,dir=True) or config.data
         
-    devices = conf_data.get('platforms',{}).get(sys.platform,{}).get('devices')
-    if devices:
-        conf_data['devices']=devices
-    conf_data["conf_file"] = conf_file
+    if nocli: config.modules = list(filter(lambda x: x['name']!='cli',config.modules ))
+    if cli: config["cli"] = { "port":cli }
+    if port:
+        posto = next((d["name"] for d in config.devices if d.get("driver") == "posto"), None)   #получим имя настройки интерфейса 
+        if posto: config[posto] = { "port": port } #если posto есть, он понимает параметр port
+    if driver:
+        config.devices = list(filter(lambda d: d['name']!='hw',config.devices)) #убрать hw
+        config.devices+= [{ "driver": driver, "name":"hw" }]                    #новый hw
+    
+    return config
 
-    persist = f'{data}/persist.dat'
-    try:
-        storage = open(persist,'r+b')
-    except FileNotFoundError:
-        with open(persist,'w+b') as f:
-            f.write(bytearray(8192))
-        storage = open(persist,'r+b')
-        storage.seek(0)
-    conf_data['storage'] = storage
-        
-    return conf_data
+def config()->ConfigBase:
+    import os
+    main_module = sys.modules.get('__main__')
+    if main_module and main_module.__file__:
+        main_file = os.path.basename(main_module.__file__)
+        if main_file=='krax.py':
+            return cli(standalone_mode=False)
+        else:
+            logger.info(f'Запуск проекта без поддержки cli(из {main_file})')
 
-def platform_init()->dict:
-    try:
-        return cli(standalone_mode=False)
-    except Exception as e:
-        logger.error(f'Неожиданная ошибка: {e}')
-        exit(0)
+    config = Config( )
+    return config
 
-__all__ = ['platform_init']
+__all__ = ['config',Config]
