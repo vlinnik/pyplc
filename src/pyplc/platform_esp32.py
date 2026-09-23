@@ -3,11 +3,11 @@ from pyplc import Config as ConfigBase,_path
 from pyplc.utils.logging import logger
 from typing import Union,List,Optional
 try:
-    from _board import tick
-    def _tick(ctx = None):
-        tick( )
+    from _board import tick as _tick
+    def tick(ctx = None):
+        _tick( )
 except:
-    def _tick():
+    def tick(ctx = None):
         pass
     
 class Config(ConfigBase):

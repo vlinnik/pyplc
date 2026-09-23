@@ -1,1 +1,3 @@
-__available__ = {'krax':'KRAX','posto':'Publisher','modbus.master':'ModbusTCP','modbus.slave':'Publisher'}
+from sys import platform
+
+__available__ = {'krax':'KRAX','posto':'Publisher','modbus.slave':'Publisher','modbus.master':'ModbusTCP'}

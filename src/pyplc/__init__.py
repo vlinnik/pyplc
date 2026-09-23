@@ -90,6 +90,7 @@ class Config(dict):
     after: List[Callable[[Dict[str,Any]],None]]  #функции в конце цикла
     db: str                         #имя файла с переменными IO
     data: str                       #где хранить файлы (persist.dat, persist.json etc)
+    etc: str                        #где искать настроечные файлы (обычно рядом с krax.json)
 
     def __init__(self,path:Optional[str]=None) -> None:
         super().__init__( )
@@ -108,9 +109,9 @@ class Config(dict):
             conf_file = _abspath(path)
             conf_dir = '/'.join(conf_file.split('/')[:-1])
             try:
-                with open(conf_file, 'rb') as f:
+                with open(conf_file, 'r') as f:
                     if conf_file.endswith('.yaml'):
-                        self.update(yaml.load(conf_file,yaml.FullLoader))
+                        self.update(yaml.safe_load(f))
                     else:
                         self.update(json.load(f))
             except OSError:
@@ -119,15 +120,32 @@ class Config(dict):
                 pass
         else:
             conf_dir = os.getcwd( )
-
+        
         if 'platforms' in self and platform in self['platforms']:
             self.update( self['platforms'][platform] )
 
         if 'conf' in self:
             conf_dir = _abspath(self['conf'])
 
+        self.etc = conf_dir
+
         self.db = _path([conf_dir+'/krax.csv','krax.csv'],file=True) or 'krax.csv'
-            
+
+    def update(self, *args, **kwargs):
+        # Эмулируем поведение стандартного dict.update()
+        if args:
+            if len(args) > 1 or len(args)==0:
+                raise TypeError(f"update expected at most 1 argument, got {len(args)}")
+            other = args[0]
+            if hasattr(other, 'keys'):
+                for k in other.keys():
+                    self[k] = other[k]  # Вызывает ваш __setitem__
+            else:
+                for k, v in other:
+                    self[k] = v         # Вызывает ваш __setitem__
+        
+        for k, v in kwargs.items():
+            self[k] = v                 # Вызывает ваш __setitem__            
         
     def __getattr__(self,key):
         try:

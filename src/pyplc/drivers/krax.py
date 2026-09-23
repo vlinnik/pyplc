@@ -4,7 +4,6 @@ from typing import Optional,List
 import sys 
 
 if sys.platform!='esp32':
-    logger.warning('KRAX предназначен для ESP32 платформы, используем заглушку')
     class __KRAXIO():
         def init(self,*args,**kwargs):
             ...

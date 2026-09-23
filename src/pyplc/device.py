@@ -4,6 +4,7 @@ from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8,Channel
 from pyplc.utils.logging import logger
 from pyplc.pou import Attribute,ACL,POU,Var
 import sys
+import re
             
 logger.info('Запуск подсистемы обмена с устройствами')
 
@@ -44,10 +45,11 @@ class IODevice(Protocol):
         ...
 
 class IOMemory(IODevice):
-    def __init__(self,*_,name: Optional[str] = None,size: int = 128,**kwargs):
+    def __init__(self,*_,name: Optional[str] = None,size: int = 128,slots:List[int] = [], **kwargs):
         self.runtime = False
         self.name = name
         self.size = size
+        self.slots= slots
         self.vars:Tuple[VAR_TYPE,...] = ( )
         self.data = array('B',[0x00]*self.size)     #что писать
         self.mask = array('B',[0x00]*self.size)     #бит из data писать только если бит=1
@@ -129,6 +131,32 @@ class IOMemory(IODevice):
         
     def __repr__(self) -> str:
         return f'{type(self).__name__}(name={self.name})'
+    
+    def channel(self,*args, **kwargs):  #потомки должны реализовать (для импорта канала из csv)
+        pass
+        # raise NotImplemented
+    
+    def import_csv(self, path: str):
+        try:
+            vars = 0
+            errs = 0
+            with open(path, 'r') as csv:
+                headers = csv.readline().strip().split(';')  # columns header
+                id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
+                num = re.compile(r'[0-9]+')
+                for info in csv:
+                    try:
+                        info = [i.strip() for i in info.split(';')]
+                        if len(info)<len(headers):
+                            continue
+                        args = { headers[n]:info[n] for n in range(len(info))}
+                        self.channel(**args)
+                        vars = vars+1
+                    except Exception as e:
+                        logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
+                        errs = errs+1
+        except Exception as e:
+            logger.error('Проблема при загрузке {db}: {e}',e=e,db=file)
 
 class IOService(IODevice):
     def __init__(self,*args, name: str, **kwargs):
@@ -241,7 +269,7 @@ class Manager():
             try:
                 return Manager.append(Manager.__drivers__[driver](*args,name=name,**kwargs))
             except Exception as e:
-                logger.warning('При создании {driver} {e}',driver=driver,e=e)
+                logger.exception('При создании {driver}:{e}',driver=driver,e=e,exc_info = e)
         else:
             logger.opt(depth = -1).critical('Драйвер {driver} не доступен: есть {avail}',driver=driver,avail=Manager.__drivers__.keys())
             
@@ -267,7 +295,7 @@ class Manager():
                     logger.info("Подключен драйвер {item}, реализация {name}",item=item,name=cls.__qualname__)
                     Manager.register(item,cls)
             except Exception as e:
-                logger.warning('Подключить драйвер {item} неудалось: {err}',item=item,err=e)
+                logger.warning('Подключить драйвер {item} не удалось: {err}',item=item,err=e)
                 pass
             
 

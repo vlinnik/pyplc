@@ -1,4 +1,5 @@
 from pyModbusTCP.server import ModbusServer as _ModbusServer, DataBank as _DataBank
+from pyModbusTCP.client import ModbusClient as pymodbus
 from pyplc.drivers.modbus import VIEW
 from typing import List
 

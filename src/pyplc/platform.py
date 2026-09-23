@@ -1,5 +1,5 @@
 import sys
-
+import yaml
 from pyplc import Config,_path
 if sys.platform=='esp32':   
     from pyplc.platform_esp32 import config
@@ -111,16 +111,33 @@ def platform_init():
     if 'hw' not in conf: conf['hw'] = {'slots': hw_conf }    #устройство hw специальное, оно default и slots должно иметь
 
     devices = conf.devices
+    init_args = { }
     for decl in devices:
         drv = decl.get('driver')
         if drv is None:
             continue
         name = decl.get('name',drv)
-        init = conf.get( name ,{})
+        if drv not in init_args:
+            try:
+                with open(f'{conf.etc}/{drv}.yaml','r') as etc:
+                    init_args[drv] = yaml.safe_load(etc)
+                logger.info(f'Загружен файл с параметрами для {drv}')
+            except Exception as e:
+                if drv not in ['krax','posto']: 
+                    logger.critical(f'Файл с параметрами для {name}/{drv} {conf.etc}/{drv}.yaml: {e}',exc_info = True)
+                init_args[drv] = { }
+                
+        init = init_args[drv].get( name, { } )
+        
         dev = None
         if drv is not None and (dev:=IO.create(name=name, driver=drv,**init)) is None:
-            logger.warning('Создание {dev} не удалось',dev=decl)
+            logger.critical('Создание {dev} не удалось',dev=decl)
         elif dev is not None:
+            if isinstance(dev,IOMemory):
+                if name=='hw' and (db:=_path([conf.db,f'{conf.etc}/{name}.csv'],file=True)):
+                    dev.import_csv(db)
+                elif (db:=_path(f'{conf.etc}/{name}.csv',file=True)):
+                    dev.import_csv(db)
             globals().update({ name:dev })
             if name=='hw':
                 hw = dev
