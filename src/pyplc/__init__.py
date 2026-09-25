@@ -84,26 +84,28 @@ class Config(dict):
     storage: IOBase                 #куда сохранить persistent
     scanTime: int                   #период работы программы
     slots:List[int]                 #размер памяти под каждый модуль/слот
-    devices: List[Dict[str,str]]    #устройства
+    devices: Dict[str,Any]          #устройства
     modules: List[Dict[str,Any]]    #модули (cli etc)
     before: List[Callable[[Dict[str,Any]],None]] #функции вначале цикла def fn(ctx: dict)
     after: List[Callable[[Dict[str,Any]],None]]  #функции в конце цикла
     db: str                         #имя файла с переменными IO
     data: str                       #где хранить файлы (persist.dat, persist.json etc)
     etc: str                        #где искать настроечные файлы (обычно рядом с krax.json)
+    source: str                     #откуда загружены настройки
 
     def __init__(self,path:Optional[str]=None) -> None:
         super().__init__( )
         self.scanTime = 100
         self.slots = []
-        self.devices = [ {"driver":"krax","name":"hw"},{"driver":"posto","name":"posto"} ]
+        self.devices = { }
         self.modules = [ {'class':'pyplc.utils.cli/CLI','name':'cli','type':'context'} ]
         self.before = [ ]
         self.after = [ ]
         self.data = os.getcwd( )
+        self.source = ''
         
         if not path:
-            path = _path(['krax.json','data/krax.json','data/krax.yaml','krax.yaml'])
+            path = _path(['data/krax.yaml','krax.yaml','krax.json','data/krax.json'])
         
         if path:
             conf_file = _abspath(path)
@@ -114,13 +116,20 @@ class Config(dict):
                         self.update(yaml.safe_load(f))
                     else:
                         self.update(json.load(f))
+                self.source = conf_file
             except OSError:
                 conf_file = None
-            except Exception as e:
-                pass
         else:
             conf_dir = os.getcwd( )
         
+        if 'hw' not in self:
+            self['hw'] = {}
+        if 'posto' not in self:
+            self['posto'] = {}
+            
+        self['hw'].update({'slots':self.slots,'driver':'krax'})
+        self['posto'].update({'driver':'posto'})
+
         if 'platforms' in self and platform in self['platforms']:
             self.update( self['platforms'][platform] )
 
@@ -158,6 +167,8 @@ class Config(dict):
             raise AttributeError(f'{key} not found in dict and attributes')
     def __setitem__(self, name: str, value: Any) -> None:
         if hasattr(self,name):
+            if name=='devices' and isinstance(value,list):#устройства могут быть списком или dict
+                value = {item["name"]: item for item in value}
             setattr(self,name,value)
         return super().__setitem__(name, value)
     def __str__(self):

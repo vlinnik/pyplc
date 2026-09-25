@@ -52,71 +52,31 @@ def __import_by_name(name: str):
         mod = getattr(mod, part)
     return mod
     
-def __import_csv(file:str,slots:List[int],hw: IODevice ):
-    try:
-        vars = 0
-        errs = 0
-        with open(file, 'r') as csv:
-            csv.readline()  # skip column headers
-            id = re.compile(r'[a-zA-Z_]+[a-zA-Z0-9_]*')
-            num = re.compile(r'[0-9]+')
-            for info in csv:
-                try:
-                    info = [i.strip() for i in info.split(';')]
-                    if len(info) < 4:
-                        continue
-                    info = info[:4]
-                    if id.match(info[0]) and num.match(info[-2]) and num.match(info[-1]):
-                        info = [i.strip() for i in info]
-                        slot_n = int(info[-2])
-                        ch_n = int(info[-1])
-                        addr = sum(slots[:slot_n-1])
-                        if info[1].upper( ) == 'DI':
-                            ch = IBool(addr,ch_n-1,info[0])
-                        elif info[1].upper( ) == 'DO':
-                            ch = QBool(addr,ch_n-1,info[0])
-                        elif info[1].upper( ) == 'AI':
-                            ch = IWord(addr+((ch_n-1)<<1),info[0])                               
-                        elif info[1].upper( ) == 'AO':
-                            ch = QWord(addr+((ch_n-1)<<1),info[0])                               
-                        elif info[1].upper( ) == 'CNT8':
-                            ch = ICounter8(addr+ch_n-1,info[0])  
-                        ch.comment = f'S{slot_n:02}C{ch_n:02}'
-                        ch.meta = (slot_n,ch_n)
-                        if hw and isinstance(hw,IOMemory): hw.register(ch, name=info[0])
-                        vars = vars+1
-                except Exception as e:
-                    logger.warning('{info}: при регистрации переменной {e}',e=e, info=info)                    
-                    errs = errs+1
-    except Exception as e:
-        logger.error('Проблема при загрузке {db}: {e}',e=e,db=file)
-
 def platform_init():
     global __devices
-    logger.debug('инициализация pyplc-платформы')
 
     conf = config( ) 
     conf.postinit( )
     if not isinstance(conf,dict):
         logger.warning('Завершение работы: инициализация платформы не вернула dict с параметрами')
         exit(0)
-    
+
+    logger.info(f'Использованы параметры из {conf.source}')
     __cleanup( )
     
     IO.discover()
-
-    #основное устройство IO описано в .hw + .hw.config хранит в каком разделе параметры для инициализации 
-    hw_conf = conf.slots
         
-    if 'hw' not in conf: conf['hw'] = {'slots': hw_conf }    #устройство hw специальное, оно default и slots должно иметь
-
     devices = conf.devices
+    devices.update( {'hw':conf['hw'],'posto':conf['posto']} )
     init_args = { }
-    for decl in devices:
-        drv = decl.get('driver')
-        if drv is None:
-            continue
-        name = decl.get('name',drv)
+    for name,decl in devices.items():
+        if isinstance(decl,dict): 
+            drv = decl.get('driver')
+            if drv is None:
+                continue
+        elif isinstance(decl,str):
+            drv = decl
+            
         if drv not in init_args:
             try:
                 with open(f'{conf.etc}/{drv}.yaml','r') as etc:
@@ -127,10 +87,11 @@ def platform_init():
                     logger.critical(f'Файл с параметрами для {name}/{drv} {conf.etc}/{drv}.yaml: {e}',exc_info = True)
                 init_args[drv] = { }
                 
-        init = init_args[drv].get( name, { } )
+        init = init_args[drv].get( name, conf.get(name,{ }) )   #use inlined device arguments
+        init['driver'] = drv
         
         dev = None
-        if drv is not None and (dev:=IO.create(name=name, driver=drv,**init)) is None:
+        if drv is not None and (dev:=IO.create(name=name,**init)) is None:
             logger.critical('Создание {dev} не удалось',dev=decl)
         elif dev is not None:
             if isinstance(dev,IOMemory):
@@ -175,7 +136,6 @@ def platform_init():
     plc = PYPLC(period=conf.scanTime, pre=conf.before, post=conf.after)
     plc.cleanup = __cleanup
     
-    __import_csv(conf.db,slots=conf.slots,hw=hw )
     try:
         plc.config(persist=conf.storage,conf_dir=conf.data)
     except:

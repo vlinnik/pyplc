@@ -113,7 +113,7 @@ def run(
         help="Dont start CLI interface (2455 port)"
     ),
     driver: str = typer.Option(
-        "krax",
+        None,
         "--driver",
         help="Default driver for IO variables"
     ),
@@ -134,8 +134,12 @@ def run(
     except:
         logger.debug('Не удалось сменить рабочий каталог {w}. Продолжаем в {cwd}',w=work_dir,cwd=os.getcwd())
         pass
-    
-    config  = Config( conf or _path(['krax.json','data/krax.json','krax.yaml','data/krax.yaml'],file=True) )
+
+    try:
+        config  = Config( conf or _path(['data/krax.json','krax.yaml','data/krax.yaml','krax.json'],file=True) )
+    except Exception as e:
+        logger.exception(f'При загрузке конфигурации произошла ошибка',exc_info=e)
+        sys.exit(-1)
     
     if exports and not export:
         def __export(ctx: dict):
@@ -153,8 +157,7 @@ def run(
     if nocli: config.modules = list(filter(lambda x: x['name']!='cli',config.modules ))
     if cli: config["cli"] = { "port":cli }
     if port:
-        posto = next((d["name"] for d in config.devices if d.get("driver") == "posto"), None)   #получим имя настройки интерфейса 
-        if posto: config[posto] = { "port": port } #если posto есть, он понимает параметр port
+        config['posto'].update({ "port": port }) #если posto есть, он понимает параметр port
     if driver:
         config.devices = list(filter(lambda d: d['name']!='hw',config.devices)) #убрать hw
         config.devices+= [{ "driver": driver, "name":"hw" }]                    #новый hw

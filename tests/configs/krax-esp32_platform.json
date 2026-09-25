@@ -10,6 +10,9 @@
     "platforms":{
         "esp32" : {
             "conf" : "data/slave"
+        },
+        "linux" : {
+            "conf" : "data/slave"
         }
     },
     "layout": [],

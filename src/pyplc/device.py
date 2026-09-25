@@ -146,8 +146,9 @@ class IOMemory(IODevice):
                 num = re.compile(r'[0-9]+')
                 for info in csv:
                     try:
+                        if not info.strip(): continue   #skip empty lines
                         info = [i.strip() for i in info.split(';')]
-                        if len(info)<len(headers):
+                        if len(info)>len(headers): 
                             continue
                         args = { headers[n]:info[n] for n in range(len(info))}
                         self.channel(**args)
@@ -295,7 +296,7 @@ class Manager():
                     logger.info("Подключен драйвер {item}, реализация {name}",item=item,name=cls.__qualname__)
                     Manager.register(item,cls)
             except Exception as e:
-                logger.warning('Подключить драйвер {item} не удалось: {err}',item=item,err=e)
+                logger.exception('Подключить драйвер {item} не удалось: {err}',item=item,err=e,exc_info = e)
                 pass
             
 
