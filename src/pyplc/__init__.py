@@ -127,7 +127,7 @@ class Config(dict):
         if 'posto' not in self:
             self['posto'] = {}
             
-        self['hw'].update({'slots':self.slots,'driver':'krax'})
+        self['hw'].update({'slots':self.slots,'driver':self.get('driver','krax')})
         self['posto'].update({'driver':'posto'})
 
         if 'platforms' in self and platform in self['platforms']:

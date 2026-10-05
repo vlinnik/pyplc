@@ -136,7 +136,7 @@ def run(
         pass
 
     try:
-        config  = Config( conf or _path(['data/krax.json','krax.yaml','data/krax.yaml','krax.json'],file=True) )
+        config  = Config( conf or _path(['krax.yaml','data/krax.yaml','krax.json','data/krax.json'],file=True) )
     except Exception as e:
         logger.exception(f'При загрузке конфигурации произошла ошибка',exc_info=e)
         sys.exit(-1)
@@ -161,7 +161,8 @@ def run(
     if driver:
         config.devices = list(filter(lambda d: d['name']!='hw',config.devices)) #убрать hw
         config.devices+= [{ "driver": driver, "name":"hw" }]                    #новый hw
-    
+
+    config.postinit( )
     return config
 
 def config()->ConfigBase:

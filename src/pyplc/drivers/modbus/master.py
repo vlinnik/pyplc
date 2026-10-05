@@ -57,7 +57,7 @@ class ModbusMapping():
     
     def map(self,data: REG_RANGES=[],bits: int=1,rw: bool=False):   #bits = сколько на один регистр бит
         self._used = (self._used+7) & ~0x7  #выровнять по началу байта
-        allocated = list(map( lambda r: REG_RANGE(start=r.start,size=r.size,slave_id=r.slave_id,offset=self.alloc(r.size), user_ctx = r.user_ctx) ,data ))
+        allocated = list(map( lambda r: REG_RANGE(start=r.start,size=r.size,slave_id=r.slave_id,offset=self.alloc(r.size*bits), user_ctx = r.user_ctx) ,data ))
         if bits==1:
             if rw:
                 self._coils +=allocated 
@@ -164,9 +164,13 @@ class ModbusClient(ModbusMapping):
             
         for r in self._inputs:
             start,size,off = r.start,r.size,r.offset
+            self._impl.read_to( r.user_ctx, self._mem)  #type: ignore
     def _write_esp32_impl(self):
         if not self._impl: return
         for r in self._coils:
+            self._impl.write_from(r.user_ctx,self._mem) #type: ignore 
+
+        for r in self._holdings:
             self._impl.write_from(r.user_ctx,self._mem) #type: ignore 
 
     def _write_linux_impl(self):
@@ -202,14 +206,15 @@ class ModbusClient(ModbusMapping):
             self._impl.start( ) #type: ignore
     
 class ModbusTCP(IOMemory):
-    def __init__(self,*_,name: Optional[str] = None,coils: REG_DESC=[],digits: REG_DESC=[], inputs:REG_DESC=[],holdings: REG_DESC=[], size: Optional[int]=None ,host:str,port:int=502, **kwargs ):
+    def __init__(self,*_,name: Optional[str] = None,coils: REG_DESC=[],digits: REG_DESC=[], inputs:REG_DESC=[],holdings: REG_DESC=[], size: Optional[int]=None ,host:str,port:int=502, layout: List[str] = [], slots: List[int]=[],**kwargs ):
         #просто преобразование из параметров 
         _inputs = [ DECL_REG_RANGE(*d) for d in self.cast(inputs) ]
         _digits = [ DECL_REG_RANGE(*d) for d in self.cast(digits) ]
         _holdings = [ DECL_REG_RANGE(*d) for d in self.cast(holdings) ]
         _coils = [ DECL_REG_RANGE(*d) for d in self.cast(coils) ]
-        super().__init__( name=name,size=size or ((sum( b.size for b in _coils)+7)//8 + (sum( b.size for b in _digits)+7)//8 + sum(b.size for b in _inputs)*2 + sum(b.size for b in _holdings)*2 ))
+        super().__init__( name=name,size=size or ((sum( b.size for b in _coils)+7)//8 + (sum( b.size for b in _digits)+7)//8 + sum(b.size for b in _inputs)*2 + sum(b.size for b in _holdings)*2 ), slots = slots)
         self.client:ModbusMapping = ModbusClient( self.mv_data)
+        self.layout = layout
         #распределение по памяти 
         self.client.map( _inputs, 16, False )
         self.client.map( _digits, 1, False)
@@ -241,11 +246,24 @@ class ModbusTCP(IOMemory):
     def __exit__(self, exc_type, exc_value, traceback):
         super().__exit__(exc_type, exc_value, traceback)
         self.client.write( )
-        
-    def channel(self, Name: str, RegType: str, Type: str, AddrHEX:Optional[str]=None,AddrDec:Optional[str]=None,Description: str = '',UnitID:int=1):
+                
+    def channel(self, Name: str, RegType: Optional[str]=None, Type: Optional[str]=None, AddrHEX:Optional[str]=None,AddrDec:Optional[str]=None,Description: str = '',UnitID:int=1,Module: Optional[int]=None,Channel: Optional[int]=None):
         addr = 0
+        RegType = RegType or Type
+        if RegType is None: raise RuntimeError('RegType|Type нужно указать для создания modbus.master канала')
+        
+        RegType=RegType.upper( )
         if AddrHEX: addr = int(AddrHEX,16)
         elif AddrDec: addr = int(AddrDec,10)
+        elif Module and Channel:
+            Module = int(Module)
+            Channel = int(Channel)
+            if not self.layout: raise RuntimeError('Для размещения по Module:Channel нужно задать layout')
+            addr = sum( self.slots[i] for i in range(Module-1) if self.layout[i]==RegType)
+            if RegType in ['AI','AO','INPUT','HOLDING']: addr = addr>>1     #нужно в каналах сколько (slots в байтах)
+            elif RegType in ['DI','DO','DISCRETE','COIL']: addr = addr<<3
+            addr += Channel-1
+            
         ch_n = 0
         if RegType.upper() in ['DISCRETE','DI']:
             if r := self.client.lookup( addr, ModbusClient.T_DISCRETE,unit_id=UnitID):
@@ -257,6 +275,16 @@ class ModbusTCP(IOMemory):
                 start,off = r.start,r.offset>>3    # где начало диапазона (в битах)
                 ch_n = addr-start
                 ch = QBool(off+(ch_n>>3),ch_n % 8,Name)
+        elif RegType.upper() in ['INPUT','AI']:
+            if r := self.client.lookup( addr, ModbusClient.T_INPUT,unit_id=UnitID):
+                start,off = r.start,r.offset>>3    # где начало диапазона (в битах переведем в байты)
+                ch_n = addr-start   
+                ch = IWord(off + (ch_n<<1),Name)
+        elif RegType.upper() in ['HOLDING','AO']:
+            if r := self.client.lookup( addr, ModbusClient.T_HOLDING,unit_id=UnitID):
+                start,off = r.start,r.offset>>3    # где начало диапазона (в битах переведем в байты)
+                ch_n = addr-start   
+                ch = QWord(off + (ch_n<<1),Name)
         else:
             logger.error(f'тип modbus регистра для {Name} {RegType} не поддерживается. Можно DISCRETE/COIL/INPUT/HOLDING/DI/DO/AI/AO')
             return

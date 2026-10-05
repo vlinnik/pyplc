@@ -56,7 +56,6 @@ def platform_init():
     global __devices
 
     conf = config( ) 
-    conf.postinit( )
     if not isinstance(conf,dict):
         logger.warning('Завершение работы: инициализация платформы не вернула dict с параметрами')
         exit(0)

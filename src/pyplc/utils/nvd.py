@@ -136,7 +136,10 @@ class NVManager(SFC):
             item = NVD.info[p.full_id]
             for name,(off,size) in zip(item['properties'],item['layout']):
                 if size!=0:
-                    NVD.__read(source,p,name,off,size)
+                    try:
+                        NVD.__read(source,p,name,off,size)
+                    except Exception as e:
+                        logger.exception(f'Ошибка восстановления {p.full_id}.{name}',exc_info=e)
             
         return True
 
@@ -178,10 +181,13 @@ class NVManager(SFC):
         item = NVD.info[full_id]
         for name,(addr,size) in zip(item['properties'],item['layout']):
             yield
-            value = getattr(p,name)
-            if addr in NVD.cache and NVD.cache[addr]==value:
-                continue
-            NVD.__write(self.target,value,addr,size)
+            try:
+                value = getattr(p,name)
+                if addr in NVD.cache and NVD.cache[addr]==value:
+                    continue
+                NVD.__write(self.target,value,addr,size)
+            except Exception as e:
+                logger.exception(f'Ошибка сохранения {full_id}.{name}',exc_info=e)
         
     def main(self):
         """Цикл работы. Частота создания копий ограничена (не чаще 1 раз/5сек)

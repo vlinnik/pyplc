@@ -20,6 +20,8 @@ class Config(ConfigBase):
         self.after += [tick]            
 
 def config()->ConfigBase:
-    return Config()
+    conf = Config()
+    conf.postinit( )
+    return conf
 
 __all__ = ['config',Config]
