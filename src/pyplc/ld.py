@@ -128,12 +128,13 @@ class ANY(Cell):
     def __init__(self,entry: IEntryCell, *args: Callable[[],bool]):
         super().__init__(entry)
         self._rungs = args
+        self._vals = [False]*len(args)
     def __call__(self,state:bool)->bool:
-        self._vals = [x() for x in self._rungs]
+        self._vals = [x()==True for x in self._rungs]
         self._last = any(self._vals)
         if self._next is not None:
             return self._next( state=self._last and state)
-        return self._last
+        return self._last and state
     def __str__(self):
         return f'─[{"|".join("{:1}".format(v) for v in self._vals)}]─'
 
@@ -197,7 +198,7 @@ class NC(Cell):
             self._last = self._cond()==False
         if self._next is not None:
             return self._next( state=self._last and state)
-        return self._last
+        return self._last and state
     def __str__(self):
         return f'─┤║{self._last:1}║├─'
 
