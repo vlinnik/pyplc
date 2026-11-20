@@ -1,3 +1,17 @@
+pyplc (0.5.2ubuntu1) UNRELEASED; urgency=medium
+
+  [ Linnik V.V ]
+  * fix: LD.__ENTRY.__name__ добавлен (нужен OutVar)
+  * fix: LD.entry() можно как LD()
+  * Тестирование на ESP32
+  * feature: modbus.master драйвер
+  * tests: проверка по тестам
+  * bug: NVD падает при несуществующем аттрибуте
+  * fix: NO/NC не учитывали состояние входное если дальше ничего нет
+  * feature: export --format=yaml + VarDescriptor.tags
+
+ -- vlinnik <vlinnik@mail.ru>  Fri, 20 Nov 2026 15:39:04 +0300
+
 pyplc (0.5.2) resolute; urgency=medium
 
   [ Linnik V.V ]
