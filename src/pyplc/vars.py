@@ -93,18 +93,20 @@ class OutVar(Var):
         super().deactivate()
         
     def __call__(self, value:Optional[T] = None):
-        self.value = value
+        if value is not None: self.value = value 
         self.touched = True
 
 class VarDescriptor:
     """Дескриптор для доступа к элементу объекта-контейнера по индексу."""
 
-    def __init__(self, value: T,cached: bool = False, hidden: bool = False, persistent: bool = False):
+    def __init__(self, value: T,*_,cached: bool = False, hidden: bool = False, persistent: bool = False,**kwargs):
         self.index: int
         self.T = type(value)
         self.init = value
         self.persistent=bool(persistent)
         self.hidden = bool(hidden)
+        self.tags = kwargs  #тэги 
+        self.tags.update( hidden=hidden, persistent=persistent )
 
     def setup(self, index, obj):
         if not isinstance(index, int):
@@ -178,8 +180,8 @@ class StrDescriptor(VarDescriptor):
 
 
 class InputDescriptor(VarDescriptor):
-    def __init__(self, value: T,*_, cached: bool = False, hidden: bool = True, **kwargs):
-        super().__init__(value,cached=cached, hidden=hidden)
+    def __init__(self, value: T,/, cached: bool = False, hidden: bool = True, **kwargs):
+        super().__init__(value,cached=cached, hidden=hidden,*kwargs)
 
     def __set__(self, obj, value: IN):
         if not callable(value) or obj is None:
@@ -189,8 +191,8 @@ class InputDescriptor(VarDescriptor):
         e.input = value
 
 class OutputDescriptor(VarDescriptor):
-    def __init__(self, value: T,*_,cached: bool = False, hidden: bool = True):
-        super().__init__(value,cached=cached,hidden=hidden)
+    def __init__(self, value: T,/,cached: bool = False, hidden: bool = True,**kwargs):
+        super().__init__(value,cached=cached,hidden=hidden,*kwargs)
 
     def __set__(self, obj, value: OUT):
         if self.index is None:

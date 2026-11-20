@@ -44,6 +44,9 @@ def __exports(ctx: dict,prefix:Optional[str]=None,filter:Optional[str]=None,form
     if format=='VAR_CONFIG':
         result.insert(0,'VAR_CONFIG')
         result.append('END_VAR')
+    else:
+        result.insert(0,f'#BEGIN_{(format or "EXPORT").upper()}')
+        result.append(f'#END_{(format or "EXPORT").upper()}')
 
     print('\n'.join(result))
     

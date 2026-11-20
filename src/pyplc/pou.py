@@ -1,5 +1,6 @@
 import time
 import struct
+import re
 from typing import Callable, Optional, Any, Union, List, Protocol, Type, Dict, cast
 from pyplc.attribute import Attribute
 from pyplc.utils.logging import logger
@@ -591,6 +592,27 @@ class Base2(VarObjProto):
                 logger.critical(f'не удалось подключить {key}: {e} ', self)
             except AttributeError:
                 logger.critical(f'аттрибут {key} отсутствует в объекте', self)
+    def tags(self,name: str):
+        """Для дескрипторов возвращает словарь тэгов 
+
+        если класс объявил переменную, например:
+        class Foo(POU):
+            in = POU.var(persistent=True,hidden=True,tag1=True,tag2='some user data')
+            ...
+        x = Foo()
+        то x.tags("in") или Foo.in.tags выдаст {"tag1":True,"tag2":'some user data'}
+
+        Args:
+            attr (str): имя аттрибута-дескриптора
+        """
+        try:
+            attr = getattr(type(self),name)
+            if isinstance(attr,VarDescriptor):
+                return attr.tags
+        except:
+            pass
+        return { }
+        
 
     def __enter__(self):
         for f in self._data_:
@@ -827,7 +849,7 @@ class ACL():
         elif self._strict:
             raise AttributeError
             
-        #return Attribute for accessing 
+        #return Attribute/Var for accessing 
         if hasattr(type(obj),name):
             d: Union[AttrDescriptor,VarDescriptor,POU]=getattr(type(obj),name)
             if isinstance(d,AttrDescriptor):

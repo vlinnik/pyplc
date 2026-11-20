@@ -71,3 +71,8 @@ EMAIL="vlinnik@mail.ru"  gbp dch --debian-branch main
 
 собрать deb
 gbp buildpackage --git-debian-branch=main
+
+## Тесты
+
+Выполнять с ключем forked (иначе тесты мешают друг другу)
+pytest --forked 

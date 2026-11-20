@@ -2,7 +2,7 @@ from array import array
 from typing import  Optional, Union,cast,Protocol,Callable,Type,List,Dict,Tuple,Any
 from pyplc.channel import QBool,QWord,IBool,IWord,ICounter8,Channel
 from pyplc.utils.logging import logger
-from pyplc.pou import Attribute,ACL,POU,Var
+from pyplc.pou import Attribute,ACL,POU,Var,InVar,OutVar
 import sys
 import re
             
@@ -27,6 +27,48 @@ def _typeof(var):
         return 'STRING'
     return f'{type(var)}'
 
+def _access(var):
+    if isinstance(var,IWord) or isinstance(var,IBool) or isinstance(var,ICounter8):
+        return 'r'
+    if isinstance(var,InVar) and var.input is not None: #подключенные переменные input менять бесполезно 
+        return 'r'
+    
+    return 'rw'
+
+def _yaml(data)->List[str]: #для списков с отступом надо
+    import yaml
+    class __IndentedDumper(yaml.SafeDumper):
+        def increase_indent(self, flow=False, indentless=False):
+            return super().increase_indent(flow, False)
+        def ignore_aliases(self, data) -> bool:
+            return True
+    return yaml.dump(data,Dumper=__IndentedDumper,allow_unicode=True,sort_keys=False).splitlines()
+
+def _exclude_tags(obj, **kwargs):
+    if not kwargs:
+        return obj
+
+    def should_exclude(item)->bool:
+        if not isinstance(item, dict):
+            return False
+        # Проверяем, что все ключи из kwargs есть в словаре и их значения совпадают
+        return all(k in item and item[k] == v for k, v in kwargs.items())
+
+    if isinstance(obj, dict):
+        return {
+            k: _exclude_tags(v, **kwargs)
+            for k, v in obj.items()
+            if not should_exclude(v)
+        }
+    elif isinstance(obj, list):
+        return [
+            _exclude_tags(item, **kwargs)
+            for item in obj
+            if not should_exclude(item)
+        ]
+
+    return obj
+    
 @runtime_checkable
 class IODevice(Protocol):
     name: Optional[str]
@@ -60,7 +102,12 @@ class IOMemory(IODevice):
         if format.upper()=='VAR_CONFIG':
             data = self.__data__()
             return [ f'\t{x} AT {self.name}.{x}: {_typeof(data[x]( ))};' for x in data.keys() ]
-        return ''
+        if format.upper()=='YAML':
+            data = self.__data__()
+            data = { self.name:[ { "name":k, "type" : type(v()).__name__ , "access" : _access(v) } for k,v in data.items() ]}
+            return _yaml(data)
+            
+        return []
 
     def get(self,name: str):
         for var in self.vars:
@@ -163,35 +210,47 @@ class IOService(IODevice):
     def __init__(self,*args, name: str, **kwargs):
         self.name = name
         self.ctx = { }
-        self.vars:Dict[str,Attribute] = { }
+        self.vars:Dict[str,Union[Attribute,Var]] = { }
+        self.tree:Dict[ str, Union[List,Dict] ] = { }
         self.acl = ACL()
         self.runtime = False
 
-    def register(self,var: Attribute,*_,name: str):
+    def register(self,var: Union[Attribute,Var],*_,name: str):
         self.vars[name] = var
 
-    def pub(self,pou: POU,*_,name: Optional[str] = None):
+    def pub(self,pou: POU,*_,name: Optional[str] = None)->List:
+        ret = [ ]
         if name is None:
             name = pou.full_id
         for key in sorted(dir(pou)):
             try:
                 attr = self.acl.access(pou,key)
                 if isinstance(attr,Attribute) and (attr.hint & 0x4)==0:
+                    ret += [{"name":key, "type":type(attr()).__name__,"access":"rw"}]
                     self.register(attr,name=f'{name}.{key}')
                 if isinstance(attr,Var):
+                    item:Dict[str,Any] = {"name":key, "type":type(attr.read()).__name__,"access":_access(attr)}
+                    tags = pou.tags(key)
+                    if tags: 
+                        item.update(tags)
+                        
+                    ret += [item]
                     self.register(attr,name=f'{name}.{key}')
                 if isinstance(attr,POU) and key!='parent' and attr.parent is pou:
-                    self.pub(attr,name=f'{name}.{key}')
+                    ret += [{key : self.pub(attr,name=f'{name}.{key}') }]
             except Exception as e:
                 pass
+        return ret
 
     def start(self,ctx: dict):
         for key in sorted(ctx.keys()):
             val = ctx[key]
             if isinstance(val,POU):
-                self.pub(val,name=key)
+                self.tree[ key ] = self.pub(val,name=key)
             if isinstance(val,Attribute):
+                self.tree[ key ] = { "type":type(val()).__name__,"access":"rw" }
                 self.register(val,name=key)
+            if key in self.tree and not self.tree[key]: self.tree.pop(key)
         self.ctx = ctx  
 
     def stop(self,*args, **kwargs):
@@ -214,11 +273,13 @@ class IOService(IODevice):
         return f'{type(self).__name__}(name="{self.name}")'
 
     def exports(self,*args,format:str = 'VAR_CONFIG',**kwargs)->List[str]:
-        if format.upper()!='VAR_CONFIG':
-            return ''
+        if format.upper()=='YAML':
+            return _yaml(_exclude_tags(self.tree,hidden=True))
         
-        data = self.__data__()
-        return [ f'\t{x.upper().replace('.','_')} AT {x}: {_typeof(data[x])};' for x in data.keys() ]
+        if format.upper()=='VAR_CONFIG':
+            data = self.__data__()
+            return [ f'\t{x.upper().replace('.','_')} AT {x}: {_typeof(data[x])};' for x in data.keys() ]
+        return []
         
 
 class Manager():
