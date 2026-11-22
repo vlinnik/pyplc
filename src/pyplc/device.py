@@ -104,7 +104,7 @@ class IOMemory(IODevice):
             return [ f'\t{x} AT {self.name}.{x}: {_typeof(data[x]( ))};' for x in data.keys() ]
         if format.upper()=='YAML':
             data = self.__data__()
-            data = { self.name:[ { "name":k, "type" : type(v()).__name__ , "access" : _access(v) } for k,v in data.items() ]}
+            data = { self.name: { k : {"type" : type(v()).__name__ , "access" : _access(v) } for k,v in data.items()} }
             return _yaml(data)
             
         return []
@@ -218,26 +218,26 @@ class IOService(IODevice):
     def register(self,var: Union[Attribute,Var],*_,name: str):
         self.vars[name] = var
 
-    def pub(self,pou: POU,*_,name: Optional[str] = None)->List:
-        ret = [ ]
+    def pub(self,pou: POU,*_,name: Optional[str] = None)->Dict[str,Any]:
+        ret = { }
         if name is None:
             name = pou.full_id
         for key in sorted(dir(pou)):
             try:
                 attr = self.acl.access(pou,key)
                 if isinstance(attr,Attribute) and (attr.hint & 0x4)==0:
-                    ret += [{"name":key, "type":type(attr()).__name__,"access":"rw"}]
+                    ret[key] = {"type":type(attr()).__name__,"access":"rw"}
                     self.register(attr,name=f'{name}.{key}')
                 if isinstance(attr,Var):
-                    item:Dict[str,Any] = {"name":key, "type":type(attr.read()).__name__,"access":_access(attr)}
+                    item:Dict[str,Any] = { "type":type(attr.read()).__name__,"access":_access(attr)}
                     tags = pou.tags(key)
                     if tags: 
                         item.update(tags)
                         
-                    ret += [item]
+                    ret[key] = item
                     self.register(attr,name=f'{name}.{key}')
                 if isinstance(attr,POU) and key!='parent' and attr.parent is pou:
-                    ret += [{key : self.pub(attr,name=f'{name}.{key}') }]
+                    ret[key] = self.pub(attr,name=f'{name}.{key}')
             except Exception as e:
                 pass
         return ret

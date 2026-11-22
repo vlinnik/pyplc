@@ -1,4 +1,4 @@
-pyplc (0.5.2ubuntu1) UNRELEASED; urgency=medium
+pyplc (0.5.3) UNRELEASED; urgency=medium
 
   [ Linnik V.V ]
   * fix: LD.__ENTRY.__name__ добавлен (нужен OutVar)
@@ -10,7 +10,10 @@ pyplc (0.5.2ubuntu1) UNRELEASED; urgency=medium
   * fix: NO/NC не учитывали состояние входное если дальше ничего нет
   * feature: export --format=yaml + VarDescriptor.tags
 
- -- vlinnik <vlinnik@mail.ru>  Fri, 20 Nov 2026 15:39:04 +0300
+  [ vlinnik ]
+  * UNRELEASED
+
+ -- vlinnik <vlinnik@mail.ru>  Fri, 20 Nov 2026 15:41:28 +0300
 
 pyplc (0.5.2) resolute; urgency=medium
 
