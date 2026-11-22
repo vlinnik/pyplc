@@ -1,4 +1,4 @@
-pyplc (0.5.3) UNRELEASED; urgency=medium
+pyplc (0.5.4) UNRELEASED; urgency=medium
 
   [ Linnik V.V ]
   * fix: LD.__ENTRY.__name__ добавлен (нужен OutVar)
@@ -12,8 +12,9 @@ pyplc (0.5.3) UNRELEASED; urgency=medium
 
   [ vlinnik ]
   * UNRELEASED
+  * UNRELEASED
 
- -- vlinnik <vlinnik@mail.ru>  Fri, 20 Nov 2026 15:41:28 +0300
+ -- vlinnik <vlinnik@mail.ru>  Sun, 22 Nov 2026 08:34:06 +0300
 
 pyplc (0.5.2) resolute; urgency=medium
 
