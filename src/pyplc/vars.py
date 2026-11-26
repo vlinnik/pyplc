@@ -180,7 +180,7 @@ class StrDescriptor(VarDescriptor):
 
 
 class InputDescriptor(VarDescriptor):
-    def __init__(self, value: T,/, cached: bool = False, hidden: bool = True, **kwargs):
+    def __init__(self, value: T,*_, cached: bool = False, hidden: bool = True, **kwargs):
         super().__init__(value,cached=cached, hidden=hidden,*kwargs)
 
     def __set__(self, obj, value: IN):
@@ -191,7 +191,7 @@ class InputDescriptor(VarDescriptor):
         e.input = value
 
 class OutputDescriptor(VarDescriptor):
-    def __init__(self, value: T,/,cached: bool = False, hidden: bool = True,**kwargs):
+    def __init__(self, value: T,*_,cached: bool = False, hidden: bool = True,**kwargs):
         super().__init__(value,cached=cached,hidden=hidden,*kwargs)
 
     def __set__(self, obj, value: OUT):
